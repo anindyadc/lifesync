@@ -1,11 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IndianRupee, CreditCard, TrendingUp, Trash2, Plus, Banknote, Pencil, LayoutList, PieChart, BarChart3 } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { 
+  IndianRupee, CreditCard, TrendingUp, Trash2, Plus, 
+  Banknote, Pencil, LayoutList, PieChart, BarChart3, 
+  Download, FileText 
+} from 'lucide-react';
+import { 
+  collection, addDoc, updateDoc, deleteDoc, doc, 
+  onSnapshot, serverTimestamp, Timestamp 
+} from 'firebase/firestore';
+import { db, auth } from '../../lib/firebase';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import ConfirmModal from '../../components/ConfirmModal';
+import { jsPDF } from 'jspdf';
+// FIX: Import as a function
+import autoTable from 'jspdf-autotable';
 
-// --- Constants (same as before) ---
+// --- Constants ---
 const CATEGORIES = [
   { id: 'food', label: 'Food & Dining', color: '#f97316', bg: 'bg-orange-100 text-orange-600' },
   { id: 'travel', label: 'Travel', color: '#3b82f6', bg: 'bg-blue-100 text-blue-600' },
@@ -22,7 +32,7 @@ const PAYMENT_MODES = [
   { id: 'card', label: 'Card', icon: CreditCard },
 ];
 
-// --- Local Components (DonutChart, WeeklyBarChart same as before) ---
+// --- Local Components ---
 const DonutChart = ({ data, total }) => {
   if (total === 0) return <div className="relative w-48 h-48 mx-auto flex items-center justify-center bg-gray-50 rounded-full border-2 border-dashed border-gray-200"><span className="text-gray-400 text-xs">No Data</span></div>;
   let currentDeg = 0;
@@ -92,6 +102,49 @@ const WalletWatchApp = ({ user }) => {
   const handleEdit = (exp) => { setEditingId(exp.id); setAmount(exp.amount); setDescription(exp.description); setCategory(exp.category); setPaymentMode(exp.paymentMode); const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); const offset = d.getTimezoneOffset(); const localDate = new Date(d.getTime() - (offset*60*1000)); setDate(localDate.toISOString().split('T')[0]); setView('add'); };
   const resetForm = () => { setEditingId(null); setAmount(''); setDescription(''); setCategory(CATEGORIES[0].id); setPaymentMode(PAYMENT_MODES[0].id); setDate(new Date().toISOString().split('T')[0]); };
 
+  // --- Export Logic ---
+  const exportToCSV = () => {
+    const headers = ['Date', 'Description', 'Category', 'Mode', 'Amount'];
+    const rows = expenses.map(e => [
+      formatDate(e.date),
+      `"${(e.description || '').replace(/"/g, '""')}"`,
+      CATEGORIES.find(c => c.id === e.category)?.label || e.category,
+      PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
+      e.amount
+    ].join(','));
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "expenses_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.text("WalletWatch Expenses Report", 14, 16);
+      // FIX: Call autoTable as a function, passing 'doc' as the first argument
+      autoTable(doc, {
+        head: [['Date', 'Description', 'Category', 'Mode', 'Amount (INR)']],
+        body: expenses.map(e => [
+          formatDate(e.date),
+          e.description,
+          CATEGORIES.find(c => c.id === e.category)?.label || e.category,
+          PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
+          `INR ${Number(e.amount).toLocaleString('en-IN')}` 
+        ]),
+        startY: 20,
+      });
+      doc.save("expenses_report.pdf");
+    } catch (err) {
+      console.error("PDF Export failed:", err);
+      alert("Failed to export PDF. Please check console for details.");
+    }
+  };
+
   const currentMonthExpenses = useMemo(() => { const now = new Date(); return expenses.filter(exp => { const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }); }, [expenses]);
   const totalMonthly = currentMonthExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const categoryBreakdown = useMemo(() => { const breakdown = {}; currentMonthExpenses.forEach(exp => { breakdown[exp.category] = (breakdown[exp.category] || 0) + Number(exp.amount); }); return Object.entries(breakdown).map(([catId, total]) => ({ id: catId, total, ...CATEGORIES.find(c => c.id === catId) || { label: 'Unknown', color: '#ccc' } })).sort((a, b) => b.total - a.total); }, [currentMonthExpenses]);
@@ -100,11 +153,16 @@ const WalletWatchApp = ({ user }) => {
     <div className="space-y-6">
       <ConfirmModal isOpen={!!deleteId} title="Delete Expense" message="Permanently remove this transaction?" onConfirm={confirmDelete} onCancel={() => setDeleteId(null)} />
       
-      {/* Navigation */}
-      <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {[{ id: 'dashboard', icon: PieChart, label: 'Overview' }, { id: 'history', icon: LayoutList, label: 'History' }, { id: 'add', icon: Plus, label: 'Add New' }].map(tab => (
-          <button key={tab.id} onClick={() => { if(tab.id === 'add') resetForm(); setView(tab.id); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><tab.icon size={16} /> {tab.label}</button>
-        ))}
+      <div className="flex justify-between items-center bg-slate-100 p-1 rounded-xl">
+        <div className="flex space-x-1">
+          {[{ id: 'dashboard', icon: PieChart, label: 'Overview' }, { id: 'history', icon: LayoutList, label: 'History' }, { id: 'add', icon: Plus, label: 'Add New' }].map(tab => (
+            <button key={tab.id} onClick={() => { if(tab.id === 'add') resetForm(); setView(tab.id); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><tab.icon size={16} /> {tab.label}</button>
+          ))}
+        </div>
+        <div className="flex gap-2 pr-2">
+          <button onClick={exportToCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export CSV"><FileText size={16}/></button>
+          <button onClick={exportToPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export PDF"><Download size={16}/></button>
+        </div>
       </div>
 
       {view === 'dashboard' && (

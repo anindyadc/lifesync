@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckSquare, TrendingUp, Plus, X, Tag, Calendar, Timer, Edit2, Trash2, ListTodo, AlertCircle, Check, Loader2 } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { 
+  CheckSquare, TrendingUp, Plus, X, Tag, Calendar, Timer, 
+  Edit2, Trash2, ListTodo, AlertCircle, Check, Loader2, Download, FileText 
+} from 'lucide-react';
+import { 
+  collection, addDoc, updateDoc, deleteDoc, doc, 
+  onSnapshot, serverTimestamp 
+} from 'firebase/firestore';
+import { db, auth } from '../../lib/firebase';
 import { formatDuration } from '../../lib/utils';
+import { jsPDF } from 'jspdf';
+// FIX: Import as a function
+import autoTable from 'jspdf-autotable';
 
-// ... (StatCard and SimpleDonutChart components remain the same as previous)
+// --- Local Components ---
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
     <div className="flex justify-between items-start">
@@ -24,7 +33,6 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
 
 const SimpleDonutChart = ({ data }) => {
   const total = data.reduce((acc, item) => acc + item.value, 0);
-  let cumulativePercent = 0;
   if (total === 0) return <div className="h-40 flex items-center justify-center text-slate-400 text-sm">No data available</div>;
   
   const getCoordinatesForPercent = (percent) => {
@@ -33,6 +41,7 @@ const SimpleDonutChart = ({ data }) => {
     return [x, y];
   };
 
+  let cumulativePercent = 0;
   const slices = data.map((slice) => {
     const startPercent = cumulativePercent;
     const slicePercent = slice.value / total;
@@ -71,7 +80,7 @@ const TaskFlowApp = ({ user }) => {
   const [logTimeAmount, setLogTimeAmount] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const APP_ID = 'default-app-id'; // Use default-app-id to match old records
+  const APP_ID = 'default-app-id';
 
   useEffect(() => {
     if (!user) return;
@@ -109,14 +118,50 @@ const TaskFlowApp = ({ user }) => {
     }
   };
 
-  // ... (Keep helper functions: addSubtask, toggleSubtask, etc. same as before)
   const addSubtask = () => { if(newSubtask.trim()){ setFormData({...formData, subtasks: [...formData.subtasks, {id: crypto.randomUUID(), title: newSubtask, completed: false}]}); setNewSubtask(''); }};
   const toggleSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.map(s => s.id === id ? {...s, completed: !s.completed} : s)});
   const removeSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.filter(s => s.id !== id)});
   const openEditModal = (task) => { setFormData({...task, subtasks: task.subtasks || [], timeSpent: task.timeSpent || 0}); setEditingId(task.id); setModalTab('details'); setIsModalOpen(true); };
   const closeModal = () => { setIsModalOpen(false); setEditingId(null); setFormData({title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', category: 'General', subtasks: [], timeSpent: 0}); setModalTab('details'); };
 
-  // Stats Logic (Same as before)
+  // --- Export Logic ---
+  const exportToCSV = () => {
+    const headers = ['Title', 'Status', 'Priority', 'Category', 'Due Date', 'Time Spent (mins)'];
+    const rows = tasks.map(t => [
+      `"${(t.title || '').replace(/"/g, '""')}"`,
+      t.status,
+      t.priority,
+      t.category,
+      t.dueDate || '',
+      t.timeSpent
+    ].join(','));
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "tasks_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.text("TaskFlow Report", 14, 16);
+      // FIX: Call autoTable as a function
+      autoTable(doc, {
+        head: [['Title', 'Status', 'Priority', 'Category', 'Time Spent']],
+        body: tasks.map(t => [t.title, t.status, t.priority, t.category, formatDuration(t.timeSpent)]),
+        startY: 20,
+      });
+      doc.save("tasks_report.pdf");
+    } catch (err) {
+      console.error("PDF Export failed:", err);
+      alert("Failed to export PDF. Please check console for details.");
+    }
+  };
+
   const stats = useMemo(() => {
     const total = tasks.length;
     const completed = tasks.filter(t => t.status === 'done').length;
@@ -140,11 +185,16 @@ const TaskFlowApp = ({ user }) => {
 
   return (
     <div className="space-y-6">
-      {/* Navigation */}
-      <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {['dashboard', 'tasks'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'tasks' ? 'My Tasks' : tab}</button>
-        ))}
+      <div className="flex justify-between items-center bg-slate-100 p-1 rounded-xl">
+        <div className="flex space-x-1">
+          {['dashboard', 'tasks'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab === 'tasks' ? 'My Tasks' : tab}</button>
+          ))}
+        </div>
+        <div className="flex gap-2 pr-2">
+          <button onClick={exportToCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export CSV"><FileText size={16}/></button>
+          <button onClick={exportToPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export PDF"><Download size={16}/></button>
+        </div>
       </div>
 
       {activeTab === 'dashboard' && (

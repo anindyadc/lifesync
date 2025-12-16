@@ -1,48 +1,74 @@
 import React, { useState } from 'react';
-import { LayoutGrid, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { LayoutGrid, Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Layers } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
-const AuthScreen = ({ onLogin }) => {
+const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
 
-  const handleAuth = (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      onLogin({ 
-        name: isLogin ? 'Demo User' : 'New User', 
-        email: 'demo@example.com' 
-      });
+    setError('');
+
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        if (name) {
+          await updateProfile(userCredential.user, { displayName: name });
+        }
+      }
+      // Auth state change is handled in App.jsx via onAuthStateChanged
+    } catch (err) {
+      console.error("Auth Error:", err);
+      let msg = "Authentication failed.";
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
+      if (err.code === 'auth/email-already-in-use') msg = "Email is already registered.";
+      if (err.code === 'auth/weak-password') msg = "Password should be at least 6 characters.";
+      setError(msg);
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
       <div className="bg-white max-w-md w-full rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-        {/* Header */}
         <div className="bg-indigo-600 p-8 text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full bg-indigo-500 opacity-20 transform -skew-y-6 origin-top-left"></div>
           <div className="relative z-10">
             <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-lg">
-              <LayoutGrid className="text-white" size={32} />
+              <Layers className="text-white" size={32} />
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Project OS</h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight">LifeSync</h1>
             <p className="text-indigo-100 mt-2 font-medium">
               {isLogin ? 'Welcome back to your workspace' : 'Join the platform today'}
             </p>
           </div>
         </div>
         
-        {/* Form */}
         <div className="p-8">
           <form onSubmit={handleAuth} className="space-y-5">
+            {error && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <AlertCircle size={16} />
+                {error}
+              </div>
+            )}
+
             {!isLogin && (
               <div className="relative group">
                 <User className="absolute left-3 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
                 <input 
                   type="text" 
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Full Name"
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                 />
@@ -53,7 +79,8 @@ const AuthScreen = ({ onLogin }) => {
               <Mail className="absolute left-3 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input 
                 type="email" 
-                defaultValue="demo@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email Address"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
               />
@@ -63,29 +90,19 @@ const AuthScreen = ({ onLogin }) => {
               <Lock className="absolute left-3 top-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
               <input 
                 type="password" 
-                defaultValue="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
               />
             </div>
-
-            {/* Remember Me & Forgot Password */}
-            {isLogin && (
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2 cursor-pointer text-slate-600">
-                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                  <span>Remember me</span>
-                </label>
-                <a href="#" className="text-indigo-600 font-medium hover:text-indigo-700">Forgot Password?</a>
-              </div>
-            )}
 
             <button 
               disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
             >
               {loading ? (
-                <span>Processing...</span>
+                <Loader2 className="animate-spin" size={20} />
               ) : (
                 <>
                   <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
@@ -95,7 +112,6 @@ const AuthScreen = ({ onLogin }) => {
             </button>
           </form>
 
-          {/* Toggle Login/Signup */}
           <div className="mt-8 text-center">
             <p className="text-slate-500 text-sm">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
@@ -114,4 +130,3 @@ const AuthScreen = ({ onLogin }) => {
 };
 
 export default AuthScreen;
-

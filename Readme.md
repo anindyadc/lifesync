@@ -78,6 +78,7 @@ Now we will create the React application on your computer and configure Tailwind
    Install Firebase, icons, Tailwind CSS, and the deployment tool:  
    npm install firebase lucide-react  
    npm install \-D tailwindcss postcss autoprefixer gh-pages
+   npm install -D tailwindcss@3.4.17 postcss autoprefixer
 
 3. Initialize Tailwind CSS:  
    Generate the configuration files:  

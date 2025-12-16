@@ -2,6 +2,7 @@
   "name": "lifesync",
   "private": true,
   "version": "0.0.0",
+  "homepage": "https://anindyadc.github.io/lifesync",
   "type": "module",
   "scripts": {
     "dev": "vite",

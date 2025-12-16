@@ -78,7 +78,6 @@ Now we will create the React application on your computer and configure Tailwind
    Install Firebase, icons, Tailwind CSS, and the deployment tool:  
    npm install firebase lucide-react  
    npm install \-D tailwindcss postcss autoprefixer gh-pages
-   npm install -D tailwindcss@3.4.17 postcss autoprefixer
 
 3. Initialize Tailwind CSS:  
    Generate the configuration files:  
@@ -158,6 +157,15 @@ Now we will create the React application on your computer and configure Tailwind
 8. **Run Locally:**  
    npm run dev
 
+   Troubleshooting: Blank Page  
+   If the page loads but is completely white/blank:  
+   1. Open index.html in your project root.  
+   2. Ensure the \<body\> tag contains this exact script line:  
+      \<div id="root"\>\</div\>  
+      \<script type="module" src="/src/main.jsx"\>\</script\>
+
+   3. If the script line is missing or different, update it to match above.
+
 ## **Phase 4: GitHub Repository & Secrets**
 
 To secure your app online, we will store the database credentials in GitHub's secure vault.
@@ -213,7 +221,7 @@ on:
     branches: \[ main \]
 
 permissions:  
-  contents: read  
+  contents: write \# This is CRITICAL for pushing to the branch  
   pages: write  
   id-token: write
 
@@ -249,9 +257,25 @@ jobs:
 
 3. **Push Workflow to Deploy:**  
    git add .  
-   git commit \-m "Add deployment workflow"  
+   git commit \-m "Update deployment permissions"  
    git push
 
+   Troubleshooting: workflow scope error  
+   If you see refusing to allow a Personal Access Token to create or update workflow, your token lacks permission.  
+   1. Go to GitHub **Settings** \> **Developer Settings** \> **Personal Access Tokens** \> **Tokens (classic)**.  
+   2. Select your token (or create a new one).  
+   3. Check the **workflow** box (Controls GitHub Actions workflows).  
+   4. Save/Generate the token.  
+   5. Use this updated token as your password when running git push.
+
+   Troubleshooting: Permission denied (403) / Exit Code 128If the GitHub Action fails with remote: Permission to ... denied to github-actions\[bot\], the bot lacks write permissions.
+
+   1. Go to your repository on GitHub.  
+   2. Click **Settings** \> **Actions** \> **General**.  
+   3. Scroll to **Workflow permissions**.  
+   4. Select **Read and write permissions**.  
+   5. Click **Save**.  
+   6. Go to the **Actions** tab, click the failed run, and click **Re-run all jobs**.  
 4. **Finalize on GitHub:**  
    * Go to **Settings** \> **Pages**.  
    * Under "Build and deployment", ensure the source is "Deploy from a branch" and the branch is set to gh-pages / root.  

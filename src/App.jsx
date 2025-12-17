@@ -4,25 +4,25 @@ import {
   User, 
   LogOut, 
   CheckCircle, 
-  Wallet, // Updated icon
-  Server, // New icon for ServerLog
+  Wallet, 
+  Server, 
   Loader2 
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './lib/firebase';
 
-// Components
+// Shared Components
 import AuthScreen from './components/AuthScreen';
 
 // App Modules
 import TaskFlowApp from './apps/taskflow'; 
 import WalletWatchApp from './apps/walletwatch'; 
-import ChangeManagerApp from './apps/changemanager'; // New App
+import ChangeManagerApp from './apps/changemanager'; 
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeApp, setActiveApp] = useState('dashboard');
+  const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'taskflow', 'walletwatch', 'changemanager'
 
   // Monitor Auth State
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function App() {
               <p className="text-slate-500 text-sm relative z-10">Track expenses and monitor your budget.</p>
             </button>
 
-            {/* ServerLog Card */}
+            {/* ChangeLog Card */}
             <button 
               onClick={() => setActiveApp('changemanager')}
               className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-100 hover:border-blue-200 transition-all text-left group relative overflow-hidden"
@@ -98,7 +98,7 @@ export default function App() {
               <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform relative z-10">
                 <Server size={24} />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">ServerLog</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">ChangeLog</h3>
               <p className="text-slate-500 text-sm relative z-10">Track IT infrastructure changes and history.</p>
             </button>
           </div>
@@ -146,7 +146,7 @@ export default function App() {
               onClick={() => setActiveApp('changemanager')} 
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'changemanager' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'hover:bg-slate-800 hover:text-white'}`}
             >
-              <Server size={18} /> ServerLog
+              <Server size={18} /> ChangeLog
             </button>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default function App() {
         <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
-              {activeApp === 'dashboard' ? 'Workspace Overview' : activeApp === 'changemanager' ? 'ServerLog' : activeApp}
+              {activeApp === 'dashboard' ? 'Workspace Overview' : activeApp === 'changemanager' ? 'ChangeLog' : activeApp}
             </h1>
             <p className="text-slate-500 mt-1">
               {activeApp === 'dashboard' 

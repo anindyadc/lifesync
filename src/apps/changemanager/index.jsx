@@ -64,7 +64,7 @@ const ChangeManagerApp = ({ user }) => {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600"><Server size={20}/></div>
           <div>
-            <h2 className="font-bold text-slate-800">ServerLog</h2>
+            <h2 className="font-bold text-slate-800">ChangeLog</h2>
             <p className="text-xs text-slate-500">Track Infrastructure Changes</p>
           </div>
         </div>

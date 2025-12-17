@@ -10,8 +10,8 @@ import {
 import { db, auth } from '../../lib/firebase';
 import { formatDuration } from '../../lib/utils';
 import { jsPDF } from 'jspdf';
-// FIX: Import as a function
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 // --- Local Components ---
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
@@ -56,7 +56,8 @@ const SimpleDonutChart = ({ data }) => {
 
   return (
     <div className="h-40 relative flex items-center justify-center">
-       <svg viewBox="-1 -1 2 2" className="w-32 h-32 -rotate-90 transform">
+       {/* Added style={{ overflow: 'visible' }} for better PDF capture stability */}
+       <svg viewBox="-1 -1 2 2" className="w-32 h-32 -rotate-90 transform" style={{ overflow: 'visible' }}>
         {slices.map((slice, i) => <path d={slice.path} fill={slice.color} key={i} />)}
         <circle cx="0" cy="0" r="0.6" fill="white" />
       </svg>
@@ -70,6 +71,7 @@ const TaskFlowApp = ({ user }) => {
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [exporting, setExporting] = useState(false);
   
   const [formData, setFormData] = useState({ 
     title: '', description: '', priority: 'medium', status: 'todo', 
@@ -145,20 +147,65 @@ const TaskFlowApp = ({ user }) => {
     document.body.removeChild(link);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    setExporting(true);
     try {
       const doc = new jsPDF();
-      doc.text("TaskFlow Report", 14, 16);
-      // FIX: Call autoTable as a function
+      
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(79, 70, 229); // Indigo
+      doc.text("TaskFlow Report", 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 30);
+
+      let yPos = 40;
+
+      // Capture Dashboard (Visuals)
+      const chartElement = document.getElementById('taskflow-dashboard-charts');
+      
+      if (chartElement && activeTab === 'dashboard') {
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text("Dashboard Overview", 14, yPos);
+        yPos += 5;
+
+        // Ensure scale is high for crisp text, but not too high to crash
+        const canvas = await html2canvas(chartElement, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 180; 
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        doc.addImage(imgData, 'PNG', 14, yPos, imgWidth, imgHeight);
+        yPos += imgHeight + 10;
+      } else {
+        doc.setFontSize(10);
+        doc.setTextColor(150);
+        doc.text("(Dashboard charts not visible in current view)", 14, yPos);
+        yPos += 10;
+      }
+
+      // Table
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("Task Details", 14, yPos);
+      yPos += 5;
+
       autoTable(doc, {
         head: [['Title', 'Status', 'Priority', 'Category', 'Time Spent']],
         body: tasks.map(t => [t.title, t.status, t.priority, t.category, formatDuration(t.timeSpent)]),
-        startY: 20,
+        startY: yPos,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [79, 70, 229] }
       });
       doc.save("tasks_report.pdf");
     } catch (err) {
       console.error("PDF Export failed:", err);
       alert("Failed to export PDF. Please check console for details.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -193,40 +240,45 @@ const TaskFlowApp = ({ user }) => {
         </div>
         <div className="flex gap-2 pr-2">
           <button onClick={exportToCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export CSV"><FileText size={16}/></button>
-          <button onClick={exportToPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export PDF"><Download size={16}/></button>
+          <button onClick={exportToPDF} disabled={exporting} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200 disabled:opacity-50" title="Export PDF">
+            {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
+          </button>
         </div>
       </div>
 
       {activeTab === 'dashboard' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Total Tasks" value={stats.total} subtext={`${stats.completed} Completed`} icon={CheckSquare} colorClass="bg-blue-100 text-blue-600" />
-            <StatCard title="Total Time" value={formatDuration(stats.totalTimeSpent)} subtext="Logged hours" icon={Timer} colorClass="bg-emerald-100 text-emerald-600" />
-            <StatCard title="Subtasks" value={`${stats.completedSubtasks}/${stats.totalSubtasks}`} subtext="Progress" icon={ListTodo} colorClass="bg-amber-100 text-amber-600" />
-            <StatCard title="Efficiency" value={`${stats.completionRate}%`} subtext="Completion rate" icon={TrendingUp} colorClass="bg-indigo-100 text-indigo-600" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-1">
-              <h3 className="font-bold text-slate-800 mb-6">Task Priority</h3>
-              <div className="flex flex-col items-center">
-                <SimpleDonutChart data={priorityData} />
-                <div className="flex gap-4 mt-6">{priorityData.map((d) => (<div key={d.name} className="flex items-center gap-2 text-xs font-medium text-slate-600"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>{d.name}</div>))}</div>
-              </div>
+          {/* WRAPPER FOR PDF CAPTURE */}
+          <div id="taskflow-dashboard-charts" className="space-y-6 bg-slate-50 p-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard title="Total Tasks" value={stats.total} subtext={`${stats.completed} Completed`} icon={CheckSquare} colorClass="bg-blue-100 text-blue-600" />
+              <StatCard title="Total Time" value={formatDuration(stats.totalTimeSpent)} subtext="Logged hours" icon={Timer} colorClass="bg-emerald-100 text-emerald-600" />
+              <StatCard title="Subtasks" value={`${stats.completedSubtasks}/${stats.totalSubtasks}`} subtext="Progress" icon={ListTodo} colorClass="bg-amber-100 text-amber-600" />
+              <StatCard title="Efficiency" value={`${stats.completionRate}%`} subtext="Completion rate" icon={TrendingUp} colorClass="bg-indigo-100 text-indigo-600" />
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col overflow-hidden">
-               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50"><h3 className="font-bold text-slate-800">Detailed Report</h3></div>
-               <div className="flex-1 overflow-x-auto">
-                 <table className="w-full text-left text-sm text-slate-600">
-                   <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100"><tr><th className="px-6 py-3">Task</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Progress</th><th className="px-6 py-3">Time</th></tr></thead>
-                   <tbody className="divide-y divide-slate-50">
-                     {tasks.slice(0, 5).map(task => {
-                       const subDone = task.subtasks?.filter(s => s.completed).length || 0; const subTotal = task.subtasks?.length || 0;
-                       return (<tr key={task.id} className="hover:bg-slate-50"><td className="px-6 py-3 font-medium text-slate-800">{task.title}</td><td className="px-6 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs capitalize ${getStatusColor(task.status)}`}>{task.status.replace('-', ' ')}</span></td><td className="px-6 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${subTotal ? (subDone/subTotal)*100 : 0}%` }}/></div><span className="text-xs">{subDone}/{subTotal}</span></div></td><td className="px-6 py-3 font-mono">{formatDuration(task.timeSpent || 0)}</td></tr>);
-                     })}
-                     {tasks.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400">No tasks yet</td></tr>}
-                   </tbody>
-                 </table>
-               </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-1">
+                <h3 className="font-bold text-slate-800 mb-6">Task Priority</h3>
+                <div className="flex flex-col items-center">
+                  <SimpleDonutChart data={priorityData} />
+                  <div className="flex gap-4 mt-6">{priorityData.map((d) => (<div key={d.name} className="flex items-center gap-2 text-xs font-medium text-slate-600"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>{d.name}</div>))}</div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 lg:col-span-2 flex flex-col overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50"><h3 className="font-bold text-slate-800">Detailed Report</h3></div>
+                <div className="flex-1 overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100"><tr><th className="px-6 py-3">Task</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Progress</th><th className="px-6 py-3">Time</th></tr></thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {tasks.slice(0, 5).map(task => {
+                        const subDone = task.subtasks?.filter(s => s.completed).length || 0; const subTotal = task.subtasks?.length || 0;
+                        return (<tr key={task.id} className="hover:bg-slate-50"><td className="px-6 py-3 font-medium text-slate-800">{task.title}</td><td className="px-6 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs capitalize ${getStatusColor(task.status)}`}>{task.status.replace('-', ' ')}</span></td><td className="px-6 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${subTotal ? (subDone/subTotal)*100 : 0}%` }}/></div><span className="text-xs">{subDone}/{subTotal}</span></div></td><td className="px-6 py-3 font-mono">{formatDuration(task.timeSpent || 0)}</td></tr>);
+                      })}
+                      {tasks.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400">No tasks yet</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>

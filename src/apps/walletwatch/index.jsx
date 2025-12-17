@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   IndianRupee, CreditCard, TrendingUp, Trash2, Plus, 
   Banknote, Pencil, LayoutList, PieChart, BarChart3, 
-  Download, FileText 
+  Download, FileText, Loader2 
 } from 'lucide-react';
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, 
@@ -12,8 +12,8 @@ import { db, auth } from '../../lib/firebase';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import ConfirmModal from '../../components/ConfirmModal';
 import { jsPDF } from 'jspdf';
-// FIX: Import as a function
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 // --- Constants ---
 const CATEGORIES = [
@@ -33,16 +33,55 @@ const PAYMENT_MODES = [
 ];
 
 // --- Local Components ---
+
+// UPDATED: Now uses SVG instead of conic-gradient for PDF compatibility
 const DonutChart = ({ data, total }) => {
   if (total === 0) return <div className="relative w-48 h-48 mx-auto flex items-center justify-center bg-gray-50 rounded-full border-2 border-dashed border-gray-200"><span className="text-gray-400 text-xs">No Data</span></div>;
-  let currentDeg = 0;
-  const gradients = data.map(item => {
-    const deg = (item.total / total) * 360;
-    const str = `${item.color} ${currentDeg}deg ${currentDeg + deg}deg`;
-    currentDeg += deg;
-    return str;
-  }).join(', ');
-  return (<div className="relative w-48 h-48 mx-auto"><div className="w-full h-full rounded-full shadow-inner" style={{ background: `conic-gradient(${gradients})` }}></div><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center shadow-sm"><span className="text-gray-400 text-xs font-medium uppercase tracking-wide">Total</span><span className="text-xl font-bold text-gray-900">{formatCurrency(total)}</span></div></div>);
+  
+  let cumulativePercent = 0;
+  
+  const getCoordinatesForPercent = (percent) => {
+    const x = Math.cos(2 * Math.PI * percent);
+    const y = Math.sin(2 * Math.PI * percent);
+    return [x, y];
+  };
+
+  const slices = data.map(item => {
+    const startPercent = cumulativePercent;
+    const slicePercent = item.total / total;
+    cumulativePercent += slicePercent;
+    const endPercent = cumulativePercent;
+    
+    const [startX, startY] = getCoordinatesForPercent(startPercent);
+    const [endX, endY] = getCoordinatesForPercent(endPercent);
+    
+    const largeArcFlag = slicePercent > 0.5 ? 1 : 0;
+    
+    // SVG Path Command for a slice
+    const pathData = [
+      `M ${startX} ${startY}`,
+      `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+      `L 0 0`,
+    ].join(' ');
+    
+    return { path: pathData, color: item.color };
+  });
+
+  return (
+    <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
+        <svg viewBox="-1 -1 2 2" className="w-full h-full -rotate-90 transform" style={{ overflow: 'visible' }}>
+            {slices.map((slice, i) => (
+                <path key={i} d={slice.path} fill={slice.color} stroke="white" strokeWidth="0.02" />
+            ))}
+            {/* Inner white circle to create donut effect */}
+            <circle cx="0" cy="0" r="0.6" fill="white" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-gray-400 text-xs font-medium uppercase tracking-wide">Total</span>
+            <span className="text-xl font-bold text-slate-900">{formatCurrency(total)}</span>
+        </div>
+    </div>
+  );
 };
 
 const WeeklyBarChart = ({ expenses }) => {
@@ -63,6 +102,7 @@ const WalletWatchApp = ({ user }) => {
   const [view, setView] = useState('dashboard');
   const [expenses, setExpenses] = useState([]);
   const [deleteId, setDeleteId] = useState(null);
+  const [exporting, setExporting] = useState(false);
   
   const [editingId, setEditingId] = useState(null);
   const [amount, setAmount] = useState('');
@@ -88,19 +128,10 @@ const WalletWatchApp = ({ user }) => {
     return () => unsubscribe();
   }, [user]);
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!amount || !user) return;
-    const expenseDate = new Date(date); const now = new Date(); expenseDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-    const payload = { amount: parseFloat(amount), description: description || 'No description', category, paymentMode, date: Timestamp.fromDate(expenseDate), updatedAt: serverTimestamp() };
-    const colRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
-    if (editingId) { await updateDoc(doc(colRef, editingId), payload); } else { await addDoc(colRef, { ...payload, createdAt: serverTimestamp() }); }
-    resetForm(); setView('dashboard');
-  };
-
-  const confirmDelete = async () => { if (deleteId && user) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', deleteId)); setDeleteId(null); } };
-  const handleEdit = (exp) => { setEditingId(exp.id); setAmount(exp.amount); setDescription(exp.description); setCategory(exp.category); setPaymentMode(exp.paymentMode); const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); const offset = d.getTimezoneOffset(); const localDate = new Date(d.getTime() - (offset*60*1000)); setDate(localDate.toISOString().split('T')[0]); setView('add'); };
-  const resetForm = () => { setEditingId(null); setAmount(''); setDescription(''); setCategory(CATEGORIES[0].id); setPaymentMode(PAYMENT_MODES[0].id); setDate(new Date().toISOString().split('T')[0]); };
+  // --- Calculations ---
+  const currentMonthExpenses = useMemo(() => { const now = new Date(); return expenses.filter(exp => { const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }); }, [expenses]);
+  const totalMonthly = currentMonthExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  const categoryBreakdown = useMemo(() => { const breakdown = {}; currentMonthExpenses.forEach(exp => { breakdown[exp.category] = (breakdown[exp.category] || 0) + Number(exp.amount); }); return Object.entries(breakdown).map(([catId, total]) => ({ id: catId, total, ...CATEGORIES.find(c => c.id === catId) || { label: 'Unknown', color: '#ccc' } })).sort((a, b) => b.total - a.total); }, [currentMonthExpenses]);
 
   // --- Export Logic ---
   const exportToCSV = () => {
@@ -122,11 +153,43 @@ const WalletWatchApp = ({ user }) => {
     document.body.removeChild(link);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    setExporting(true);
     try {
       const doc = new jsPDF();
-      doc.text("WalletWatch Expenses Report", 14, 16);
-      // FIX: Call autoTable as a function, passing 'doc' as the first argument
+      doc.setFontSize(20);
+      doc.setTextColor(79, 70, 229);
+      doc.text("WalletWatch Expenses Report", 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 30);
+
+      let yPos = 40;
+
+      const chartElement = document.getElementById('walletwatch-dashboard-charts');
+      
+      if (chartElement && view === 'dashboard') {
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text("Dashboard Overview", 14, yPos);
+        yPos += 5;
+
+        // Ensure scale is high for crisp text, but not too high to crash
+        const canvas = await html2canvas(chartElement, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 180; 
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        doc.addImage(imgData, 'PNG', 14, yPos, imgWidth, imgHeight);
+        yPos += imgHeight + 10;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("Transaction Details", 14, yPos);
+      yPos += 5;
+
       autoTable(doc, {
         head: [['Date', 'Description', 'Category', 'Mode', 'Amount (INR)']],
         body: expenses.map(e => [
@@ -136,18 +199,33 @@ const WalletWatchApp = ({ user }) => {
           PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
           `INR ${Number(e.amount).toLocaleString('en-IN')}` 
         ]),
-        startY: 20,
+        startY: yPos,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [79, 70, 229] }
       });
+
       doc.save("expenses_report.pdf");
     } catch (err) {
       console.error("PDF Export failed:", err);
-      alert("Failed to export PDF. Please check console for details.");
+      alert("Failed to export PDF.");
+    } finally {
+      setExporting(false);
     }
   };
 
-  const currentMonthExpenses = useMemo(() => { const now = new Date(); return expenses.filter(exp => { const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }); }, [expenses]);
-  const totalMonthly = currentMonthExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const categoryBreakdown = useMemo(() => { const breakdown = {}; currentMonthExpenses.forEach(exp => { breakdown[exp.category] = (breakdown[exp.category] || 0) + Number(exp.amount); }); return Object.entries(breakdown).map(([catId, total]) => ({ id: catId, total, ...CATEGORIES.find(c => c.id === catId) || { label: 'Unknown', color: '#ccc' } })).sort((a, b) => b.total - a.total); }, [currentMonthExpenses]);
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!amount || !user) return;
+    const expenseDate = new Date(date); const now = new Date(); expenseDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    const payload = { amount: parseFloat(amount), description: description || 'No description', category, paymentMode, date: Timestamp.fromDate(expenseDate), updatedAt: serverTimestamp() };
+    const colRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
+    if (editingId) { await updateDoc(doc(colRef, editingId), payload); } else { await addDoc(colRef, { ...payload, createdAt: serverTimestamp() }); }
+    resetForm(); setView('dashboard');
+  };
+
+  const confirmDelete = async () => { if (deleteId && user) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', deleteId)); setDeleteId(null); } };
+  const handleEdit = (exp) => { setEditingId(exp.id); setAmount(exp.amount); setDescription(exp.description); setCategory(exp.category); setPaymentMode(exp.paymentMode); const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); const offset = d.getTimezoneOffset(); const localDate = new Date(d.getTime() - (offset*60*1000)); setDate(localDate.toISOString().split('T')[0]); setView('add'); };
+  const resetForm = () => { setEditingId(null); setAmount(''); setDescription(''); setCategory(CATEGORIES[0].id); setPaymentMode(PAYMENT_MODES[0].id); setDate(new Date().toISOString().split('T')[0]); };
 
   return (
     <div className="space-y-6">
@@ -161,22 +239,31 @@ const WalletWatchApp = ({ user }) => {
         </div>
         <div className="flex gap-2 pr-2">
           <button onClick={exportToCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export CSV"><FileText size={16}/></button>
-          <button onClick={exportToPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200" title="Export PDF"><Download size={16}/></button>
+          <button onClick={exportToPDF} disabled={exporting} className="p-2 text-slate-500 hover:text-indigo-600 bg-white rounded-lg shadow-sm border border-slate-200 disabled:opacity-50" title="Export PDF">
+            {exporting ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+          </button>
         </div>
       </div>
 
       {view === 'dashboard' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-           <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
-              <button onClick={() => { resetForm(); setView('add'); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex gap-2"><Plus size={16}/> Add Expense</button>
+           {/* WRAPPER FOR PDF CAPTURE */}
+           <div id="walletwatch-dashboard-charts" className="space-y-6 bg-slate-50 p-2">
+             <div className="flex justify-between items-center mb-2">
+                <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Total Spent (Month)</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalMonthly)}</p></div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Transactions</p><p className="text-3xl font-bold text-slate-900 mt-2">{currentMonthExpenses.length}</p></div>
+             </div>
+
+             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6 text-center">Monthly Breakdown</h3><DonutChart data={categoryBreakdown} total={totalMonthly} /><div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">{categoryBreakdown.map((item) => (<div key={item.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div><span className="text-slate-600">{item.label}</span></div><span className="font-semibold">{formatCurrency(item.total)}</span></div>))}</div></div>
+             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"><div className="flex items-center gap-2 mb-4 font-semibold text-slate-800"><BarChart3 size={18} className="text-blue-500" /> Weekly Activity</div><WeeklyBarChart expenses={expenses} /></div>
            </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Total Spent (Month)</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalMonthly)}</p></div>
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Transactions</p><p className="text-3xl font-bold text-slate-900 mt-2">{currentMonthExpenses.length}</p></div>
-           </div>
-           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6 text-center">Monthly Breakdown</h3><DonutChart data={categoryBreakdown} total={totalMonthly} /><div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">{categoryBreakdown.map((item) => (<div key={item.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div><span className="text-slate-600">{item.label}</span></div><span className="font-semibold">{formatCurrency(item.total)}</span></div>))}</div></div>
-           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"><div className="flex items-center gap-2 mb-4 font-semibold text-slate-800"><BarChart3 size={18} className="text-blue-500" /> Weekly Activity</div><WeeklyBarChart expenses={expenses} /></div>
+           
+           <div className="flex justify-end"><button onClick={() => { resetForm(); setView('add'); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex gap-2"><Plus size={16}/> Add Expense</button></div>
+
            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="font-bold text-slate-800">Recent Transactions</h3><button onClick={() => setView('history')} className="text-xs text-indigo-600 font-medium hover:underline">View All</button></div><div className="divide-y divide-slate-100">{expenses.slice(0, 3).map(exp => (<div key={exp.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === exp.category)?.bg || 'bg-gray-100'}`}><CreditCard size={18} className="opacity-75" /></div><div><p className="font-medium text-slate-800">{CATEGORIES.find(c => c.id === exp.category)?.label}</p><p className="text-xs text-slate-400">{formatDate(exp.date)}</p></div></div><span className="font-bold text-slate-900">{formatCurrency(exp.amount)}</span></div>))}{expenses.length === 0 && <div className="text-center py-4 text-slate-400 text-sm">No recent transactions</div>}</div></div>
         </div>
       )}

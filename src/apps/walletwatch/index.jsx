@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   IndianRupee, CreditCard, TrendingUp, Trash2, Plus, 
   Banknote, Pencil, LayoutList, PieChart, BarChart3, 
-  Download, FileText, Loader2, Layers, ChevronDown, ChevronUp, Folder
+  Download, FileText, Loader2, Layers, ChevronDown, ChevronUp, Folder,
+  RefreshCcw, Link as LinkIcon, CheckCircle2, ArrowLeftRight
 } from 'lucide-react';
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, 
@@ -24,6 +25,7 @@ const CATEGORIES = [
   { id: 'health', label: 'Health', color: '#22c55e', bg: 'bg-green-100 text-green-600' },
   { id: 'entertainment', label: 'Fun', color: '#ec4899', bg: 'bg-pink-100 text-pink-600' },
   { id: 'other', label: 'Other', color: '#6b7280', bg: 'bg-gray-100 text-gray-600' },
+  { id: 'reimbursement', label: 'Reimbursement', color: '#10b981', bg: 'bg-emerald-100 text-emerald-600' }, // Added category
 ];
 
 const PAYMENT_MODES = [
@@ -64,7 +66,7 @@ const DonutChart = ({ data, total }) => {
             <circle cx="0" cy="0" r="0.6" fill="white" />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-gray-400 text-xs font-medium uppercase tracking-wide">Total</span>
+            <span className="text-gray-400 text-xs font-medium uppercase tracking-wide">Net Total</span>
             <span className="text-xl font-bold text-slate-900">{formatCurrency(total)}</span>
         </div>
     </div>
@@ -76,7 +78,11 @@ const WeeklyBarChart = ({ expenses }) => {
     const result = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i); const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
-      const total = expenses.filter(e => { const eDate = e.date && typeof e.date.toDate === 'function' ? e.date.toDate() : new Date(e.date); return eDate.getDate() === d.getDate() && eDate.getMonth() === d.getMonth() && eDate.getFullYear() === d.getFullYear(); }).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      // Filter out negative amounts (reimbursements) for the bar chart to show pure spending
+      const total = expenses.filter(e => { 
+        const eDate = e.date && typeof e.date.toDate === 'function' ? e.date.toDate() : new Date(e.date); 
+        return eDate.getDate() === d.getDate() && eDate.getMonth() === d.getMonth() && eDate.getFullYear() === d.getFullYear() && e.amount > 0; 
+      }).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
       result.push({ day: dayName, total });
     }
     return result;
@@ -86,7 +92,7 @@ const WeeklyBarChart = ({ expenses }) => {
 };
 
 // --- Group Card Component ---
-const GroupCard = ({ groupName, items, total, onEdit, onDelete }) => {
+const GroupCard = ({ groupName, items, total, onEdit, onDelete, onSettle }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -115,7 +121,12 @@ const GroupCard = ({ groupName, items, total, onEdit, onDelete }) => {
           {items.map(exp => (
             <div key={exp.id} className="p-3 pl-16 flex justify-between items-center hover:bg-slate-50">
               <div>
-                <p className="text-sm font-medium text-slate-700">{exp.description}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-700">{exp.description}</p>
+                  {exp.reimbursementStatus === 'pending' && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 rounded-full font-medium">Lent</span>}
+                  {exp.reimbursementStatus === 'settled' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 rounded-full font-medium">Settled</span>}
+                  {exp.amount < 0 && <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 rounded-full font-medium flex items-center gap-1"><ArrowLeftRight size={8}/> Refund</span>}
+                </div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span>{formatDate(exp.date)}</span>
                   <span>•</span>
@@ -123,8 +134,13 @@ const GroupCard = ({ groupName, items, total, onEdit, onDelete }) => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-slate-700">{formatCurrency(exp.amount)}</span>
+                <span className={`text-sm font-bold ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-700'}`}>{formatCurrency(exp.amount)}</span>
                 <div className="flex gap-1">
+                  {exp.reimbursementStatus === 'pending' && (
+                    <button onClick={(e) => { e.stopPropagation(); onSettle(exp); }} className="p-1 text-orange-400 hover:text-orange-600 rounded bg-orange-50 mr-1" title="Settle/Reimburse">
+                      <RefreshCcw size={12}/>
+                    </button>
+                  )}
                   <button onClick={() => onEdit(exp)} className="p-1 text-slate-300 hover:text-indigo-600 rounded"><Pencil size={12}/></button>
                   <button onClick={() => onDelete(exp.id)} className="p-1 text-slate-300 hover:text-red-500 rounded"><Trash2 size={12}/></button>
                 </div>
@@ -142,7 +158,7 @@ const WalletWatchApp = ({ user }) => {
   const [expenses, setExpenses] = useState([]);
   const [deleteId, setDeleteId] = useState(null);
   const [exporting, setExporting] = useState(false);
-  const [groupByEvent, setGroupByEvent] = useState(false); // Toggle for History view
+  const [groupByEvent, setGroupByEvent] = useState(false); 
   
   // Form State
   const [editingId, setEditingId] = useState(null);
@@ -152,6 +168,10 @@ const WalletWatchApp = ({ user }) => {
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [paymentMode, setPaymentMode] = useState(PAYMENT_MODES[0].id);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Reimbursement State
+  const [isReimbursable, setIsReimbursable] = useState(false);
+  const [relatedTxn, setRelatedTxn] = useState(null); // The original expense being settled
 
   const APP_ID = 'default-app-id';
 
@@ -171,7 +191,6 @@ const WalletWatchApp = ({ user }) => {
   }, [user]);
 
   // --- Calculations ---
-  // Ensure we capture all expenses, but also split by current month for dashboard
   const currentMonthExpenses = useMemo(() => { 
     const now = new Date(); 
     return expenses.filter(exp => { 
@@ -185,9 +204,18 @@ const WalletWatchApp = ({ user }) => {
   
   const categoryBreakdown = useMemo(() => { 
     const breakdown = {}; 
-    currentMonthExpenses.forEach(exp => { breakdown[exp.category] = (breakdown[exp.category] || 0) + Number(exp.amount); }); 
+    currentMonthExpenses.forEach(exp => { 
+      // Only include positive expenses in breakdown to avoid skewing donut
+      if (Number(exp.amount) > 0) {
+        breakdown[exp.category] = (breakdown[exp.category] || 0) + Number(exp.amount);
+      }
+    }); 
+    // Total for donut must be sum of segments (only positives)
     return Object.entries(breakdown).map(([catId, total]) => ({ id: catId, total, ...CATEGORIES.find(c => c.id === catId) || { label: 'Unknown', color: '#ccc' } })).sort((a, b) => b.total - a.total); 
   }, [currentMonthExpenses]);
+
+  // Donut total should only be sum of categories displayed (positive spending)
+  const donutTotal = categoryBreakdown.reduce((acc, curr) => acc + curr.total, 0);
 
   // Grouping Logic
   const groupedExpenses = useMemo(() => {
@@ -207,16 +235,107 @@ const WalletWatchApp = ({ user }) => {
     return { groups, ungrouped };
   }, [expenses]);
 
+  // --- Actions ---
+  
+  const handleSettle = (originalExp) => {
+    setEditingId(null); // New transaction
+    setRelatedTxn(originalExp);
+    setAmount(originalExp.amount); // Prefill amount (will be saved as negative)
+    setDescription(`Refund: ${originalExp.description}`);
+    setGroup(originalExp.group || '');
+    setCategory('reimbursement');
+    setPaymentMode('upi');
+    setDate(new Date().toISOString().split('T')[0]);
+    setIsReimbursable(false); // A settlement itself isn't reimbursable
+    setView('add');
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!amount || !user) return;
+    
+    const expenseDate = new Date(date); 
+    const now = new Date(); 
+    expenseDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    
+    // Logic: If it's a settlement (relatedTxn exists), amount should be negative (inflow)
+    // If user enters -500 manually, keep it. If user enters 500 for a refund, flip it.
+    let finalAmount = parseFloat(amount);
+    
+    // Auto-detect refund if category is reimbursement, but strictly enforce for 'relatedTxn' flow
+    if (relatedTxn && finalAmount > 0) {
+      finalAmount = -finalAmount;
+    }
+
+    const payload = { 
+      amount: finalAmount, 
+      description: description || 'No description', 
+      group: group || '', 
+      category, 
+      paymentMode, 
+      date: Timestamp.fromDate(expenseDate), 
+      updatedAt: serverTimestamp(),
+      reimbursementStatus: isReimbursable ? 'pending' : 'none', // 'pending', 'settled', 'none'
+      relatedId: relatedTxn ? relatedTxn.id : null // Link back to original
+    };
+
+    const colRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
+    
+    if (editingId) { 
+      await updateDoc(doc(colRef, editingId), payload); 
+    } else { 
+      await addDoc(colRef, { ...payload, createdAt: serverTimestamp() }); 
+      
+      // If this was a settlement, update the original transaction status
+      if (relatedTxn) {
+        await updateDoc(doc(colRef, relatedTxn.id), { reimbursementStatus: 'settled' });
+      }
+    }
+    resetForm(); 
+    setView('dashboard');
+  };
+
+  const confirmDelete = async () => { if (deleteId && user) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', deleteId)); setDeleteId(null); } };
+  
+  const handleEdit = (exp) => { 
+    setEditingId(exp.id); 
+    setAmount(Math.abs(exp.amount)); // Show absolute amount in form for easier editing
+    setDescription(exp.description); 
+    setGroup(exp.group || '');
+    setCategory(exp.category); 
+    setPaymentMode(exp.paymentMode); 
+    setIsReimbursable(exp.reimbursementStatus === 'pending');
+    setRelatedTxn(null); // Reset related if just editing
+    const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); 
+    const offset = d.getTimezoneOffset(); 
+    const localDate = new Date(d.getTime() - (offset*60*1000)); 
+    setDate(localDate.toISOString().split('T')[0]); 
+    setView('add'); 
+  };
+  
+  const resetForm = () => { 
+    setEditingId(null); 
+    setAmount(''); 
+    setDescription(''); 
+    setGroup(''); 
+    setCategory(CATEGORIES[0].id); 
+    setPaymentMode(PAYMENT_MODES[0].id); 
+    setDate(new Date().toISOString().split('T')[0]); 
+    setIsReimbursable(false);
+    setRelatedTxn(null);
+  };
+
   // --- Export Logic ---
   const exportToCSV = () => {
-    const headers = ['Date', 'Group', 'Description', 'Category', 'Mode', 'Amount'];
+    const headers = ['Date', 'Group', 'Description', 'Category', 'Mode', 'Amount', 'Status'];
     const rows = expenses.map(e => [
       formatDate(e.date),
       `"${(e.group || '').replace(/"/g, '""')}"`,
       `"${(e.description || '').replace(/"/g, '""')}"`,
       CATEGORIES.find(c => c.id === e.category)?.label || e.category,
       PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
-      e.amount
+      e.amount,
+      e.reimbursementStatus === 'pending' ? 'Lent' : e.reimbursementStatus === 'settled' ? 'Settled' : '-'
     ].join(','));
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -269,7 +388,7 @@ const WalletWatchApp = ({ user }) => {
         body: expenses.map(e => [
           formatDate(e.date),
           e.group || '-',
-          e.description,
+          e.description + (e.reimbursementStatus === 'pending' ? ' (Lent)' : ''),
           CATEGORIES.find(c => c.id === e.category)?.label || e.category,
           PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
           `INR ${Number(e.amount).toLocaleString('en-IN')}` 
@@ -287,42 +406,6 @@ const WalletWatchApp = ({ user }) => {
       setExporting(false);
     }
   };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!amount || !user) return;
-    const expenseDate = new Date(date); const now = new Date(); expenseDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-    const payload = { 
-      amount: parseFloat(amount), 
-      description: description || 'No description', 
-      group: group || '', 
-      category, 
-      paymentMode, 
-      date: Timestamp.fromDate(expenseDate), 
-      updatedAt: serverTimestamp() 
-    };
-    const colRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
-    if (editingId) { await updateDoc(doc(colRef, editingId), payload); } else { await addDoc(colRef, { ...payload, createdAt: serverTimestamp() }); }
-    resetForm(); setView('dashboard');
-  };
-
-  const confirmDelete = async () => { if (deleteId && user) { await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', deleteId)); setDeleteId(null); } };
-  
-  const handleEdit = (exp) => { 
-    setEditingId(exp.id); 
-    setAmount(exp.amount); 
-    setDescription(exp.description); 
-    setGroup(exp.group || '');
-    setCategory(exp.category); 
-    setPaymentMode(exp.paymentMode); 
-    const d = exp.date && typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date); 
-    const offset = d.getTimezoneOffset(); 
-    const localDate = new Date(d.getTime() - (offset*60*1000)); 
-    setDate(localDate.toISOString().split('T')[0]); 
-    setView('add'); 
-  };
-  
-  const resetForm = () => { setEditingId(null); setAmount(''); setDescription(''); setGroup(''); setCategory(CATEGORIES[0].id); setPaymentMode(PAYMENT_MODES[0].id); setDate(new Date().toISOString().split('T')[0]); };
 
   return (
     <div className="space-y-6">
@@ -356,15 +439,15 @@ const WalletWatchApp = ({ user }) => {
              </div>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Total Spent (Month)</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalMonthly)}</p></div>
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Total Spent (All Time)</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalAllTime)}</p></div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Net Monthly Spend</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalMonthly)}</p></div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center"><p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Net All-Time Spend</p><p className="text-3xl font-bold text-slate-900 mt-2">{formatCurrency(totalAllTime)}</p></div>
              </div>
 
-             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6 text-center">Monthly Breakdown</h3><DonutChart data={categoryBreakdown} total={totalMonthly} /><div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">{categoryBreakdown.map((item) => (<div key={item.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div><span className="text-slate-600">{item.label}</span></div><span className="font-semibold">{formatCurrency(item.total)}</span></div>))}</div></div>
+             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6 text-center">Monthly Breakdown (Expenses Only)</h3><DonutChart data={categoryBreakdown} total={donutTotal} /><div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">{categoryBreakdown.map((item) => (<div key={item.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div><span className="text-slate-600">{item.label}</span></div><span className="font-semibold">{formatCurrency(item.total)}</span></div>))}</div></div>
              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100"><div className="flex items-center gap-2 mb-4 font-semibold text-slate-800"><BarChart3 size={18} className="text-blue-500" /> Weekly Activity</div><WeeklyBarChart expenses={expenses} /></div>
            </div>
            
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="font-bold text-slate-800">Recent Transactions</h3><button onClick={() => setView('history')} className="text-xs text-indigo-600 font-medium hover:underline">View All</button></div><div className="divide-y divide-slate-100">{expenses.slice(0, 3).map(exp => (<div key={exp.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === exp.category)?.bg || 'bg-gray-100'}`}><CreditCard size={18} className="opacity-75" /></div><div><p className="font-medium text-slate-800">{CATEGORIES.find(c => c.id === exp.category)?.label}</p><p className="text-xs text-slate-400">{formatDate(exp.date)}</p></div></div><span className="font-bold text-slate-900">{formatCurrency(exp.amount)}</span></div>))}{expenses.length === 0 && <div className="text-center py-4 text-slate-400 text-sm">No recent transactions</div>}</div></div>
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"><div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="font-bold text-slate-800">Recent Transactions</h3><button onClick={() => setView('history')} className="text-xs text-indigo-600 font-medium hover:underline">View All</button></div><div className="divide-y divide-slate-100">{expenses.slice(0, 3).map(exp => (<div key={exp.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><div className={`w-10 h-10 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === exp.category)?.bg || 'bg-gray-100'}`}><CreditCard size={18} className="opacity-75" /></div><div><p className="font-medium text-slate-800">{CATEGORIES.find(c => c.id === exp.category)?.label}</p><p className="text-xs text-slate-400">{formatDate(exp.date)}</p></div></div><span className={`font-bold ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span></div>))}{expenses.length === 0 && <div className="text-center py-4 text-slate-400 text-sm">No recent transactions</div>}</div></div>
         </div>
       )}
 
@@ -381,11 +464,10 @@ const WalletWatchApp = ({ user }) => {
             </div>
 
             {groupByEvent ? (
-              // GROUPED VIEW IN HISTORY
+              // GROUPED VIEW
               <>
                 {Object.keys(groupedExpenses.groups).length === 0 && groupedExpenses.ungrouped.length === 0 && <div className="text-center py-12 text-slate-400">No transactions found.</div>}
                 
-                {/* Render Group Cards First */}
                 {Object.entries(groupedExpenses.groups).map(([name, data]) => (
                   <GroupCard 
                     key={name}
@@ -394,22 +476,41 @@ const WalletWatchApp = ({ user }) => {
                     total={data.total}
                     onEdit={handleEdit}
                     onDelete={(id) => setDeleteId(id)}
+                    onSettle={handleSettle}
                   />
                 ))}
 
-                {/* Render Ungrouped Items */}
+                {groupedExpenses.ungrouped.length > 0 && <div className="text-xs font-bold text-slate-400 uppercase mt-4 mb-2">Ungrouped</div>}
+                
                 {groupedExpenses.ungrouped.map(exp => (
                   <div key={exp.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center group">
                      <div className="flex items-center gap-4">
                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === exp.category)?.bg || 'bg-gray-100'}`}><CreditCard size={20} className="opacity-75" /></div>
                        <div>
                           <h3 className="font-semibold text-slate-800">{CATEGORIES.find(c => c.id === exp.category)?.label}</h3>
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                             {exp.description} • {formatDate(exp.date)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              {exp.description} • {formatDate(exp.date)}
+                            </p>
+                            {exp.reimbursementStatus === 'pending' && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 rounded-full font-medium">Lent</span>}
+                            {exp.reimbursementStatus === 'settled' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 rounded-full font-medium">Settled</span>}
+                            {exp.amount < 0 && <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 rounded-full font-medium flex items-center gap-1"><ArrowLeftRight size={8}/> Refund</span>}
+                          </div>
                        </div>
                      </div>
-                     <div className="text-right flex flex-col items-end"><span className="block font-bold text-slate-900 mb-1">{formatCurrency(exp.amount)}</span><div className="flex items-center gap-2"><span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase font-medium mr-1">{PAYMENT_MODES.find(p => p.id === exp.paymentMode)?.label}</span><button onClick={() => handleEdit(exp)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Pencil size={14} /></button><button onClick={() => setDeleteId(exp.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button></div></div>
+                     <div className="text-right flex flex-col items-end">
+                       <span className={`block font-bold mb-1 ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span>
+                       <div className="flex items-center gap-2">
+                         <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase font-medium mr-1">{PAYMENT_MODES.find(p => p.id === exp.paymentMode)?.label}</span>
+                         {exp.reimbursementStatus === 'pending' && (
+                            <button onClick={() => handleSettle(exp)} className="p-1 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="Settle/Reimburse">
+                              <RefreshCcw size={14}/>
+                            </button>
+                         )}
+                         <button onClick={() => handleEdit(exp)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Pencil size={14} /></button>
+                         <button onClick={() => setDeleteId(exp.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                       </div>
+                     </div>
                   </div>
                 ))}
               </>
@@ -421,13 +522,30 @@ const WalletWatchApp = ({ user }) => {
                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === exp.category)?.bg || 'bg-gray-100'}`}><CreditCard size={20} className="opacity-75" /></div>
                      <div>
                         <h3 className="font-semibold text-slate-800">{CATEGORIES.find(c => c.id === exp.category)?.label}</h3>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                           {exp.description} • {formatDate(exp.date)}
-                           {exp.group && <span className="bg-indigo-50 text-indigo-600 px-1.5 rounded ml-2 font-medium">{exp.group}</span>}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                             {exp.description} • {formatDate(exp.date)}
+                             {exp.group && <span className="bg-indigo-50 text-indigo-600 px-1.5 rounded ml-2 font-medium">{exp.group}</span>}
+                          </p>
+                          {exp.reimbursementStatus === 'pending' && <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 rounded-full font-medium">Lent</span>}
+                          {exp.reimbursementStatus === 'settled' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 rounded-full font-medium">Settled</span>}
+                          {exp.amount < 0 && <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 rounded-full font-medium flex items-center gap-1"><ArrowLeftRight size={8}/> Refund</span>}
+                        </div>
                      </div>
                    </div>
-                   <div className="text-right flex flex-col items-end"><span className="block font-bold text-slate-900 mb-1">{formatCurrency(exp.amount)}</span><div className="flex items-center gap-2"><span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase font-medium mr-1">{PAYMENT_MODES.find(p => p.id === exp.paymentMode)?.label}</span><button onClick={() => handleEdit(exp)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Pencil size={14} /></button><button onClick={() => setDeleteId(exp.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button></div></div>
+                   <div className="text-right flex flex-col items-end">
+                     <span className={`block font-bold mb-1 ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span>
+                     <div className="flex items-center gap-2">
+                       <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase font-medium mr-1">{PAYMENT_MODES.find(p => p.id === exp.paymentMode)?.label}</span>
+                       {exp.reimbursementStatus === 'pending' && (
+                          <button onClick={() => handleSettle(exp)} className="p-1 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors" title="Settle/Reimburse">
+                            <RefreshCcw size={14}/>
+                          </button>
+                       )}
+                       <button onClick={() => handleEdit(exp)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Pencil size={14} /></button>
+                       <button onClick={() => setDeleteId(exp.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                     </div>
+                   </div>
                 </div>
               ))
             )}
@@ -437,11 +555,19 @@ const WalletWatchApp = ({ user }) => {
       {view === 'add' && (
          <div className="max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
              <form onSubmit={handleSave} className="space-y-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">{editingId ? 'Edit Transaction' : 'New Transaction'}</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-slate-800">
+                    {relatedTxn ? 'Record Reimbursement' : editingId ? 'Edit Transaction' : 'New Transaction'}
+                  </h2>
+                  {relatedTxn && <button type="button" onClick={resetForm} className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">Cancel Return</button>}
+                </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    {relatedTxn ? 'Reimbursement Amount (Positive Value)' : 'Amount'}
+                  </label>
                   <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-semibold">₹</span><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="w-full pl-8 pr-4 py-3 text-2xl font-bold text-slate-900 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" required autoFocus={!editingId} /></div>
+                  {relatedTxn && <p className="text-xs text-emerald-600 mt-1">This will be saved as a negative expense (inflow).</p>}
                 </div>
                 
                 <div>
@@ -470,7 +596,26 @@ const WalletWatchApp = ({ user }) => {
 
                 <div><label className="block text-sm font-medium text-slate-700 mb-2">Category</label><div className="grid grid-cols-2 gap-2">{CATEGORIES.map(cat => (<button key={cat.id} type="button" onClick={() => setCategory(cat.id)} className={`p-3 rounded-lg border text-left text-sm font-medium transition-all ${category === cat.id ? `border-indigo-500 ring-1 ring-indigo-500 ${cat.bg}` : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{cat.label}</button>))}</div></div>
                 <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-2">Payment</label><select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full px-3 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">{PAYMENT_MODES.map(mode => (<option key={mode.id} value={mode.id}>{mode.label}</option>))}</select></div><div><label className="block text-sm font-medium text-slate-700 mb-2">Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" /></div></div>
-                <div className="pt-4"><button type="submit" className={`w-full py-4 text-white font-bold rounded-xl shadow-lg active:scale-[0.98] transition-all ${editingId ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>{editingId ? 'Update Expense' : 'Save Expense'}</button></div>
+                
+                {/* Reimbursable Toggle */}
+                {!relatedTxn && (
+                  <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isReimbursable} 
+                        onChange={(e) => setIsReimbursable(e.target.checked)} 
+                        className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                      />
+                      <div>
+                        <span className="block text-sm font-bold text-slate-800">Lent to someone?</span>
+                        <span className="block text-xs text-slate-500">Mark as pending reimbursement.</span>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                <div className="pt-4"><button type="submit" className={`w-full py-4 text-white font-bold rounded-xl shadow-lg active:scale-[0.98] transition-all ${editingId || relatedTxn ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>{relatedTxn ? 'Confirm Return' : editingId ? 'Update Expense' : 'Save Expense'}</button></div>
              </form>
          </div>
       )}

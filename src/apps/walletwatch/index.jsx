@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   IndianRupee, CreditCard, TrendingUp, Trash2, Plus, 
   Banknote, Pencil, LayoutList, PieChart, BarChart3, 
-  Download, FileText, Loader2 
+  Download, FileText, Loader2, Wallet 
 } from 'lucide-react';
 import { 
   collection, addDoc, updateDoc, deleteDoc, doc, 
@@ -34,7 +34,7 @@ const PAYMENT_MODES = [
 
 // --- Local Components ---
 
-// UPDATED: Now uses SVG instead of conic-gradient for PDF compatibility
+// SVG Donut Chart (Fixes PDF Export Issue)
 const DonutChart = ({ data, total }) => {
   if (total === 0) return <div className="relative w-48 h-48 mx-auto flex items-center justify-center bg-gray-50 rounded-full border-2 border-dashed border-gray-200"><span className="text-gray-400 text-xs">No Data</span></div>;
   
@@ -57,7 +57,7 @@ const DonutChart = ({ data, total }) => {
     
     const largeArcFlag = slicePercent > 0.5 ? 1 : 0;
     
-    // SVG Path Command for a slice
+    // SVG Path Command
     const pathData = [
       `M ${startX} ${startY}`,
       `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
@@ -73,7 +73,6 @@ const DonutChart = ({ data, total }) => {
             {slices.map((slice, i) => (
                 <path key={i} d={slice.path} fill={slice.color} stroke="white" strokeWidth="0.02" />
             ))}
-            {/* Inner white circle to create donut effect */}
             <circle cx="0" cy="0" r="0.6" fill="white" />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -175,7 +174,6 @@ const WalletWatchApp = ({ user }) => {
         doc.text("Dashboard Overview", 14, yPos);
         yPos += 5;
 
-        // Ensure scale is high for crisp text, but not too high to crash
         const canvas = await html2canvas(chartElement, { scale: 2, useCORS: true });
         const imgData = canvas.toDataURL('image/png');
         const imgWidth = 180; 
@@ -250,7 +248,10 @@ const WalletWatchApp = ({ user }) => {
            {/* WRAPPER FOR PDF CAPTURE */}
            <div id="walletwatch-dashboard-charts" className="space-y-6 bg-slate-50 p-2">
              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
+                <div className="flex items-center gap-2">
+                  <Wallet size={20} className="text-indigo-600" />
+                  <h2 className="text-2xl font-bold text-slate-800">Overview</h2>
+                </div>
              </div>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

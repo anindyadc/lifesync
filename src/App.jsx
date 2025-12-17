@@ -1,30 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutGrid, 
-  User, 
-  LogOut, 
-  CheckCircle, 
-  Wallet, 
-  Server, 
-  Loader2 
-} from 'lucide-react';
+import { LayoutGrid, User, LogOut, CheckCircle, IndianRupee, Loader2, Server, ShieldAlert } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './lib/firebase';
 
-// Shared Components
+// Components
 import AuthScreen from './components/AuthScreen';
-
-// App Modules
 import TaskFlowApp from './apps/taskflow'; 
 import WalletWatchApp from './apps/walletwatch'; 
-import ChangeManagerApp from './apps/changemanager'; 
+import ChangeManagerApp from './apps/changemanager';
+// Import new app
+import IncidentLoggerApp from './apps/incidentlogger';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'taskflow', 'walletwatch', 'changemanager'
+  const [activeApp, setActiveApp] = useState('dashboard');
 
-  // Monitor Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -34,11 +25,7 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
-        <Loader2 size={48} className="animate-spin" />
-      </div>
-    );
+    return <div className="h-screen flex items-center justify-center bg-slate-50 text-indigo-600"><Loader2 size={48} className="animate-spin" /></div>;
   }
 
   if (!user) {
@@ -53,11 +40,11 @@ export default function App() {
         return <WalletWatchApp user={user} />;
       case 'changemanager':
         return <ChangeManagerApp user={user} />;
+      case 'incidentlogger':
+        return <IncidentLoggerApp user={user} />;
       default:
-        // Main Dashboard Launcher
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {/* TaskFlow Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
             <button 
               onClick={() => setActiveApp('taskflow')}
               className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-emerald-100 hover:border-emerald-200 transition-all text-left group relative overflow-hidden"
@@ -69,25 +56,23 @@ export default function App() {
                 <CheckCircle size={24} />
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">TaskFlow</h3>
-              <p className="text-slate-500 text-sm relative z-10">Manage projects and personal todos efficiently.</p>
+              <p className="text-slate-500 text-sm relative z-10">Manage projects and tasks.</p>
             </button>
 
-            {/* WalletWatch Card */}
             <button 
               onClick={() => setActiveApp('walletwatch')}
               className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-indigo-100 hover:border-indigo-200 transition-all text-left group relative overflow-hidden"
             >
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Wallet size={100} className="text-indigo-500" />
+                <IndianRupee size={100} className="text-indigo-500" />
               </div>
               <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform relative z-10">
-                <Wallet size={24} />
+                <IndianRupee size={24} />
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">WalletWatch</h3>
-              <p className="text-slate-500 text-sm relative z-10">Track expenses and monitor your budget.</p>
+              <p className="text-slate-500 text-sm relative z-10">Track expenses and budget.</p>
             </button>
 
-            {/* ChangeLog Card */}
             <button 
               onClick={() => setActiveApp('changemanager')}
               className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-100 hover:border-blue-200 transition-all text-left group relative overflow-hidden"
@@ -98,8 +83,22 @@ export default function App() {
               <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform relative z-10">
                 <Server size={24} />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">ChangeLog</h3>
-              <p className="text-slate-500 text-sm relative z-10">Track IT infrastructure changes and history.</p>
+              <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">ServerLog</h3>
+              <p className="text-slate-500 text-sm relative z-10">Track IT infrastructure history.</p>
+            </button>
+
+            <button 
+              onClick={() => setActiveApp('incidentlogger')}
+              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-red-100 hover:border-red-200 transition-all text-left group relative overflow-hidden"
+            >
+               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <ShieldAlert size={100} className="text-red-500" />
+              </div>
+              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform relative z-10">
+                <ShieldAlert size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-1 relative z-10">Incidents</h3>
+              <p className="text-slate-500 text-sm relative z-10">Log and resolve system issues.</p>
             </button>
           </div>
         );
@@ -108,7 +107,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900">
-      {/* Sidebar Navigation */}
       <nav className="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col h-screen sticky top-0">
         <div className="p-6">
           <div className="flex items-center gap-3 text-white mb-8">
@@ -119,34 +117,21 @@ export default function App() {
           </div>
           
           <div className="space-y-1">
-            <button 
-              onClick={() => setActiveApp('dashboard')} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
+            <button onClick={() => setActiveApp('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
               <LayoutGrid size={18} /> Dashboard
             </button>
-            
             <div className="pt-6 pb-3 text-xs font-bold uppercase tracking-wider text-slate-500 pl-4">Apps</div>
-            
-            <button 
-              onClick={() => setActiveApp('taskflow')} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'taskflow' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
+            <button onClick={() => setActiveApp('taskflow')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'taskflow' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'hover:bg-slate-800 hover:text-white'}`}>
               <CheckCircle size={18} /> TaskFlow
             </button>
-            
-            <button 
-              onClick={() => setActiveApp('walletwatch')} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'walletwatch' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Wallet size={18} /> WalletWatch
+            <button onClick={() => setActiveApp('walletwatch')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'walletwatch' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+              <IndianRupee size={18} /> WalletWatch
             </button>
-
-            <button 
-              onClick={() => setActiveApp('changemanager')} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'changemanager' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Server size={18} /> ChangeLog
+            <button onClick={() => setActiveApp('changemanager')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'changemanager' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+              <Server size={18} /> ServerLog
+            </button>
+            <button onClick={() => setActiveApp('incidentlogger')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${activeApp === 'incidentlogger' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'hover:bg-slate-800 hover:text-white'}`}>
+              <ShieldAlert size={18} /> Incidents
             </button>
           </div>
         </div>
@@ -161,33 +146,22 @@ export default function App() {
               <p className="text-xs text-slate-400 truncate">{user.email}</p>
             </div>
           </div>
-          <button 
-            onClick={() => signOut(auth)} 
-            className="w-full flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 py-2 rounded-lg transition-colors"
-          >
+          <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 py-2 rounded-lg transition-colors">
             <LogOut size={16} /> Sign Out
           </button>
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen bg-slate-50">
         <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
-              {activeApp === 'dashboard' ? 'Workspace Overview' : activeApp === 'changemanager' ? 'ChangeLog' : activeApp}
-            </h1>
-            <p className="text-slate-500 mt-1">
-              {activeApp === 'dashboard' 
-                ? 'Welcome back! Here is what is happening today.' 
-                : `Manage your ${activeApp} activities.`}
-            </p>
+            <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">{activeApp === 'dashboard' ? 'Workspace Overview' : activeApp === 'changemanager' ? 'ServerLog' : activeApp === 'incidentlogger' ? 'Incident Logger' : activeApp}</h1>
+            <p className="text-slate-500 mt-1">{activeApp === 'dashboard' ? 'Welcome back! Here is what is happening today.' : `Manage your ${activeApp} activities.`}</p>
           </div>
           <div className="hidden md:block text-right bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-sm font-medium text-slate-600">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </header>
-
         {renderContent()}
       </main>
     </div>

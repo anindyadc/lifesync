@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { Tag, Wallet, ArrowDownCircle, PieChart } from 'lucide-react';
+import { Tag, Wallet, ArrowDownCircle, PieChart, Layers } from 'lucide-react';
 
-// Locally: import { formatCurrency } from '../../../lib/utils';
+/**
+ * UTILS
+ */
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -38,6 +40,42 @@ export const SummaryCards = ({ expenses }) => {
           <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Net Balance</p>
           <p className="text-xl font-black text-white">{formatCurrency(stats.net)}</p>
         </div>
+      </div>
+    </div>
+  );
+};
+
+export const GroupSubtotals = ({ expenses }) => {
+  const groups = useMemo(() => {
+    const map = {};
+    expenses.forEach(e => {
+      if (e.group) {
+        map[e.group] = (map[e.group] || 0) + (Number(e.amount) || 0);
+      }
+    });
+    return Object.entries(map)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3); // Top 3 groups
+  }, [expenses]);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6 font-sans animate-in slide-in-from-right-4">
+      <h3 className="font-bold text-slate-400 mb-4 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+        <Layers size={14} className="text-indigo-500" /> Event Totals
+      </h3>
+      <div className="space-y-4">
+        {groups.map((g, i) => (
+          <div key={i} className="flex justify-between items-center">
+            <div>
+              <p className="text-sm font-bold text-slate-800">{g.name}</p>
+              <p className="text-[10px] text-slate-400 font-medium">Accumulated spending</p>
+            </div>
+            <span className="text-sm font-black text-slate-900">{formatCurrency(g.total)}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -81,7 +119,7 @@ export const CategoryDistribution = ({ categories, expenses }) => {
                 cx="18" cy="18" r="15.915"
                 fill="transparent"
                 stroke={s.color || '#6366f1'}
-                strokeWidth="3.5"
+                strokeWidth="4"
                 strokeDasharray={`${s.percent} ${100 - s.percent}`}
                 strokeDashoffset={-s.start}
                 className="transition-all duration-1000"
@@ -90,7 +128,7 @@ export const CategoryDistribution = ({ categories, expenses }) => {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[8px] font-black text-slate-400 uppercase">Spent</span>
-            <span className="text-sm font-black text-slate-800">{formatCurrency(data.totalVal)}</span>
+            <span className="text-xs font-black text-slate-800">{formatCurrency(data.totalVal)}</span>
           </div>
         </div>
 
@@ -132,7 +170,7 @@ export const CategorySubtotals = ({ categories, expenses }) => {
               <span className="text-slate-600">{cat.label}</span>
               <span className="text-slate-900">{formatCurrency(cat.total)}</span>
             </div>
-            <div className="w-full bg-slate-50 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-50 h-1 rounded-full overflow-hidden">
               <div 
                 className="h-full rounded-full transition-all duration-700" 
                 style={{ 

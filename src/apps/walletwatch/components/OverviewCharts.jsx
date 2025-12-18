@@ -3,16 +3,19 @@ import { TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { formatCurrency } from '../../../lib/utils';
 
 // Helper to reliably parse date from Firestore or String
-const parseDate = (dateField) => {
+  const parseDate = (dateField) => {
   if (!dateField) return new Date();
+  // Handle Firestore Timestamp
   if (dateField.toDate && typeof dateField.toDate === 'function') return dateField.toDate();
   if (dateField.seconds) return new Date(dateField.seconds * 1000);
-  return new Date(dateField);
+  // Handle String or Date object
+  const d = new Date(dateField);
+  return isNaN(d.getTime()) ? new Date() : d;
 };
 
 /**
  * NetTrendGraph Component
- * Shows the line chart of balance velocity over the last 7 active days.
+ * Visualizes the balance velocity (inflows - outflows).
  */
 export const NetTrendGraph = ({ expenses }) => {
   const { chartData, netTotal } = useMemo(() => {
@@ -21,17 +24,13 @@ export const NetTrendGraph = ({ expenses }) => {
 
     expenses.forEach(e => {
       const date = parseDate(e.date);
-      if (isNaN(date)) return;
-
       const dateKey = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
       const amt = Number(e.amount) || 0;
 
-      // For the balance trend, we aggregate everything (inflows and outflows)
       daily[dateKey] = (daily[dateKey] || 0) + amt;
       total += amt;
     });
 
-    // Sort and get last 7 entries
     const sorted = Object.entries(daily)
       .sort((a, b) => new Date(a[0]) - new Date(b[0]))
       .slice(-7);
@@ -39,16 +38,8 @@ export const NetTrendGraph = ({ expenses }) => {
     return { chartData: sorted, netTotal: total };
   }, [expenses]);
 
-  if (chartData.length < 1) {
-    return (
-      <div className="bg-white p-8 rounded-3xl border border-slate-100 h-64 flex flex-col items-center justify-center text-slate-400 space-y-2">
-        <Activity size={32} className="opacity-20" />
-        <p className="text-sm italic font-medium">Add transactions to see flow trends</p>
-      </div>
-    );
-  }
+  if (chartData.length === 0) return null;
 
-  // Visual Logic
   const vals = chartData.map(d => d[1]);
   const max = Math.max(...vals.map(Math.abs), 1);
   const height = 100, width = 300, padding = 20;
@@ -64,27 +55,21 @@ export const NetTrendGraph = ({ expenses }) => {
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
       <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest">
-          <TrendingUp size={16}/> Net Flow
+        <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest">
+          <TrendingUp size={14}/> Balance Trend
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Current Balance</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Current Net</p>
           <p className="text-xl font-black text-slate-900">{formatCurrency(netTotal)}</p>
         </div>
       </div>
 
       <div className="h-40 w-full">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-          <defs>
-            <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#a855f7" />
-            </linearGradient>
-          </defs>
           <polyline
             fill="none"
-            stroke="url(#lineGradient)"
-            strokeWidth="4"
+            stroke="#6366f1"
+            strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             points={points}
@@ -92,7 +77,7 @@ export const NetTrendGraph = ({ expenses }) => {
           {chartData.map((d, i) => {
             const x = chartData.length > 1 ? (i / (chartData.length - 1)) * (width - padding * 2) + padding : width / 2;
             const y = height - ((d[1] / max) * (height / 2) + (height / 2));
-            return <circle key={i} cx={x} cy={y} r="4" fill="#4338ca" />;
+            return <circle key={i} cx={x} cy={y} r="3.5" fill="#4338ca" />;
           })}
         </svg>
       </div>
@@ -102,52 +87,65 @@ export const NetTrendGraph = ({ expenses }) => {
 
 /**
  * WeeklyBarChart Component
- * Shows a bar chart for daily spending for the current week.
+ * Visualizes daily spending (positive amounts) for the current week.
  */
 export const WeeklyBarChart = ({ expenses }) => {
   const days = useMemo(() => {
     const result = [];
     const now = new Date();
+    // Normalize "now" to midnight for consistent comparison
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(now.getDate() - i);
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
       const dayLabel = d.toLocaleDateString('en-IN', { weekday: 'short' });
 
-      const total = expenses.filter(e => {
+      const dayTotal = expenses.reduce((sum, e) => {
         const eDate = parseDate(e.date);
-        return eDate.toDateString() === d.toDateString();
-      }).reduce((sum, e) => {
+        const isSameDay = eDate.getFullYear() === d.getFullYear() &&
+                         eDate.getMonth() === d.getMonth() &&
+                         eDate.getDate() === d.getDate();
+
         const val = Number(e.amount) || 0;
-        return sum + (val > 0 ? val : 0); // Only count outflows (spending) for activity
+        // Weekly activity usually tracks spending (outflows > 0)
+        return isSameDay && val > 0 ? sum + val : sum;
       }, 0);
 
-      result.push({ day: dayLabel, total });
+      result.push({ day: dayLabel, total: dayTotal });
     }
     return result;
   }, [expenses]);
 
   const maxVal = Math.max(...days.map(d => d.total), 1);
+  const hasData = days.some(d => d.total > 0);
 
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
       <div className="flex items-center gap-2 mb-6 font-bold text-slate-800 text-[10px] uppercase tracking-widest">
-        <BarChart3 size={14} className="text-indigo-500" /> Weekly Activity
+        <BarChart3 size={14} className="text-indigo-500" /> Weekly Outflow
       </div>
 
-      <div className="flex items-end justify-between h-32 gap-3">
-        {days.map((d, i) => (
-          <div key={i} className="flex flex-col items-center flex-1 group">
-            <div className="w-full bg-slate-50 rounded-t-lg h-full flex items-end overflow-hidden">
-              <div
-                className="w-full bg-indigo-500 transition-all duration-1000 ease-out rounded-t-sm"
-                style={{ height: `${(d.total / maxVal) * 100}%` }}
-              />
+      {hasData ? (
+        <div className="flex items-end justify-between h-32 gap-3 px-1">
+          {days.map((d, i) => (
+            <div key={i} className="flex flex-col items-center flex-1 group">
+              <div className="w-full bg-slate-50 rounded-t-lg h-full flex items-end overflow-hidden">
+                <div
+                  className="w-full bg-indigo-500 transition-all duration-1000 ease-out rounded-t-sm"
+                  style={{ height: `${(d.total / maxVal) * 100}%` }}
+                />
+              </div>
+              <span className="text-[9px] mt-3 text-slate-400 font-bold uppercase">{d.day.charAt(0)}</span>
             </div>
-            <span className="text-[10px] mt-3 text-slate-400 font-bold uppercase">{d.day.charAt(0)}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-slate-50 rounded-2xl">
+          <Activity size={20} className="text-slate-200 mb-2" />
+          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">No activity this week</p>
+        </div>
+      )}
     </div>
   );
 };

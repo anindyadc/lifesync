@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, ArrowLeftRight, CreditCard, Calendar, Type, Hash } from 'lucide-react';
+import { Layers, ArrowLeftRight, CreditCard, Calendar, Type } from 'lucide-react';
 
-/**
- * CONSTANTS
- * Inlined to resolve pathing issues in the preview environment.
- * Locally: import { PAYMENT_MODES } from '../constants';
- */
-const PAYMENT_MODES = [
-  { id: 'upi', label: 'UPI' },
-  { id: 'cash', label: 'Cash' },
-  { id: 'card', label: 'Card' }
-];
+// Modular import for local deployment - ensuring single source of truth
+import { PAYMENT_MODES } from '../constants';
 
 /**
  * TransactionForm Component
- * Refined to match standard LifeSync application scaling:
- * - Compact max-width (max-w-md)
- * - Standardized typography and icon sizing
- * - Maintained Grid Category selection
+ * Standardized LifeSync Visuals:
+ * - Labels: text-xs font-bold text-slate-500 uppercase
+ * - Inputs: rounded-xl bg-slate-50 border-slate-200
+ * - Headings: text-xl font-bold text-slate-800
  */
 const TransactionForm = ({ initialData, onSubmit, categories, isSettling }) => {
   const [formData, setFormData] = useState({
@@ -73,9 +65,9 @@ const TransactionForm = ({ initialData, onSubmit, categories, isSettling }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Amount Input */}
+          {/* Amount Field */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
               Amount
             </label>
             <div className="relative">
@@ -93,118 +85,120 @@ const TransactionForm = ({ initialData, onSubmit, categories, isSettling }) => {
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
-              Description
-            </label>
-            <div className="relative">
-              <Type className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="e.g. Lunch at Office"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
-              />
+          {/* Description & Group */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
+                Description
+              </label>
+              <div className="relative">
+                <Type className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="What was this for?"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
+                Group / Event (Optional)
+              </label>
+              <div className="relative">
+                <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  value={formData.group}
+                  onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                  placeholder="e.g. Goa Trip 2024"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Group/Event */}
+          {/* Category Selection Grid */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
-              Group / Event (Optional)
-            </label>
-            <div className="relative">
-              <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                value={formData.group}
-                onChange={(e) => setFormData({ ...formData, group: e.target.value })}
-                placeholder="e.g. Trip to Goa"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Categories Grid - Compact Version */}
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-wider">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">
               Category
             </label>
             <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, category: cat.id })}
-                  className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
-                    formData.category === cat.id 
-                      ? `border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-600/10` 
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
-                  <span className="text-xs font-bold truncate block">{cat.label}</span>
-                </button>
-              ))}
+              {categories.map(cat => {
+                const isSelected = formData.category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, category: cat.id })}
+                    style={isSelected ? { borderColor: cat.color } : {}}
+                    className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                      isSelected 
+                        ? `${cat.bg || 'bg-indigo-50 text-indigo-700'} shadow-sm ring-1 ring-opacity-20` 
+                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="text-xs font-bold truncate block">{cat.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
+          {/* Mode & Date Row */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Payment Mode */}
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
                 Payment
               </label>
               <select
                 value={formData.paymentMode}
                 onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm transition-all"
               >
                 {PAYMENT_MODES.map(mode => (
                   <option key={mode.id} value={mode.id}>{mode.label}</option>
                 ))}
               </select>
             </div>
-
-            {/* Date */}
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
                 Date
               </label>
               <input
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm transition-all"
               />
             </div>
           </div>
 
-          {/* Reimbursement Toggle - Compact Card */}
+          {/* Lent Toggle Section */}
           {!isSettling && (
-            <div className={`p-4 rounded-xl border transition-all ${
+            <div className={`p-4 rounded-xl border transition-all duration-200 ${
               formData.isReimbursable 
-                ? 'bg-indigo-600 border-indigo-700 shadow-md shadow-indigo-100' 
-                : 'bg-slate-50 border-slate-200'
+                ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                : 'bg-slate-50 border-slate-200 opacity-80'
             }`}>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.isReimbursable}
                   onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-500/20"
+                  className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 transition-all"
                 />
                 <div>
-                  <span className={`block text-[10px] font-black uppercase tracking-widest ${
-                    formData.isReimbursable ? 'text-white' : 'text-slate-800'
+                  <span className={`block text-xs font-bold uppercase tracking-tight ${
+                    formData.isReimbursable ? 'text-indigo-900' : 'text-slate-700'
                   }`}>
-                    Mark as Lent
+                    Lent to someone?
                   </span>
-                  <p className={`text-[9px] font-medium leading-tight ${
-                    formData.isReimbursable ? 'text-indigo-100' : 'text-slate-400'
+                  <p className={`text-[10px] font-medium leading-tight mt-0.5 ${
+                    formData.isReimbursable ? 'text-indigo-600' : 'text-slate-400'
                   }`}>
-                    Expect this money to be returned
+                    Mark as pending return
                   </p>
                 </div>
               </label>

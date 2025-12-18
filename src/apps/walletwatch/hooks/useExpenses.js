@@ -1,71 +1,66 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, addDoc, updateDoc, deleteDoc, doc, 
-  onSnapshot, serverTimestamp, Timestamp 
-} from 'firebase/firestore';
-import { db } from '../../../lib/firebase'; // Adjust path based on your folder structure
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { DEFAULT_CATEGORIES } from '../constants';
 
-const APP_ID = 'default-app-id'; // Or import from a config file
-
-export const useExpenses = (user) => {
+export const useExpenses = (user, appId = 'default-app-id') => {
   const [expenses, setExpenses] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
-    
-    // Firestore Listener
-    const q = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Sort by Date Descending
-      data.sort((a, b) => {
-        const dateA = a.date && typeof a.date.toDate === 'function' ? a.date.toDate() : new Date(a.date);
-        const dateB = b.date && typeof b.date.toDate === 'function' ? b.date.toDate() : new Date(b.date);
-        return dateB - dateA;
-      });
-      
-      setExpenses(data);
+
+    // 1. Listen to Expenses
+    const qExp = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
+    const unsubExp = onSnapshot(qExp, (snapshot) => {
+      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore Expenses Error:", error);
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [user]);
-
-  // Actions
-  const addExpense = async (data) => {
-    const dateObj = new Date(data.date);
-    // Preserve current time to avoid timezone shifts
-    const now = new Date();
-    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-
-    await addDoc(collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses'), {
-      ...data,
-      amount: parseFloat(data.amount),
-      date: Timestamp.fromDate(dateObj),
-      createdAt: serverTimestamp()
+    // 2. Listen to Custom Categories in Settings
+    const catRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig');
+    const unsubCat = onSnapshot(catRef, (docSnap) => {
+      if (docSnap.exists() && docSnap.data().categories) {
+        setCategories(docSnap.data().categories);
+      } else {
+        setCategories(DEFAULT_CATEGORIES);
+      }
+    }, (error) => {
+      console.error("Firestore Categories Error:", error);
     });
+
+    return () => { unsubExp(); unsubCat(); };
+  }, [user, appId]);
+
+  const addCategory = async (label) => {
+    if (!label.trim()) return;
+    const id = label.toLowerCase().replace(/\s+/g, '_');
+    if (categories.some(c => c.id === id)) return;
+    
+    const newCat = { 
+      id, 
+      label, 
+      color: '#6366f1', 
+      bg: 'bg-indigo-100 text-indigo-600' 
+    };
+    
+    const updated = [...categories, newCat];
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig'), {
+      categories: updated
+    }, { merge: true });
   };
 
-  const updateExpense = async (id, data) => {
-    const dateObj = new Date(data.date);
-    const now = new Date();
-    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-
-    const expenseRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', id);
-    await updateDoc(expenseRef, {
-      ...data,
-      amount: parseFloat(data.amount),
-      date: Timestamp.fromDate(dateObj),
-      updatedAt: serverTimestamp()
-    });
+  const removeCategory = async (id) => {
+    // Prevent removing core categories if needed, or allow all
+    const updated = categories.filter(c => c.id !== id);
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig'), {
+      categories: updated
+    }, { merge: true });
   };
 
-  const deleteExpense = async (id) => {
-    const expenseRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', id);
-    await deleteDoc(expenseRef);
-  };
-
-  return { expenses, loading, addExpense, updateExpense, deleteExpense };
+  return { expenses, categories, loading, addCategory, removeCategory };
 };

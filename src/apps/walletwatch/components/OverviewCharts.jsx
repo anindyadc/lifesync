@@ -1,115 +1,95 @@
 import React, { useMemo } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { formatCurrency } from '../../../lib/utils';
-import { CATEGORIES } from '../constants';
 
-// Internal SVG Donut
-const Donut = ({ data, total }) => {
-  if (total === 0) return <div className="relative w-48 h-48 mx-auto flex items-center justify-center bg-gray-50 rounded-full border-2 border-dashed border-gray-200"><span className="text-gray-400 text-xs">No Data</span></div>;
-  
-  let cumulativePercent = 0;
-  const getCoordinatesForPercent = (percent) => {
-    const x = Math.cos(2 * Math.PI * percent);
-    const y = Math.sin(2 * Math.PI * percent);
-    return [x, y];
-  };
+export const NetTrendGraph = ({ expenses }) => {
+  const { chartData, netTotal } = useMemo(() => {
+    const daily = {};
+    let total = 0;
+    expenses.forEach(e => {
+      const rawDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      if (isNaN(rawDate)) return;
+      const dateKey = rawDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const amt = Number(e.amount) || 0;
+      daily[dateKey] = (daily[dateKey] || 0) + amt;
+      total += amt;
+    });
+    const sorted = Object.entries(daily).sort((a, b) => new Date(a[0]) - new Date(b[0])).slice(-7);
+    return { chartData: sorted, netTotal: total };
+  }, [expenses]);
 
-  const slices = data.map((item, i) => {
-    const startPercent = cumulativePercent;
-    const slicePercent = item.value / total;
-    cumulativePercent += slicePercent;
-    const endPercent = cumulativePercent;
-    
-    const [startX, startY] = getCoordinatesForPercent(startPercent);
-    const [endX, endY] = getCoordinatesForPercent(endPercent);
-    const largeArcFlag = slicePercent > 0.5 ? 1 : 0;
-    
-    const pathData = [
-      `M ${startX} ${startY}`,
-      `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-      `L 0 0`,
-    ].join(' ');
-    
-    return { path: pathData, color: item.color, key: i };
-  });
+  if (chartData.length < 2) return (
+    <div className="bg-white p-8 rounded-3xl border border-slate-100 h-64 flex flex-col items-center justify-center text-slate-400 space-y-2">
+      <Activity size={32} className="opacity-20" />
+      <p className="text-sm italic font-medium">Log daily transactions to see trends</p>
+    </div>
+  );
+
+  const max = Math.max(...chartData.map(d => Math.abs(d[1])), 1);
+  const height = 100, width = 300, padding = 20;
+  const points = chartData.map((d, i) => {
+    const x = (i / (chartData.length - 1)) * (width - padding * 2) + padding;
+    const y = height - ((d[1] / max) * (height / 2) + (height / 2));
+    return `${x},${y}`;
+  }).join(' ');
 
   return (
-    <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
-        <svg viewBox="-1 -1 2 2" className="w-full h-full -rotate-90 transform" style={{ overflow: 'visible' }}>
-            {slices.map((slice) => (
-                <path key={slice.key} d={slice.path} fill={slice.color} stroke="white" strokeWidth="0.02" />
-            ))}
-            <circle cx="0" cy="0" r="0.6" fill="white" />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-gray-400 text-xs font-medium uppercase tracking-wide">Total</span>
-            <span className="text-xl font-bold text-slate-900">{formatCurrency(total)}</span>
+    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest"><TrendingUp size={16}/> Net Flow Velocity</div>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Net Balance</p>
+          <p className="text-xl font-black text-slate-900">{formatCurrency(netTotal)}</p>
         </div>
+      </div>
+      <div className="h-48 w-full">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+          <polyline fill="none" stroke="#6366f1" strokeWidth="4" strokeLinecap="round" points={points} />
+          {chartData.map((d, i) => (
+            <circle key={i} cx={(i / (chartData.length - 1)) * (width - padding * 2) + padding} cy={height - ((d[1] / max) * (height / 2) + (height / 2))} r="5" fill="#4338ca" />
+          ))}
+        </svg>
+      </div>
     </div>
   );
 };
 
-// Internal Weekly Bar
-const WeeklyBar = ({ expenses }) => {
+export const WeeklyBarChart = ({ expenses }) => {
   const days = useMemo(() => {
     const result = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(); 
-      d.setDate(d.getDate() - i); 
+      const d = new Date();
+      d.setDate(d.getDate() - i);
       const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
-      const total = expenses.filter(e => { 
-        const eDate = e.date && typeof e.date.toDate === 'function' ? e.date.toDate() : new Date(e.date); 
-        return eDate.getDate() === d.getDate() && eDate.getMonth() === d.getMonth() && eDate.getFullYear() === d.getFullYear(); 
-      }).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      const total = expenses.filter(e => {
+        const eDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+        return eDate.toDateString() === d.toDateString();
+      }).reduce((sum, e) => sum + Math.max(0, Number(e.amount)), 0);
       result.push({ day: dayName, total });
     }
     return result;
   }, [expenses]);
-  
+
   const maxVal = Math.max(...days.map(d => d.total), 1);
-  return (
-    <div className="flex items-end justify-between h-32 pt-4 pb-2 px-2 gap-2">
-      {days.map((d, i) => (
-        <div key={i} className="flex flex-col items-center flex-1 h-full justify-end group">
-           <div className="relative w-full flex items-end justify-center h-full">
-             <div className={`w-full max-w-[12px] rounded-t-sm transition-all duration-500 ease-out ${d.total > 0 ? 'bg-blue-500' : 'bg-gray-100'}`} style={{ height: `${(d.total / maxVal) * 100}%`, minHeight: '4px' }}></div>
-           </div>
-           <span className="text-[10px] mt-2 text-gray-400">{d.day.charAt(0)}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
 
-const OverviewCharts = ({ expenses, categoryData, totalSpent }) => {
   return (
-    <div className="space-y-4">
-      {/* Category Donut */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-6 text-center">Monthly Breakdown</h3>
-        <Donut data={categoryData} total={totalSpent} />
-        <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {categoryData.slice(0, 8).map((item) => (
-            <div key={item.label} className="flex items-center justify-between text-xs p-2 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span className="text-slate-600">{item.label}</span>
-              </div>
-              <span className="font-semibold">{formatCurrency(item.value)}</span>
+    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="flex items-center gap-2 mb-6 font-bold text-slate-800 text-xs uppercase tracking-widest">
+        <BarChart3 size={16} className="text-indigo-500" /> Weekly Activity
+      </div>
+      <div className="flex items-end justify-between h-32 gap-2">
+        {days.map((d, i) => (
+          <div key={i} className="flex flex-col items-center flex-1">
+            <div className="w-full bg-slate-50 rounded-t-lg h-full flex items-end overflow-hidden">
+              <div 
+                className="w-full bg-indigo-500 transition-all duration-700" 
+                style={{ height: `${(d.total / maxVal) * 100}%` }}
+              />
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Weekly Activity */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-4 font-semibold text-slate-800">
-          <BarChart3 size={18} className="text-blue-500" /> Weekly Activity
-        </div>
-        <WeeklyBar expenses={expenses} />
+            <span className="text-[10px] mt-2 text-slate-400 font-bold uppercase">{d.day.charAt(0)}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
-
-export default OverviewCharts;

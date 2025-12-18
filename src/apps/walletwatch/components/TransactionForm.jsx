@@ -1,117 +1,227 @@
 import React, { useState, useEffect } from 'react';
-import { CATEGORIES, PAYMENT_MODES } from '../constants';
+import { Layers, ArrowLeftRight, CreditCard, Calendar, Type, Hash } from 'lucide-react';
 
-const TransactionForm = ({ initialData, onSubmit }) => {
-  const [formData, setFormData] = useState({ 
-    amount: '', 
-    description: '', 
-    category: 'food', 
+/**
+ * CONSTANTS
+ * Inlined to resolve pathing issues in the preview environment.
+ * Locally: import { PAYMENT_MODES } from '../constants';
+ */
+const PAYMENT_MODES = [
+  { id: 'upi', label: 'UPI' },
+  { id: 'cash', label: 'Cash' },
+  { id: 'card', label: 'Card' }
+];
+
+/**
+ * TransactionForm Component
+ * Refined to match standard LifeSync application scaling:
+ * - Compact max-width (max-w-md)
+ * - Standardized typography and icon sizing
+ * - Maintained Grid Category selection
+ */
+const TransactionForm = ({ initialData, onSubmit, categories, isSettling }) => {
+  const [formData, setFormData] = useState({
+    amount: '',
+    description: '',
+    category: '',
+    group: '',
     paymentMode: 'upi',
-    date: new Date().toISOString().split('T')[0] 
+    date: new Date().toISOString().split('T')[0],
+    isReimbursable: false
   });
 
   useEffect(() => {
     if (initialData) {
-      const d = initialData.date && typeof initialData.date.toDate === 'function' ? initialData.date.toDate() : new Date(initialData.date);
-      // Adjust timezone for input
-      const offset = d.getTimezoneOffset();
-      const localDate = new Date(d.getTime() - (offset*60*1000)).toISOString().split('T')[0];
-      
+      const d = initialData.date?.toDate ? initialData.date.toDate() : new Date(initialData.date);
       setFormData({
-        amount: initialData.amount,
-        description: initialData.description,
-        category: initialData.category,
-        paymentMode: initialData.paymentMode,
-        date: localDate
+        amount: Math.abs(initialData.amount),
+        description: initialData.description || '',
+        category: initialData.category || '',
+        group: initialData.group || '',
+        paymentMode: initialData.paymentMode || 'upi',
+        date: d.toISOString().split('T')[0],
+        isReimbursable: initialData.reimbursementStatus === 'pending'
       });
+    } else if (categories && categories.length > 0 && !formData.category) {
+      setFormData(prev => ({ ...prev, category: categories[0].id }));
     }
-  }, [initialData]);
+  }, [initialData, categories]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if(!formData.amount) return;
-    onSubmit(formData);
+    if (!formData.amount || !formData.category) return;
+    
+    onSubmit({
+      ...formData,
+      amount: Number(formData.amount),
+      reimbursementStatus: formData.isReimbursable ? 'pending' : 'none'
+    });
   };
 
   return (
-    <div className="max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <form onSubmit={handleSubmit} className="space-y-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">{initialData ? 'Edit Transaction' : 'New Transaction'}</h2>
-        
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Amount</label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-semibold">₹</span>
-            <input 
-              type="number" 
-              value={formData.amount} 
-              onChange={(e) => setFormData({...formData, amount: e.target.value})} 
-              placeholder="0.00" 
-              className="w-full pl-8 pr-4 py-3 text-2xl font-bold text-slate-900 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" 
-              required 
-              autoFocus={!initialData} 
-            />
+    <div className="max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300 font-sans">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            {isSettling ? (
+              <ArrowLeftRight className="text-emerald-500" size={20} />
+            ) : (
+              <CreditCard className="text-indigo-600" size={20} />
+            )}
+            {isSettling ? 'Record Refund' : (initialData ? 'Edit Entry' : 'New Transaction')}
+          </h2>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Amount Input */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+              Amount
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">₹</span>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full pl-10 pr-4 py-3 text-2xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                required
+                autoFocus={!initialData}
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-          <input 
-            type="text" 
-            value={formData.description} 
-            onChange={(e) => setFormData({...formData, description: e.target.value})} 
-            placeholder="What was this for?" 
-            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" 
-          />
-        </div>
+          {/* Description */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+              Description
+            </label>
+            <div className="relative">
+              <Type className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="e.g. Lunch at Office"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
-          <div className="grid grid-cols-2 gap-2">
-            {CATEGORIES.map(cat => (
-              <button 
-                key={cat.id} 
-                type="button" 
-                onClick={() => setFormData({...formData, category: cat.id})} 
-                className={`p-3 rounded-lg border text-left text-sm font-medium transition-all ${formData.category === cat.id ? `border-indigo-500 ring-1 ring-indigo-500 ${cat.bg}` : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+          {/* Group/Event */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+              Group / Event (Optional)
+            </label>
+            <div className="relative">
+              <Layers className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                value={formData.group}
+                onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                placeholder="e.g. Trip to Goa"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Categories Grid - Compact Version */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-wider">
+              Category
+            </label>
+            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, category: cat.id })}
+                  className={`px-3 py-2.5 rounded-lg border text-left transition-all ${
+                    formData.category === cat.id 
+                      ? `border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-600/10` 
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-xs font-bold truncate block">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Payment Mode */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+                Payment
+              </label>
+              <select
+                value={formData.paymentMode}
+                onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
               >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        </div>
+                {PAYMENT_MODES.map(mode => (
+                  <option key={mode.id} value={mode.id}>{mode.label}</option>
+                ))}
+              </select>
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Payment</label>
-            <select 
-              value={formData.paymentMode} 
-              onChange={(e) => setFormData({...formData, paymentMode: e.target.value})} 
-              className="w-full px-3 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+            {/* Date */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 block tracking-wider">
+                Date
+              </label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Reimbursement Toggle - Compact Card */}
+          {!isSettling && (
+            <div className={`p-4 rounded-xl border transition-all ${
+              formData.isReimbursable 
+                ? 'bg-indigo-600 border-indigo-700 shadow-md shadow-indigo-100' 
+                : 'bg-slate-50 border-slate-200'
+            }`}>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.isReimbursable}
+                  onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked })}
+                  className="w-5 h-5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-500/20"
+                />
+                <div>
+                  <span className={`block text-[10px] font-black uppercase tracking-widest ${
+                    formData.isReimbursable ? 'text-white' : 'text-slate-800'
+                  }`}>
+                    Mark as Lent
+                  </span>
+                  <p className={`text-[9px] font-medium leading-tight ${
+                    formData.isReimbursable ? 'text-indigo-100' : 'text-slate-400'
+                  }`}>
+                    Expect this money to be returned
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {/* Action Button */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 active:scale-[0.98] transition-all"
             >
-              {PAYMENT_MODES.map(mode => (<option key={mode.id} value={mode.id}>{mode.label}</option>))}
-            </select>
+              {initialData ? 'Update Record' : 'Save Transaction'}
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Date</label>
-            <input 
-              type="date" 
-              value={formData.date} 
-              onChange={(e) => setFormData({...formData, date: e.target.value})} 
-              className="w-full px-3 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" 
-            />
-          </div>
-        </div>
-
-        <div className="pt-4">
-          <button 
-            type="submit" 
-            className={`w-full py-4 text-white font-bold rounded-xl shadow-lg active:scale-[0.98] transition-all ${initialData ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}
-          >
-            {initialData ? 'Update Expense' : 'Save Expense'}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

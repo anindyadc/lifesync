@@ -1,7 +1,7 @@
 import React from 'react';
 import { CreditCard, Pencil, Trash2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../../lib/utils';
-import { CATEGORIES, PAYMENT_MODES } from '../constants';
+import { DEFAULT_CATEGORIES, PAYMENT_MODES } from '../constants';
 
 const TransactionList = ({ expenses, onEdit, onDelete, onViewAll, limit }) => {
   const displayExpenses = limit ? expenses.slice(0, limit) : expenses;
@@ -21,12 +21,12 @@ const TransactionList = ({ expenses, onEdit, onDelete, onViewAll, limit }) => {
         {displayExpenses.map(e => (
           <div key={e.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors group">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${CATEGORIES.find(c => c.id === e.category)?.bg || 'bg-gray-100'}`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${DEFAULT_CATEGORIES.find(c => c.id === e.category)?.bg || 'bg-gray-100'}`}>
                 <CreditCard size={20} className="opacity-75" />
               </div>
               <div>
                 <h3 className="font-semibold text-slate-800 text-sm">
-                  {CATEGORIES.find(c => c.id === e.category)?.label || 'Other'}
+                  {DEFAULT_CATEGORIES.find(c => c.id === e.category)?.label || 'Other'}
                 </h3>
                 <p className="text-xs text-slate-500 flex items-center gap-1">
                   {e.description || 'No description'} • {formatDate(e.date)}

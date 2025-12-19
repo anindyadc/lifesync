@@ -1,40 +1,43 @@
-/**
- * Global Utilities for Project OS
- */
+import { clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+ 
+export function cn(...inputs) {
+  return twMerge(clsx(inputs))
+}
 
-export const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-IN', {
+export const formatDuration = (minutes) => {
+  if (minutes === 0) return "0m";
+  if (!minutes) return "-";
+
+  const days = Math.floor(minutes / (24 * 60));
+  const hours = Math.floor((minutes % (24 * 60)) / 60);
+  const remainingMinutes = minutes % 60;
+
+  let parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (remainingMinutes > 0) parts.push(`${remainingMinutes}m`);
+
+  return parts.join(" ");
+};
+
+export const formatCurrency = (amount, locale = 'en-IN', currency = 'INR') => {
+  if (typeof amount !== 'number') return '-';
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'INR',
+    currency: currency,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
 };
 
-/**
- * Returns YYYY-MM-DD string in local time.
- * This is the most reliable way to match dates in charts.
- */
-export const toISODate = (dateInput) => {
-  let d;
-  if (!dateInput) d = new Date();
-  else if (dateInput.toDate && typeof dateInput.toDate === 'function') d = dateInput.toDate();
-  else if (dateInput.seconds) d = new Date(dateInput.seconds * 1000);
-  else d = new Date(dateInput);
-  if (isNaN(d.getTime())) d = new Date();
-  
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const toISODate = (date) => {
+  if (!date) return '';
+  return new Date(date).toISOString().split('T')[0];
 };
 
-export const formatDate = (dateField) => {
-  const d = dateField?.toDate ? dateField.toDate() : new Date(dateField);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-};
-
-export const formatDuration = (minutes) => {
-  if (!minutes || minutes <= 0) return '0m';
-  const hrs = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hrs === 0) return `${mins}m`;
-  if (mins === 0) return `${hrs}h`;
-  return `${hrs}h ${mins}m`;
+export const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
 };

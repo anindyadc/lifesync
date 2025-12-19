@@ -2,6 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 210 20% 98%; /* Light gray */
+    --foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+ 
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+ 
+    --primary: 235 60% 60%; /* Indigo-600 */
+    --primary-foreground: 210 40% 98%; /* Light gray */
+ 
+    --secondary: 210 40% 96.1%; /* Light gray */
+    --secondary-foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+ 
+    --muted: 210 40% 96.1%; /* Light gray */
+    --muted-foreground: 215.4 16.3% 46.9%; /* Gray */
+ 
+    --accent: 210 40% 96.1%; /* Light gray */
+    --accent-foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+ 
+    --destructive: 0 84.2% 60.2%; /* Red */
+    --destructive-foreground: 210 40% 98%; /* Light gray */
+
+    --border: 214.3 31.8% 91.4%; /* Light gray */
+    --input: 214.3 31.8% 91.4%; /* Light gray */
+    --ring: 235 60% 60%; /* Indigo-600 */
+ 
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%; /* Dark background */
+    --foreground: 210 40% 98%; /* Light foreground */
+ 
+    --card: 222.2 84% 4.9%; /* Dark card background */
+    --card-foreground: 210 40% 98%; /* Light card foreground */
+ 
+    --popover: 222.2 84% 4.9%; /* Dark popover background */
+    --popover-foreground: 210 40% 98%; /* Light popover foreground */
+ 
+    --primary: 235 60% 60%; /* Indigo-600 */
+    --primary-foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
+ 
+    --secondary: 217.2 32.6% 17.5%; /* Darker gray secondary */
+    --secondary-foreground: 210 40% 98%; /* Light gray */
+ 
+    --muted: 217.2 32.6% 17.5%; /* Darker gray muted */
+    --muted-foreground: 215 20.2% 65.1%; /* Gray muted foreground */
+ 
+    --accent: 217.2 32.6% 17.5%; /* Darker gray accent */
+    --accent-foreground: 210 40% 98%; /* Light gray */
+ 
+    --destructive: 0 62.8% 30.6%; /* Dark red */
+    --destructive-foreground: 210 40% 98%; /* Light gray */
+ 
+    --border: 217.2 32.6% 17.5%; /* Dark border */
+    --input: 217.2 32.6% 17.5%; /* Dark input border */
+    --ring: 235 60% 60%; /* Indigo-600 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
 @layer components {
   .input-with-icon {
     @apply flex items-center w-full bg-slate-50 border border-slate-200 rounded-xl transition-all;
@@ -19,4 +92,3 @@
     @apply text-slate-400;
   }
 }
-

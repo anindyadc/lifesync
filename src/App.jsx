@@ -4,19 +4,18 @@ import {
   User, 
   LogOut, 
   CheckCircle, 
-  Wallet, // Updated icon
+  Wallet, 
   Loader2, 
   Server, 
   ShieldAlert, 
-  Shield 
+  Shield, 
+  PiggyBank // New icon for Investments
 } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
-// Import initialized Firebase services from your provided src/lib/firebase.js
 import { auth, db } from './lib/firebase';
 
-// Import modular components (ensure these paths exist in your local project)
 import Layout from './components/Layout';
 import AuthScreen from './components/AuthScreen';
 import TaskFlowApp from './apps/taskflow';
@@ -24,6 +23,7 @@ import WalletWatchApp from './apps/walletwatch';
 import ChangeManagerApp from './apps/changemanager';
 import IncidentLoggerApp from './apps/incidentlogger';
 import AdminPanelApp from './apps/admin';
+import InvestmentsApp from './apps/investments'; // New app import
 
 /**
  * Main Application Shell
@@ -35,21 +35,18 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeApp, setActiveApp] = useState('dashboard');
 
-  // Must match the appId used in your Firestore rules path
   const appId = 'default-app-id';
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
-          // Fetch the user's permission profile from the public directory
           const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'userProfiles', currentUser.uid);
           const snap = await getDoc(profileRef);
           
           if (snap.exists()) {
             setUserProfile(snap.data());
           } else {
-            // Default fallback for new users before Admin approval
             setUserProfile({ 
               role: 'user', 
               allowedApps: [], 
@@ -83,16 +80,7 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  /**
-   * Personalized Name Logic:
-   * Priority: Firestore Profile -> Firebase Auth -> Email Prefix -> "User"
-   */
   const displayName = userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'User';
-
-  /**
-   * Permission Helpers:
-   * Admins see everything. Users see only apps in their 'allowedApps' array.
-   */
   const isAllowed = (appKey) => userProfile?.allowedApps?.includes(appKey) || userProfile?.role === 'admin';
   const isAdmin = userProfile?.role === 'admin';
 
@@ -102,6 +90,7 @@ export default function App() {
       case 'walletwatch': return isAllowed('walletwatch') ? <WalletWatchApp user={user} /> : null;
       case 'changemanager': return isAllowed('changemanager') ? <ChangeManagerApp user={user} /> : null;
       case 'incidentlogger': return isAllowed('incidentlogger') ? <IncidentLoggerApp user={user} /> : null;
+      case 'investments': return isAllowed('investments') ? <InvestmentsApp user={user} /> : null; // New app case
       case 'admin': return isAdmin ? <AdminPanelApp /> : null;
       default:
         return (
@@ -142,6 +131,15 @@ export default function App() {
               </button>
             )}
 
+            {isAllowed('investments') && (
+              <button onClick={() => setActiveApp('investments')} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+                <PiggyBank size={100} className="absolute -right-4 -bottom-4 opacity-5 text-amber-500"/>
+                <PiggyBank size={24} className="text-amber-500 mb-4"/>
+                <h3 className="text-xl font-bold text-slate-800">Investments</h3>
+                <p className="text-xs text-slate-400">Track savings & maturities</p>
+              </button>
+            )}
+
             {isAdmin && (
               <button onClick={() => setActiveApp('admin')} className="bg-slate-800 p-6 rounded-2xl shadow-xl transition-all text-left group relative overflow-hidden text-white hover:bg-slate-900">
                 <Shield size={100} className="absolute -right-4 -bottom-4 opacity-10"/>
@@ -176,7 +174,7 @@ export default function App() {
               {isAllowed('walletwatch') && <button onClick={() => setActiveApp('walletwatch')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'walletwatch' ? 'text-indigo-400 bg-slate-800 font-bold border border-indigo-500/20' : ''}`}><Wallet size={18} /> WalletWatch</button>}
               {isAllowed('changemanager') && <button onClick={() => setActiveApp('changemanager')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'changemanager' ? 'text-indigo-400 bg-slate-800 font-bold border border-indigo-500/20' : ''}`}><Server size={18} /> ServerLog</button>}
               {isAllowed('incidentlogger') && <button onClick={() => setActiveApp('incidentlogger')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'incidentlogger' ? 'text-indigo-400 bg-slate-800 font-bold border border-indigo-500/20' : ''}`}><ShieldAlert size={18} /> Incidents</button>}
-              
+              {isAllowed('investments') && <button onClick={() => setActiveApp('investments')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'investments' ? 'text-amber-400 bg-slate-800 font-bold border border-amber-500/20' : ''}`}><PiggyBank size={18} /> Investments</button>}
               {isAdmin && <button onClick={() => setActiveApp('admin')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 border border-indigo-500/20 mt-4 text-indigo-400 transition-all ${activeApp === 'admin' ? 'bg-indigo-600 text-white border-transparent' : ''}`}><Shield size={18} /> Admin Hub</button>}
             </div>
           </div>

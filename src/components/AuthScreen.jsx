@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-// Added CheckCircle to the import list below
 import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Layers, CheckCircle } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -30,7 +29,6 @@ const AuthScreen = () => {
     setError('');
 
     try {
-      // Set persistence based on "Remember Me" selection
       const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
       await setPersistence(auth, persistence);
 
@@ -44,7 +42,6 @@ const AuthScreen = () => {
           await updateProfile(user, { displayName: name });
         }
 
-        // Initialize User Profile in Public Directory
         const profileRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'userProfiles', user.uid);
         await setDoc(profileRef, {
           uid: user.uid,
@@ -56,35 +53,34 @@ const AuthScreen = () => {
         });
       }
     } catch (err) {
-      console.error("Auth Error:", err);
-      let msg = "Authentication failed.";
+      let msg = "Authentication failed. Please try again.";
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
-      if (err.code === 'auth/email-already-in-use') msg = "Email already registered.";
-      if (err.code === 'auth/weak-password') msg = "Password should be at least 6 characters.";
+      if (err.code === 'auth/email-already-in-use') msg = "An account with this email already exists.";
+      if (err.code === 'auth/weak-password') msg = "Password must be at least 6 characters long.";
       setError(msg);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-900">
-      <div className="bg-white max-w-md w-full rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-        {/* Branding Header */}
-        <div className="bg-indigo-600 p-8 text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-full bg-indigo-500 opacity-20 transform -skew-y-6 origin-top-left"></div>
-          <div className="relative z-10 text-white">
-            <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-lg">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans text-foreground">
+      <div className="bg-card max-w-md w-full rounded-2xl shadow-lg border border-border overflow-hidden">
+        <div className="bg-primary/90 p-8 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-primary opacity-20 transform -skew-y-6 origin-top-left"></div>
+          <div className="relative z-10 text-primary-foreground">
+            <div className="bg-primary-foreground/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-lg">
               <Layers size={32} />
             </div>
             <h1 className="text-3xl font-bold tracking-tight">LifeSync</h1>
-            <p className="text-indigo-100 mt-2 font-medium">Enterprise Management Platform</p>
+            <p className="text-primary-foreground/80 mt-2 font-medium">Your All-in-One Hub</p>
           </div>
         </div>
         
         <div className="p-8">
           <Form onSubmit={handleAuth} className="space-y-5">
             {error && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2">
                 <AlertCircle size={16} /> {error}
               </div>
             )}
@@ -92,8 +88,8 @@ const AuthScreen = () => {
             {!isLogin && (
               <FormGroup>
                 <Label htmlFor="name">Full Name</Label>
-                <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-                  <User className="text-slate-400 mr-3 shrink-0" size={20} />
+                <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
+                  <User className="text-muted-foreground mr-3 shrink-0" size={20} />
                   <Input 
                     required 
                     type="text"
@@ -101,7 +97,7 @@ const AuthScreen = () => {
                     value={name} 
                     onChange={(e) => setName(e.target.value)} 
                     placeholder="Full Name" 
-                    className="flex-1 border-none focus:ring-0 px-0 py-0"
+                    className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
                   />
                 </div>
               </FormGroup>
@@ -109,8 +105,8 @@ const AuthScreen = () => {
             
             <FormGroup>
               <Label htmlFor="email">Email Address</Label>
-              <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-                <Mail className="text-slate-400 mr-3 shrink-0" size={20} />
+              <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
+                <Mail className="text-muted-foreground mr-3 shrink-0" size={20} />
                 <Input 
                   required 
                   type="email"
@@ -118,15 +114,15 @@ const AuthScreen = () => {
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   placeholder="Email Address" 
-                  className="flex-1 border-none focus:ring-0 px-0 py-0"
+                  className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
                 />
               </div>
             </FormGroup>
             
             <FormGroup>
               <Label htmlFor="password">Password</Label>
-              <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-                <Lock className="text-slate-400 mr-3 shrink-0" size={20} />
+              <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
+                <Lock className="text-muted-foreground mr-3 shrink-0" size={20} />
                 <Input 
                   required 
                   type="password"
@@ -134,7 +130,7 @@ const AuthScreen = () => {
                   value={password} 
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="Password" 
-                  className="flex-1 border-none focus:ring-0 px-0 py-0"
+                  className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
                 />
               </div>
             </FormGroup>
@@ -142,18 +138,13 @@ const AuthScreen = () => {
             {isLogin && (
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${rememberMe ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 group-hover:border-indigo-400'}`}>
-                    {rememberMe && <CheckCircle size={14} className="text-white" />}
-                    <input 
-                      type="checkbox" 
-                      className="hidden" 
-                      checked={rememberMe} 
-                      onChange={(e) => setRememberMe(e.target.checked)} 
-                    />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-primary border-primary' : 'border-border group-hover:border-primary/50'}`}>
+                    {rememberMe && <CheckCircle size={14} className="text-primary-foreground" />}
                   </div>
-                  <span className="text-sm text-slate-600 font-medium">Remember me</span>
+                  <input type="checkbox" className="sr-only" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                  <span className="text-sm text-muted-foreground font-medium">Remember me</span>
                 </Label>
-                <button type="button" className="text-sm text-indigo-600 font-bold hover:underline">
+                <button type="button" className="text-sm text-primary font-bold hover:underline">
                   Forgot Password?
                 </button>
               </div>
@@ -161,7 +152,7 @@ const AuthScreen = () => {
 
             <Button
               disabled={loading} 
-              className="w-full py-3.5 font-bold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+              className="w-full py-3.5 font-bold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
@@ -175,14 +166,14 @@ const AuthScreen = () => {
           </Form>
 
           <div className="mt-8 text-center">
-            <p className="text-slate-500 text-sm">
+            <p className="text-muted-foreground text-sm">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
               <button 
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
                 }} 
-                className="text-indigo-600 font-bold hover:underline"
+                className="text-primary font-bold hover:underline"
               >
                 {isLogin ? 'Sign Up' : 'Sign In'}
               </button>

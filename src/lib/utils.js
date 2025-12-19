@@ -31,13 +31,23 @@ export const formatCurrency = (amount, locale = 'en-IN', currency = 'INR') => {
   }).format(amount);
 };
 
-export const toISODate = (date) => {
-  if (!date) return '';
-  return new Date(date).toISOString().split('T')[0];
+export const toISODate = (dateInput) => {
+  if (!dateInput) return '';
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return '';
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
 };
 
-export const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
+export const formatDate = (dateInput) => {
+  if (!dateInput) return '-';
+  const date = dateInput.toDate ? dateInput.toDate() : new Date(dateInput);
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
   return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
 };

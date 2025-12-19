@@ -50,7 +50,9 @@ const WalletWatchApp = ({ user }) => {
     const [year, month, day] = formData.date.split('-').map(Number);
     const localDate = new Date(year, month - 1, day);
 
-    const finalAmount = relatedTxn ? -Math.abs(Number(formData.amount)) : Number(formData.amount);
+    const finalAmount = formData.category === 'reimbursement' 
+      ? Math.abs(Number(formData.amount)) 
+      : -Math.abs(Number(formData.amount));
 
     const payload = {
       ...formData,

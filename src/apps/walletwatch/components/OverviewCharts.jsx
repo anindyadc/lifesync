@@ -53,19 +53,32 @@ export const NetTrendGraph = ({ expenses }) => {
  */
 export const WeeklyBarChart = ({ expenses }) => {
   const days = useMemo(() => {
+    const dailyTotals = new Map();
+    expenses.forEach(e => {
+      if (e.category === 'reimbursement') return;
+
+      const expenseDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      const isoKey = toISODate(expenseDate);
+      if (!isoKey) return;
+
+      const currentTotal = dailyTotals.get(isoKey) || 0;
+      const amount = Math.abs(Number(e.amount) || 0);
+      dailyTotals.set(isoKey, currentTotal + amount);
+    });
+
     const result = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
+      
       const isoKey = toISODate(d);
-      const dayTotal = expenses.reduce((sum, e) => {
-        const expenseDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-        const eIso = toISODate(expenseDate.toISOString());
-        const val = Number(e.amount) || 0;
-        return (eIso === isoKey && val > 0) ? sum + val : sum;
-      }, 0);
-      result.push({ day: d.toLocaleDateString('en-IN', { weekday: 'short' }), total: dayTotal });
+      const total = dailyTotals.get(isoKey) || 0;
+
+      result.push({ 
+        day: d.toLocaleDateString('en-IN', { weekday: 'short' }), 
+        total: total 
+      });
     }
     return result;
   }, [expenses]);
@@ -79,11 +92,12 @@ export const WeeklyBarChart = ({ expenses }) => {
       {hasData ? (
         <div className="flex items-end justify-between h-32 gap-3 px-1">
           {days.map((d, i) => (
-            <div key={i} className="flex flex-col items-center flex-1 group">
-              <div className="w-full rounded-t-lg h-full flex items-end overflow-hidden bg-transparent">
-                <div className="w-full bg-indigo-500 transition-all duration-700 ease-out rounded-t-sm min-h-[1px]" style={{ height: `${(d.total / maxVal) * 100}%` }} />
-              </div>
-              <span className="text-[9px] mt-3 text-slate-400 font-bold uppercase">{d.day.charAt(0)}</span>
+            <div key={i} className="flex-1 flex flex-col justify-end items-center gap-2 h-full">
+              <div 
+                className="w-full bg-indigo-500 rounded-t-sm transition-all duration-500 ease-out"
+                style={{ height: `${(d.total / maxVal) * 100}%` }}
+              />
+              <span className="text-[9px] text-slate-400 font-bold uppercase">{d.day}</span>
             </div>
           ))}
         </div>

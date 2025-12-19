@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar } from 'lucide-react';
+import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User } from 'lucide-react';
 
 const formatDate = (dateField) => {
   if (!dateField) return '-';
@@ -36,14 +36,9 @@ const PriorityBadge = ({ priority }) => {
   );
 };
 
-/**
- * IncidentCard Component
- * Expanded layout for better visibility of long descriptions and resolution notes.
- */
 const IncidentCard = ({ incident, onResolve, onEdit }) => {
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
-      {/* Visual Status Indicator */}
       {incident.status === 'open' && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>}
       
       <div className="flex justify-between items-start mb-5">
@@ -81,9 +76,12 @@ const IncidentCard = ({ incident, onResolve, onEdit }) => {
             {incident.application}
           </div>
         )}
+        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 text-xs font-bold text-indigo-600">
+          <User size={14} className="text-indigo-400" />
+          {incident.reportedBy || 'Unknown Reporter'}
+        </div>
       </div>
 
-      {/* Expanded Description Area */}
       <div className="flex-grow">
         <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-2 block">Issue Details</label>
         <div className="text-base text-slate-700 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 leading-relaxed whitespace-pre-wrap">

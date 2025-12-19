@@ -3,6 +3,10 @@ import { Users, Shield, ShieldCheck, ShieldAlert, Check, Save, Loader2, Search }
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
+/**
+ * AdminPanelApp
+ * Manages user roles and grants access to specific applications.
+ */
 const AdminPanelApp = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,9 +14,12 @@ const AdminPanelApp = () => {
   const [savingId, setSavingId] = useState(null);
 
   const APP_ID = 'default-app-id';
+  
+  // UPDATED: Added 'investment' to the manageable apps list
   const APPS_LIST = [
     { id: 'taskflow', label: 'TaskFlow', color: 'bg-emerald-100 text-emerald-700' },
     { id: 'walletwatch', label: 'WalletWatch', color: 'bg-indigo-100 text-indigo-700' },
+    { id: 'investment', label: 'Investment', color: 'bg-rose-100 text-rose-700' },
     { id: 'changemanager', label: 'ServerLog', color: 'bg-blue-100 text-blue-700' },
     { id: 'incidentlogger', label: 'Incidents', color: 'bg-red-100 text-red-700' },
   ];
@@ -56,7 +63,6 @@ const AdminPanelApp = () => {
       });
     } catch (err) {
       console.error("Failed to save permissions:", err);
-      alert("Permission denied. Ensure you have admin rights in Firebase.");
     } finally {
       setSavingId(null);
     }
@@ -76,7 +82,7 @@ const AdminPanelApp = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-800">Admin Control Center</h2>
-            <p className="text-sm text-slate-500">Manage user roles and application access</p>
+            <p className="text-sm text-slate-500">Assign permissions for the new Investment app and more</p>
           </div>
         </div>
         <div className="relative w-full md:w-72">
@@ -155,12 +161,6 @@ const AdminPanelApp = () => {
               </tbody>
             </table>
           </div>
-          {filteredUsers.length === 0 && (
-            <div className="p-20 text-center text-slate-400">
-              <Users size={48} className="mx-auto mb-4 opacity-20" />
-              <p>No users found matching your search.</p>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPER FUNCTIONS ---
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Safely check if a profile exists and get its data
+    function getProfile() {
+      return get(/databases/$(database)/documents/artifacts/default-app-id/public/data/userProfiles/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getProfile().role == 'admin';
+    }
+
+    function hasAppPermission(appName) {
+      // Admins get everything, users check their array
+      return isAdmin() || (isAuthenticated() && appName in getProfile().allowedApps);
+    }
+
+    // --- RULES ---
+
+    // 1. User Profiles Rule
+    match /artifacts/default-app-id/public/data/userProfiles/{userId} {
+      allow read: if isAuthenticated(); // Allow reading profile directory
+      allow create: if isOwner(userId);
+      allow update, delete: if isAdmin();
+    }
+
+    // 2. TaskFlow Data
+    match /artifacts/default-app-id/users/{userId}/tasks/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 3. WalletWatch Data
+    match /artifacts/default-app-id/users/{userId}/expenses/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 4. ServerLog (changelogs) Data
+    match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
+    }
+
+    // 5. IncidentLogger (incidents) Data
+    match /artifacts/default-app-id/users/{userId}/incidents/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('incidentlogger');
+    }
+
+    // 6. Investments Data
+    match /artifacts/default-app-id/users/{userId}/investments/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('investments');
+    }
+    
+    // Default Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

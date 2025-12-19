@@ -43,7 +43,7 @@ export const useInvestments = (userId) => {
     setLoading(true);
     setError(null);
     console.log("useInvestments: Listening for userId:", userId);
-    const investmentsCollectionRef = collection(db, `users/${userId}/investments`);
+    const investmentsCollectionRef = collection(db, `artifacts/default-app-id/users/${userId}/investments`);
     const q = query(investmentsCollectionRef, orderBy('maturityDate', 'asc'));
 
     const unsubscribe = onSnapshot(q, 
@@ -73,7 +73,7 @@ export const useInvestments = (userId) => {
       const { amount, ...rest } = investmentData;
       const amountEncrypted = encryptAmount(amount);
 
-      await addDoc(collection(db, `users/${userId}/investments`), {
+      await addDoc(collection(db, `artifacts/default-app-id/users/${userId}/investments`), {
         ...rest,
         amountEncrypted, // Store encrypted amount
         createdAt: serverTimestamp(),
@@ -90,7 +90,7 @@ export const useInvestments = (userId) => {
       const { amount, ...rest } = investmentData;
       const amountEncrypted = encryptAmount(amount);
 
-      const investmentRef = doc(db, `users/${userId}/investments`, id);
+      const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investments`, id);
       await updateDoc(investmentRef, {
         ...rest,
         amountEncrypted, // Update with encrypted amount
@@ -104,7 +104,7 @@ export const useInvestments = (userId) => {
 
   const deleteInvestment = useCallback(async (id) => {
     try {
-      await deleteDoc(doc(db, `users/${userId}/investments`, id));
+      await deleteDoc(doc(db, `artifacts/default-app-id/users/${userId}/investments`, id));
     } catch (e) {
       console.error("Error deleting investment: ", e);
       setError("Failed to delete investment.");

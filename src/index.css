@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .input-with-icon {
+    @apply flex items-center w-full bg-slate-50 border border-slate-200 rounded-xl transition-all;
+  }
+  
+  .input-with-icon:focus-within {
+    @apply bg-white ring-2 ring-indigo-500;
+  }
+  
+  .input-with-icon input {
+    @apply w-full bg-transparent border-none rounded-xl outline-none focus:ring-0;
+  }
+  
+  .input-icon {
+    @apply text-slate-400;
+  }
+}
+

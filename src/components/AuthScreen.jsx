@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { Form, FormGroup, Label, Input, Button } from './Form';
 
 const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -81,7 +82,7 @@ const AuthScreen = () => {
         </div>
         
         <div className="p-8">
-          <form onSubmit={handleAuth} className="space-y-5">
+          <Form onSubmit={handleAuth} className="space-y-5">
             {error && (
               <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
                 <AlertCircle size={16} /> {error}
@@ -89,46 +90,58 @@ const AuthScreen = () => {
             )}
 
             {!isLogin && (
-              <div className="relative">
-                <User className="absolute left-3 top-3 text-slate-400" size={20} />
-                <input 
-                  required 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  placeholder="Full Name" 
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                />
-              </div>
+              <FormGroup>
+                <Label htmlFor="name">Full Name</Label>
+                <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                  <User className="text-slate-400 mr-3 shrink-0" size={20} />
+                  <Input 
+                    required 
+                    type="text"
+                    id="name" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)} 
+                    placeholder="Full Name" 
+                    className="flex-1 border-none focus:ring-0 px-0 py-0"
+                  />
+                </div>
+              </FormGroup>
             )}
             
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 text-slate-400" size={20} />
-              <input 
-                required 
-                type="email" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                placeholder="Email Address" 
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-              />
-            </div>
+            <FormGroup>
+              <Label htmlFor="email">Email Address</Label>
+              <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                <Mail className="text-slate-400 mr-3 shrink-0" size={20} />
+                <Input 
+                  required 
+                  type="email"
+                  id="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  placeholder="Email Address" 
+                  className="flex-1 border-none focus:ring-0 px-0 py-0"
+                />
+              </div>
+            </FormGroup>
             
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-              <input 
-                required 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="Password" 
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-              />
-            </div>
+            <FormGroup>
+              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                <Lock className="text-slate-400 mr-3 shrink-0" size={20} />
+                <Input 
+                  required 
+                  type="password"
+                  id="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="Password" 
+                  className="flex-1 border-none focus:ring-0 px-0 py-0"
+                />
+              </div>
+            </FormGroup>
 
             {isLogin && (
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer group">
+                <Label className="flex items-center gap-2 cursor-pointer group">
                   <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${rememberMe ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 group-hover:border-indigo-400'}`}>
                     {rememberMe && <CheckCircle size={14} className="text-white" />}
                     <input 
@@ -139,16 +152,16 @@ const AuthScreen = () => {
                     />
                   </div>
                   <span className="text-sm text-slate-600 font-medium">Remember me</span>
-                </label>
+                </Label>
                 <button type="button" className="text-sm text-indigo-600 font-bold hover:underline">
                   Forgot Password?
                 </button>
               </div>
             )}
 
-            <button 
+            <Button
               disabled={loading} 
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+              className="w-full py-3.5 font-bold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
@@ -158,8 +171,8 @@ const AuthScreen = () => {
                   <ArrowRight size={18} />
                 </>
               )}
-            </button>
-          </form>
+            </Button>
+          </Form>
 
           <div className="mt-8 text-center">
             <p className="text-slate-500 text-sm">

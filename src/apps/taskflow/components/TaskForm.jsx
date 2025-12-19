@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, Plus } from 'lucide-react';
 import { formatDuration } from '../../../lib/utils';
+import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
 
 const TaskForm = ({ initialData, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({ 
@@ -71,42 +72,54 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
       </div>
 
       <div className="p-6 overflow-y-auto flex-1">
-        <form id="task-form" onSubmit={handleSubmit} className="space-y-4">
+        <Form id="task-form" onSubmit={handleSubmit}>
           {modalTab === 'details' && (
             <div className="space-y-4 animate-in fade-in">
-              <input 
-                type="text" 
-                placeholder="Task Title" 
-                required
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                value={formData.title} 
-                onChange={e => setFormData({...formData, title: e.target.value})} 
-              />
-              <textarea 
-                rows="3" 
-                placeholder="Description" 
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
-                value={formData.description} 
-                onChange={e => setFormData({...formData, description: e.target.value})} 
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <input 
-                  type="date" 
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                  value={formData.dueDate} 
-                  onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+              <FormGroup>
+                <Label htmlFor="title">Task Title</Label>
+                <Input 
+                  id="title"
+                  type="text" 
+                  placeholder="Task Title" 
+                  required
+                  value={formData.title} 
+                  onChange={e => setFormData({...formData, title: e.target.value})} 
                 />
-                <select 
-                  className="w-full px-3 py-2 border rounded-lg bg-white outline-none" 
-                  value={formData.category} 
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                >
-                  <option>General</option><option>Work</option><option>Personal</option><option>Shopping</option><option>Health</option>
-                </select>
+              </FormGroup>
+              <FormGroup>
+                <Label htmlFor="description">Description</Label>
+                <Textarea 
+                  id="description"
+                  rows="3" 
+                  placeholder="Description" 
+                  value={formData.description} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
+                />
+              </FormGroup>
+              <div className="grid grid-cols-2 gap-4">
+                <FormGroup>
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input 
+                    id="dueDate"
+                    type="date" 
+                    value={formData.dueDate} 
+                    onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                  />
+                </FormGroup>
+                <FormGroup>
+                  <Label htmlFor="category">Category</Label>
+                  <Select 
+                    id="category"
+                    value={formData.category} 
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                  >
+                    <option>General</option><option>Work</option><option>Personal</option><option>Shopping</option><option>Health</option>
+                  </Select>
+                </FormGroup>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Priority</label>
+                <FormGroup>
+                  <Label>Priority</Label>
                   <div className="flex gap-2">
                     {['low', 'medium', 'high'].map(p => (
                       <button 
@@ -119,17 +132,17 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
                       </button>
                     ))}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Status</label>
-                  <select 
-                    className="w-full px-3 py-2 border rounded-lg bg-white outline-none" 
+                </FormGroup>
+                <FormGroup>
+                  <Label htmlFor="status">Status</Label>
+                  <Select 
+                    id="status"
                     value={formData.status} 
                     onChange={e => setFormData({...formData, status: e.target.value})}
                   >
                     <option value="todo">To Do</option><option value="in-progress">In Progress</option><option value="done">Done</option>
-                  </select>
-                </div>
+                  </Select>
+                </FormGroup>
               </div>
             </div>
           )}
@@ -137,15 +150,14 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
           {modalTab === 'subtasks' && (
             <div className="space-y-4 animate-in fade-in">
               <div className="flex gap-2">
-                <input 
+                <Input 
                   type="text" 
                   placeholder="Add subtask..." 
-                  className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
                   value={newSubtask} 
                   onChange={e => setNewSubtask(e.target.value)} 
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubtask())} 
                 />
-                <button type="button" onClick={addSubtask} className="px-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg">Add</button>
+                <Button type="button" onClick={addSubtask}>Add</Button>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {formData.subtasks.map(s => (
@@ -170,28 +182,27 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
                 <div className="text-sm text-emerald-600 font-medium mb-1">Total Time Logged</div>
                 <div className="text-3xl font-bold text-emerald-700">{formatDuration(formData.timeSpent)}</div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Log Additional Time (Minutes)</label>
+              <FormGroup>
+                <Label>Log Additional Time (Minutes)</Label>
                 <div className="flex gap-2">
-                  <input 
+                  <Input 
                     type="number" 
                     min="1" 
                     placeholder="e.g. 30" 
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
                     value={logTimeAmount} 
                     onChange={e => setLogTimeAmount(e.target.value)} 
                   />
-                  <button type="button" onClick={addLog} className="px-4 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-medium flex items-center gap-2"><Plus size={16}/> Add Log</button>
+                  <Button type="button" onClick={addLog} className="bg-emerald-600 hover:bg-emerald-700"><Plus size={16}/> Add Log</Button>
                 </div>
-              </div>
+              </FormGroup>
             </div>
           )}
-        </form>
+        </Form>
       </div>
       
       <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
-        <button type="submit" form="task-form" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-200">Save Task</button>
+        <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
+        <Button type="submit" form="task-form">Save Task</Button>
       </div>
     </div>
   );

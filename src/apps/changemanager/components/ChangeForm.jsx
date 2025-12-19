@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { XCircle } from 'lucide-react';
+import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
 
 const ChangeForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -19,53 +20,53 @@ const ChangeForm = ({ onSubmit, onCancel }) => {
         <button onClick={onCancel}><XCircle className="text-slate-400 hover:text-slate-600" /></button>
       </div>
       
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <Form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Server Name</label>
-            <input required type="text" value={formData.serverName} onChange={e => setFormData({...formData, serverName: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Web-Prod-01" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Application (Optional)</label>
-            <input type="text" value={formData.application} onChange={e => setFormData({...formData, application: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Nginx" />
-          </div>
+          <FormGroup>
+            <Label htmlFor="serverName">Server Name</Label>
+            <Input required type="text" id="serverName" value={formData.serverName} onChange={e => setFormData({...formData, serverName: e.target.value})} placeholder="e.g. Web-Prod-01" />
+          </FormGroup>
+          <FormGroup>
+            <Label htmlFor="application">Application (Optional)</Label>
+            <Input type="text" id="application" value={formData.application} onChange={e => setFormData({...formData, application: e.target.value})} placeholder="e.g. Nginx" />
+          </FormGroup>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Change Type</label>
-            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          <FormGroup>
+            <Label htmlFor="type">Change Type</Label>
+            <Select id="type" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
               <option>Update</option><option>Patch</option><option>Config Change</option><option>Reboot</option><option>Deployment</option><option>Hardware</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+            </Select>
+          </FormGroup>
+          <FormGroup>
+            <Label htmlFor="status">Status</Label>
+            <Select id="status" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
               <option value="success">Success</option><option value="pending">Pending</option><option value="failed">Failed</option>
-            </select>
-          </div>
+            </Select>
+          </FormGroup>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Title / Summary</label>
-          <input required type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Brief summary of change" />
-        </div>
+        <FormGroup>
+          <Label htmlFor="title">Title / Summary</Label>
+          <Input required type="text" id="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Brief summary of change" />
+        </FormGroup>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Detailed Description</label>
-          <textarea rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none" placeholder="Steps taken, reasons, etc." />
-        </div>
+        <FormGroup>
+          <Label htmlFor="description">Detailed Description</Label>
+          <Textarea rows="3" id="description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Steps taken, reasons, etc." />
+        </FormGroup>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parameters Changed (Key:Value)</label>
-          <textarea rows="2" value={formData.parameters} onChange={e => setFormData({...formData, parameters: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-xs bg-slate-50" placeholder="e.g. worker_processes: 4; timeout: 30s" />
-        </div>
+        <FormGroup>
+          <Label htmlFor="parameters">Parameters Changed (Key:Value)</Label>
+          <Textarea rows="2" id="parameters" value={formData.parameters} onChange={e => setFormData({...formData, parameters: e.target.value})} className="font-mono text-xs bg-slate-50" placeholder="e.g. worker_processes: 4; timeout: 30s" />
+        </FormGroup>
 
         <div className="pt-4 flex justify-end gap-3">
-          <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md">Record Change</button>
+          <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
+          <Button type="submit">Record Change</Button>
         </div>
-      </form>
+      </Form>
     </div>
   );
 };

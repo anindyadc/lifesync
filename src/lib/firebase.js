@@ -16,7 +16,6 @@ const getFirebaseConfig = () => {
   }
 
   // 2. Try process.env (For GitHub Actions / Create React App / Standard Node)
-  // Note: VITE_ prefix might still be needed depending on build tool, or REACT_APP_ for CRA
   if (typeof process !== 'undefined' && process.env) {
     if (process.env.VITE_FIREBASE_API_KEY || process.env.REACT_APP_FIREBASE_API_KEY) {
       return {
@@ -40,8 +39,16 @@ const getFirebaseConfig = () => {
 };
 
 const firebaseConfig = getFirebaseConfig();
-console.log("Firebase Config: ", firebaseConfig);
 const app = initializeApp(firebaseConfig);
+
+// Export services for use in App.jsx and other modules
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+/** * appId: Unique identifier for this specific deployment instance.
+ * The Incident Logger and other apps use this to namespace Firestore collections.
+ * Providing a default here, or you can use firebaseConfig.projectId.
+ */
+export const appId = 'default-app-id'; 
+
 export default app;

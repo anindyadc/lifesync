@@ -1,11 +1,6 @@
 import React from 'react';
-import { AlertOctagon, CheckCircle, Pencil } from 'lucide-react';
+import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar } from 'lucide-react';
 
-/**
- * UTILS
- * Note: If your local path is different, adjust the import.
- * Standard path: import { formatDate } from '../../../lib/utils';
- */
 const formatDate = (dateField) => {
   if (!dateField) return '-';
   const d = dateField?.toDate ? dateField.toDate() : new Date(dateField);
@@ -15,27 +10,27 @@ const formatDate = (dateField) => {
 const StatusBadge = ({ status }) => {
   if (status === 'resolved') {
     return (
-      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-        <CheckCircle size={10} /> Resolved
+      <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+        <CheckCircle size={12} /> Resolved
       </span>
     );
   }
   return (
-    <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 animate-pulse">
-      <AlertOctagon size={10} /> Open
+    <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase bg-red-100 text-red-700 border border-red-200 flex items-center gap-1.5 animate-pulse">
+      <AlertOctagon size={12} /> Open Issue
     </span>
   );
 };
 
 const PriorityBadge = ({ priority }) => {
   const colors = {
-    critical: 'bg-red-600 text-white',
+    critical: 'bg-red-600 text-white shadow-sm',
     high: 'bg-orange-500 text-white',
     medium: 'bg-yellow-500 text-white',
     low: 'bg-blue-500 text-white'
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${colors[priority] || colors.low}`}>
+    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${colors[priority] || colors.low}`}>
       {priority}
     </span>
   );
@@ -43,61 +38,73 @@ const PriorityBadge = ({ priority }) => {
 
 /**
  * IncidentCard Component
- * Displays incident details and provides hooks for resolution and editing.
+ * Expanded layout for better visibility of long descriptions and resolution notes.
  */
 const IncidentCard = ({ incident, onResolve, onEdit }) => {
   return (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
-      {/* Decorative side bar for open incidents */}
-      {incident.status === 'open' && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>}
+    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
+      {/* Visual Status Indicator */}
+      {incident.status === 'open' && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>}
       
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex justify-between items-start mb-5">
+        <div className="flex flex-wrap items-center gap-3">
           <PriorityBadge priority={incident.priority} />
-          <span className="text-xs text-slate-400 font-mono">
+          <div className="flex items-center gap-1.5 text-slate-400 font-medium text-xs">
+            <Calendar size={14} />
             {formatDate(incident.dateReported)}
-          </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {/* Edit button - now visible on hover for all statuses */}
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => onEdit(incident)}
-            className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-            title="Edit Ticket"
+            className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+            title="Edit Details"
           >
-            <Pencil size={14} />
+            <Pencil size={18} />
           </button>
           <StatusBadge status={incident.status} />
         </div>
       </div>
 
-      <h4 className="font-bold text-slate-800 mb-1 truncate">{incident.title}</h4>
+      <h4 className="text-xl font-black text-slate-800 mb-3 tracking-tight leading-tight">
+        {incident.title}
+      </h4>
       
-      <div className="text-xs text-slate-500 mb-4 flex flex-wrap gap-2">
-        <span className="bg-slate-100 px-2 py-0.5 rounded">Srv: {incident.serverName}</span>
+      <div className="flex flex-wrap gap-3 mb-5">
+        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 text-xs font-bold text-slate-600">
+          <Server size={14} className="text-slate-400" />
+          {incident.serverName}
+        </div>
         {incident.application && (
-          <span className="bg-slate-100 px-2 py-0.5 rounded">App: {incident.application}</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 text-xs font-bold text-slate-600">
+            <Laptop size={14} className="text-slate-400" />
+            {incident.application}
+          </div>
         )}
       </div>
 
-      <p className="text-sm text-slate-600 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100 line-clamp-3 italic">
-        {incident.issueDescription}
-      </p>
+      {/* Expanded Description Area */}
+      <div className="flex-grow">
+        <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-2 block">Issue Details</label>
+        <div className="text-base text-slate-700 mb-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 leading-relaxed whitespace-pre-wrap">
+          {incident.issueDescription}
+        </div>
+      </div>
 
       <div className="mt-auto">
         {incident.status === 'resolved' ? (
-          <div className="pt-3 border-t border-slate-100">
-            <p className="text-xs font-bold text-emerald-700 mb-1">✓ Fix Provided:</p>
-            <p className="text-sm text-slate-600 line-clamp-2 italic">
-              {incident.fixProvided || 'No details provided.'}
-            </p>
+          <div className="pt-5 border-t border-slate-100">
+            <label className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.1em] mb-2 block">✓ Resolution / Fix</label>
+            <div className="text-sm text-slate-700 p-4 bg-emerald-50/30 rounded-xl border border-emerald-100 leading-relaxed italic">
+              {incident.fixProvided || 'No resolution details provided.'}
+            </div>
           </div>
         ) : (
           <button 
             onClick={() => onResolve(incident)}
-            className="w-full py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-xs hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-indigo-600 text-white font-black rounded-xl text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 active:scale-[0.98]"
           >
-            <CheckCircle size={14} /> Mark Resolved
+            <CheckCircle size={18} /> Mark as Resolved
           </button>
         )}
       </div>
@@ -105,5 +112,4 @@ const IncidentCard = ({ incident, onResolve, onEdit }) => {
   );
 };
 
-// CRITICAL: This default export resolves your "Uncaught SyntaxError"
 export default IncidentCard;

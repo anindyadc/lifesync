@@ -1,119 +1,130 @@
 /* src/apps/investments/components/MaturityCalendar.css */
 
-.rbc-calendar {
-  font-family: var(--font-sans);
-  background-color: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  color: hsl(var(--foreground));
-}
-
-.rbc-header {
-  padding: 10px 0;
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--foreground));
-  font-weight: 600;
-  font-size: 0.875rem; /* text-sm */
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.rbc-row-segment .rbc-event {
-  background-color: hsl(var(--primary));
-  border-radius: var(--radius-sm);
-  color: hsl(var(--primary-foreground));
-  font-size: 0.75rem; /* text-xs */
-  padding: 2px 5px;
-  border: none;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-}
-
-.rbc-off-range-bg {
-  background-color: hsl(var(--muted));
-}
-
-.rbc-current-time-indicator {
-  background-color: hsl(var(--destructive));
-}
-
-.rbc-btn-group button {
+.fc .fc-button {
   background-color: hsl(var(--secondary));
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-sm);
-  margin-left: 5px;
+  text-transform: capitalize; /* Make view names readable */
 }
 
-.rbc-btn-group button.rbc-active {
+.fc .fc-button:hover {
+  background-color: hsl(var(--secondary-foreground));
+  color: hsl(var(--secondary));
+}
+
+.fc .fc-button-primary {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
 }
 
-.rbc-toolbar button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    border-radius: var(--radius-md);
-    font-weight: 500;
-    font-size: 0.875rem;
-    height: 2.5rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    background-color: hsl(var(--secondary));
-    color: hsl(var(--secondary-foreground));
-    border: 1px solid hsl(var(--border));
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
-}
-
-.rbc-toolbar button:hover {
-    background-color: hsl(var(--secondary-foreground));
-    color: hsl(var(--secondary));
-}
-
-.rbc-toolbar button.rbc-active {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-color: hsl(var(--primary));
-}
-
-.rbc-toolbar button.rbc-active:hover {
+.fc .fc-button-primary:hover {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
   opacity: 0.9;
 }
 
-.rbc-event-content, .rbc-event-content span {
-    white-space: normal;
+.fc .fc-button-group {
+  display: inline-flex;
+  vertical-align: middle;
 }
 
-.rbc-month-view, .rbc-time-view, .rbc-agenda-view {
-    border: none;
+.fc .fc-button-group > .fc-button {
+  margin: 0;
+  border-radius: 0;
 }
 
-.rbc-day-bg + .rbc-day-bg {
-    border-left: 1px solid hsl(var(--border));
+.fc .fc-button-group > .fc-button:first-child {
+  border-top-left-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
 }
 
-.rbc-rtl .rbc-day-bg + .rbc-day-bg {
-    border-left-width: 0;
-    border-right: 1px solid hsl(var(--border));
+.fc .fc-button-group > .fc-button:last-child {
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
 }
 
-.rbc-row-content span {
-    color: hsl(var(--foreground));
+.fc .fc-toolbar-title {
+  color: hsl(var(--foreground));
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 700; /* font-bold */
 }
 
-.rbc-today {
+.fc .fc-col-header-cell-cushion {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem; /* text-sm */
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.fc-daygrid-event {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem; /* text-xs */
+  padding: 2px 5px;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.fc-day-other .fc-daygrid-day-top {
+  opacity: 0.5;
+}
+
+.fc-day-today {
   background-color: hsl(var(--accent));
 }
 
-.rbc-toolbar-label {
+.fc-view-harness {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.fc-scrollgrid, .fc-scrollgrid-liquid {
+  border: none;
+}
+
+.fc-daygrid-day-frame {
+  border-color: hsl(var(--border));
+}
+
+.fc-daygrid-day-top {
+  color: hsl(var(--foreground));
+}
+
+.fc-list-event-title a {
     color: hsl(var(--foreground));
-    font-size: 1.125rem;
+    text-decoration: none;
+}
+
+.fc-list-event.fc-event {
+    background-color: hsl(var(--secondary));
+    border-left: 3px solid hsl(var(--primary));
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.5rem;
+}
+
+.fc-list-event:hover {
+    background-color: hsl(var(--secondary-foreground));
+}
+
+.fc-list-event-time {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
+}
+
+.fc-list-event-graphic {
+    color: hsl(var(--primary));
+}
+
+.fc-list-table {
+    border: none;
+}
+
+.fc-list-day-text, .fc-list-day-side-text {
+    color: hsl(var(--foreground));
     font-weight: 600;
 }

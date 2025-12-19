@@ -20,7 +20,7 @@ export const Input = React.forwardRef((props, ref) => (
   <input
     ref={ref}
     {...props}
-    className="w-full px-3 py-2 border border-input bg-card rounded-md shadow-sm focus:ring-ring focus:border-primary sm:text-sm text-foreground"
+    className="w-full text-foreground sm:text-sm focus:outline-none"
   />
 ));
 

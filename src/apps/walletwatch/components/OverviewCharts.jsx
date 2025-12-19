@@ -60,7 +60,8 @@ export const WeeklyBarChart = ({ expenses }) => {
       d.setDate(today.getDate() - i);
       const isoKey = toISODate(d);
       const dayTotal = expenses.reduce((sum, e) => {
-        const eIso = toISODate(e.date);
+        const expenseDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+        const eIso = toISODate(expenseDate.toISOString());
         const val = Number(e.amount) || 0;
         return (eIso === isoKey && val > 0) ? sum + val : sum;
       }, 0);

@@ -39,7 +39,9 @@ const getFirebaseConfig = () => {
   return {};
 };
 
-const app = initializeApp(getFirebaseConfig());
+const firebaseConfig = getFirebaseConfig();
+console.log("Firebase Config: ", firebaseConfig);
+const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export default app;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, PiggyBank, CalendarDays, Key } from 'lucide-react';
+import { PlusCircle, PiggyBank, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
 import InvestmentList from './components/InvestmentList';
 import InvestmentForm from './components/InvestmentForm';
 import MaturityCalendar from './components/MaturityCalendar';
@@ -9,7 +9,7 @@ const InvestmentsApp = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
   const [activeTab, setActiveTab] = useState('list'); // 'list', 'calendar'
-  const { investments, addInvestment, updateInvestment, deleteInvestment } = useInvestments(user.uid);
+  const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment } = useInvestments(user.uid);
 
   const handleSave = async (investmentData) => {
     if (editInvestment) {
@@ -25,6 +25,24 @@ const InvestmentsApp = ({ user }) => {
     setEditInvestment(investment);
     setShowForm(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48 bg-white rounded-2xl shadow-sm border border-slate-200">
+        <Loader2 className="animate-spin text-indigo-500" size={24} />
+        <p className="ml-3 text-slate-600">Loading investments...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-center shadow-sm">
+        <AlertCircle className="mr-3" size={20} />
+        <p>Error: {error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -56,29 +74,46 @@ const InvestmentsApp = ({ user }) => {
         </div>
       )}
 
-      {activeTab === 'list' && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={() => { setShowForm(true); setEditInvestment(null); }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md"
-            >
-              <PlusCircle size={20} />
-              <span>Add Investment</span>
-            </button>
-          </div>
-          <InvestmentList 
-            investments={investments}
-            onEdit={handleEdit}
-            onDelete={deleteInvestment}
-          />
+      {investments.length === 0 && (activeTab === 'list' || activeTab === 'calendar') ? (
+        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+          <PiggyBank size={40} className="mx-auto mb-4 text-slate-400" />
+          <p className="text-lg font-medium">No investments added yet.</p>
+          <p className="text-sm mb-4">Add your first investment to start tracking maturities and amounts.</p>
+          <button
+            onClick={() => { setShowForm(true); setEditInvestment(null); }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md mx-auto"
+          >
+            <PlusCircle size={20} />
+            <span>Add Investment</span>
+          </button>
         </div>
-      )}
+      ) : (
+        <>
+          {activeTab === 'list' && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => { setShowForm(true); setEditInvestment(null); }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md"
+                >
+                  <PlusCircle size={20} />
+                  <span>Add Investment</span>
+                </button>
+              </div>
+              <InvestmentList 
+                investments={investments}
+                onEdit={handleEdit}
+                onDelete={deleteInvestment}
+              />
+            </div>
+          )}
 
-      {activeTab === 'calendar' && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <MaturityCalendar investments={investments} />
-        </div>
+          {activeTab === 'calendar' && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <MaturityCalendar investments={investments} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

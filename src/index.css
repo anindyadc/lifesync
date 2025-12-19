@@ -1,9 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    --font-sans: "Inter", sans-serif;
     --background: 210 20% 98%; /* Light gray */
     --foreground: 222.2 47.4% 11.2%; /* Dark blue/gray */
 
@@ -36,6 +39,7 @@
   }
  
   .dark {
+    --font-sans: "Inter", sans-serif;
     --background: 222.2 84% 4.9%; /* Dark background */
     --foreground: 210 40% 98%; /* Light foreground */
  

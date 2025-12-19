@@ -42,16 +42,19 @@ export const useInvestments = (userId) => {
 
     setLoading(true);
     setError(null);
+    console.log("useInvestments: Listening for userId:", userId);
     const investmentsCollectionRef = collection(db, `users/${userId}/investments`);
     const q = query(investmentsCollectionRef, orderBy('maturityDate', 'asc'));
 
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const fetchedInvestments = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          amount: decryptAmount(doc.data().amountEncrypted) // Decrypt on fetch
-        }));
+        const fetchedInvestments = [...snapshot.docs].map(doc => {
+          return {
+            id: doc.id,
+            ...doc.data(),
+            amount: decryptAmount(doc.data().amountEncrypted) // Decrypt on fetch
+          };
+        });
         setInvestments(fetchedInvestments);
         setLoading(false);
       }, 

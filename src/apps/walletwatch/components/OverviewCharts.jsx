@@ -80,8 +80,8 @@ export const WeeklyBarChart = ({ expenses }) => {
         <div className="flex items-end justify-between h-32 gap-3 px-1">
           {days.map((d, i) => (
             <div key={i} className="flex flex-col items-center flex-1 group">
-              <div className="w-full bg-slate-50 rounded-t-lg h-full flex items-end overflow-hidden">
-                <div className="w-full bg-indigo-500 transition-all duration-700 ease-out rounded-t-sm" style={{ height: `${(d.total / maxVal) * 100}%` }} />
+              <div className="w-full rounded-t-lg h-full flex items-end overflow-hidden bg-transparent">
+                <div className="w-full bg-indigo-500 transition-all duration-700 ease-out rounded-t-sm min-h-[1px]" style={{ height: `${(d.total / maxVal) * 100}%` }} />
               </div>
               <span className="text-[9px] mt-3 text-slate-400 font-bold uppercase">{d.day.charAt(0)}</span>
             </div>

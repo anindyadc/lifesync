@@ -43,7 +43,7 @@ const InvestmentList = ({ investments, onEdit, onDelete }) => {
                 <div className="text-sm font-bold text-slate-900">₹{investment.amount?.toLocaleString('en-IN')}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div classNameName="text-sm text-slate-500 flex items-center gap-1">
+                <div className="text-sm text-slate-500 flex items-center gap-1">
                   <CalendarDays size={16} className="text-slate-400"/>
                   {investment.maturityDate}
                 </div>

@@ -89,7 +89,7 @@ service cloud.firestore {
 
     // 2. TaskFlow Data
     match /artifacts/default-app-id/users/{userId}/tasks/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
+      allow read, write: if isOwner(userId);
     }
 
     // 3. WalletWatch Data

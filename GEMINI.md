@@ -4,7 +4,16 @@ This document provides a concise overview of the LifeSync application, its setup
 
 ## Project Overview
 
-LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investments, all secured by user authentication and Firestore rules.
+LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investments, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
+
+## Features (Taskflow App)
+
+*   **Create and Manage Tasks:** Add, edit, and delete tasks with details like priority, due date, and category.
+*   **Subtask Management:** Add, edit, delete, and mark subtasks as complete.
+*   **Progress Tracking:**
+    *   Task progress is automatically calculated based on the completion of its subtasks.
+    *   Manually set a task's progress with a slider, which overrides the automatic calculation.
+*   **Export Options:** Export your task list to CSV or PDF.
 
 ## Technology Stack
 

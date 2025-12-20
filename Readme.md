@@ -2,6 +2,16 @@
 
 This guide details the complete process for setting up, securing, and deploying your React application (LifeSync) using Firebase as the backend, Tailwind CSS for styling, and GitHub Pages for hosting.
 
+## **Project Overview**
+
+LifeSync is a multi-module React application designed to help you organize different aspects of your life. It uses Firebase for a secure backend and includes several apps:
+
+*   **Taskflow:** A powerful task manager where you can create tasks, add detailed subtasks, and track completion progress. Progress can be automatically calculated from subtasks or set manually for greater control.
+*   **WalletWatch:** An expense tracker.
+*   **IncidentLogger:** A tool for logging incidents.
+*   **ChangeManager:** A utility for managing changes.
+*   **Investments:** A module for tracking investments.
+
 ## **Phase 1: Prerequisites & Installation**
 
 Before writing code, ensure you have the necessary tools installed on your computer.

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Plus } from 'lucide-react';
+import { X, CheckSquare, Plus, Edit2, Check } from 'lucide-react';
 import { formatDuration } from '../../../lib/utils';
 import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
 
@@ -11,6 +11,8 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
   const [modalTab, setModalTab] = useState('details');
   const [newSubtask, setNewSubtask] = useState('');
   const [logTimeAmount, setLogTimeAmount] = useState('');
+  const [editingSubtaskId, setEditingSubtaskId] = useState(null);
+  const [editingSubtaskText, setEditingSubtaskText] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -22,7 +24,8 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
         dueDate: initialData.dueDate || '',
         category: initialData.category || 'General',
         subtasks: initialData.subtasks || [],
-        timeSpent: initialData.timeSpent || 0
+        timeSpent: initialData.timeSpent || 0,
+        progress: initialData.progress || 0
       });
     }
   }, [initialData]);
@@ -42,6 +45,20 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
   };
   const toggleSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.map(s => s.id === id ? {...s, completed: !s.completed} : s)});
   const removeSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.filter(s => s.id !== id)});
+  const startEditSubtask = (subtask) => {
+    setEditingSubtaskId(subtask.id);
+    setEditingSubtaskText(subtask.title);
+  };
+  const saveEditSubtask = () => {
+    setFormData({
+      ...formData,
+      subtasks: formData.subtasks.map(s => 
+        s.id === editingSubtaskId ? { ...s, title: editingSubtaskText } : s
+      )
+    });
+    setEditingSubtaskId(null);
+    setEditingSubtaskText('');
+  };
 
   // Time Log Helper
   const addLog = () => {
@@ -145,6 +162,18 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
                   </Select>
                 </FormGroup>
               </div>
+              <FormGroup>
+                <Label htmlFor="progress">Progress: {formData.progress || 0}%</Label>
+                <input
+                  id="progress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={formData.progress || 0}
+                  onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </FormGroup>
             </div>
           )}
 
@@ -168,10 +197,32 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
                     <button type="button" onClick={() => toggleSubtask(s.id)}>
                       <CheckSquare size={16} className={s.completed ? 'text-indigo-600' : 'text-slate-300'}/>
                     </button>
-                    <span className={`flex-1 text-sm ${s.completed && 'line-through text-slate-400'}`}>{s.title}</span>
-                    <button type="button" onClick={() => removeSubtask(s.id)}>
-                      <X size={14} className="text-slate-400 opacity-0 group-hover:opacity-100"/>
-                    </button>
+                    {editingSubtaskId === s.id ? (
+                      <input
+                        type="text"
+                        value={editingSubtaskText}
+                        onChange={e => setEditingSubtaskText(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), saveEditSubtask())}
+                        className="flex-1 text-sm p-1 border border-indigo-300 rounded"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className={`flex-1 text-sm ${s.completed && 'line-through text-slate-400'}`}>{s.title}</span>
+                    )}
+                    <div className="flex items-center">
+                      {editingSubtaskId === s.id ? (
+                        <button type="button" onClick={saveEditSubtask} className="p-1 text-emerald-600 hover:text-emerald-800">
+                          <Check size={16}/>
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => startEditSubtask(s)} className="p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-indigo-600">
+                          <Edit2 size={14}/>
+                        </button>
+                      )}
+                      <button type="button" onClick={() => removeSubtask(s.id)}>
+                        <X size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600"/>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

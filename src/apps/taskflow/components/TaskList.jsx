@@ -37,7 +37,7 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
         {displayedTasks.map(task => {
           const subCompleted = task.subtasks?.filter(s => s.completed).length || 0; 
           const subTotal = task.subtasks?.length || 0; 
-          const progress = subTotal > 0 ? (subCompleted / subTotal) * 100 : 0;
+          const progress = task.progress ?? (subTotal > 0 ? (subCompleted / subTotal) * 100 : 0);
           
           return (
             <div key={task.id}>
@@ -54,16 +54,14 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
                       <h4 className={`font-semibold text-slate-800 truncate ${task.status === 'done' ? 'line-through text-slate-400' : ''}`}>{task.title}</h4>
                       {task.description && <p className="text-sm text-slate-500 line-clamp-1">{task.description}</p>}
                       
-                      {subTotal > 0 && (
-                        <div className="mt-2 w-full max-w-xs">
-                          <div className="flex justify-between text-xs text-slate-500 mb-1">
-                            <span>Subtasks</span><span>{subCompleted}/{subTotal}</span>
-                          </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}/>
-                          </div>
+                      <div className="mt-2 w-full max-w-xs">
+                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                          <span>Progress</span><span>{Math.round(progress)}%</span>
                         </div>
-                      )}
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}/>
+                        </div>
+                      </div>
                       
                       <div className="flex flex-wrap gap-2 mt-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium capitalize border ${getPriorityColor(task.priority)}`}>

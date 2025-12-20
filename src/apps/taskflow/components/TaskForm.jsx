@@ -35,7 +35,8 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
   // Subtask Helpers
   const addSubtask = () => { 
     if(newSubtask.trim()){ 
-      setFormData({...formData, subtasks: [...formData.subtasks, {id: crypto.randomUUID(), title: newSubtask, completed: false}]}); 
+      const updatedSubtasks = [...formData.subtasks, {id: crypto.randomUUID(), title: newSubtask, completed: false}];
+      setFormData({...formData, subtasks: updatedSubtasks}); 
       setNewSubtask(''); 
     }
   };
@@ -150,12 +151,14 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
           {modalTab === 'subtasks' && (
             <div className="space-y-4 animate-in fade-in">
               <div className="flex gap-2">
-                <Input 
+                <input 
                   type="text" 
+                  name="newSubtask" 
                   placeholder="Add subtask..." 
                   value={newSubtask} 
                   onChange={e => setNewSubtask(e.target.value)} 
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubtask())} 
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubtask())}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
                 <Button type="button" onClick={addSubtask}>Add</Button>
               </div>

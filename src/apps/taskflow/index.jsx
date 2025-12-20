@@ -13,6 +13,7 @@ import PriorityChart from './components/PriorityChart';
 import TaskReportTable from './components/TaskReportTable';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
+import TimeReport from './components/TimeReport';
 
 const TaskFlowApp = ({ user }) => {
   // 1. Initialize Hooks
@@ -25,15 +26,24 @@ const TaskFlowApp = ({ user }) => {
   const [editingTask, setEditingTask] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
 
+  const memoizedEditingTask = useMemo(() => editingTask, [editingTask]);
+
   // 3. Derived Stats
+  const totalTimeSpent = useMemo(() => {
+    return tasks.reduce((acc, task) => {
+      const subtaskTime = task.subtasks?.reduce((sAcc, s) => sAcc + (s.timeSpent || 0), 0) || 0;
+      return acc + (task.timeSpent || 0) + subtaskTime;
+    }, 0);
+  }, [tasks]);
+
   const stats = useMemo(() => ({
     total: tasks.length,
     completed: tasks.filter(t => t.status === 'done').length,
     completionRate: tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100) : 0,
-    time: tasks.reduce((acc, t) => acc + (t.timeSpent || 0), 0),
+    time: totalTimeSpent,
     totalSubtasks: tasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0),
     completedSubtasks: tasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.completed).length || 0), 0)
-  }), [tasks]);
+  }), [tasks, totalTimeSpent]);
 
   const priorityData = useMemo(() => {
     const high = tasks.filter(t => t.priority === 'high').length;
@@ -88,7 +98,7 @@ const TaskFlowApp = ({ user }) => {
       {/* Header */}
       <div className="flex justify-between items-center bg-slate-100 p-2 rounded-xl">
         <div className="flex space-x-1">
-          {['dashboard', 'tasks'].map(tab => (
+          {['dashboard', 'tasks', 'report'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)} 
@@ -100,7 +110,7 @@ const TaskFlowApp = ({ user }) => {
         </div>
         <div className="flex gap-2 pr-2">
           <button onClick={exportToCSV} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
-          <button onClick={() => exportToPDF(activeTab)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
+          <button onClick={() => exportToPDF(activeTab, `taskflow-${activeTab}`)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
             {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
           </button>
           <button onClick={handleCreateNew} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"><Plus size={16}/> New Task</button>
@@ -108,11 +118,10 @@ const TaskFlowApp = ({ user }) => {
       </div>
 
       {/* Content */}
-      <>
+      <div id={`taskflow-${activeTab}`}>
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* ID for PDF capture */}
-            <div id="taskflow-dashboard-charts" className="space-y-6 bg-slate-50 p-2 rounded-xl">
+            <div className="space-y-6 bg-slate-50 p-2 rounded-xl">
               <DashboardStats stats={stats} />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
@@ -138,13 +147,19 @@ const TaskFlowApp = ({ user }) => {
             />
           </div>
         )}
-      </>
+        
+        {activeTab === 'report' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <TimeReport tasks={tasks} />
+          </div>
+        )}
+      </div>
 
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
           <TaskForm 
-            initialData={editingTask} 
+            initialData={memoizedEditingTask} 
             onSubmit={handleSave} 
             onCancel={() => setIsModalOpen(false)} 
           />

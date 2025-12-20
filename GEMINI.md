@@ -10,12 +10,7 @@ LifeSync is a React application that integrates with Firebase for backend servic
 
 *   **Create and Manage Tasks:** Add, edit, and delete tasks with details like priority, due date, and category.
 *   **Subtask Management:** Add, edit, delete, and mark subtasks as complete.
-*   **Progress Tracking:**
-    *   Task progress is automatically calculated based on the completion of its subtasks.
-    *   Manually set a task's progress with a slider, which overrides the automatic calculation.
-*   **Export Options:** Export your task list to CSV or PDF.
-
-## Technology Stack
+*   **Time Logging:** Users can add new time log entries for tasks and subtasks, and delete existing ones. Direct editing of time logs is not supported; instead, users should delete and re-add entries if modifications are required.
 
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)

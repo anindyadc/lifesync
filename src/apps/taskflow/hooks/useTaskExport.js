@@ -7,14 +7,15 @@ import { formatDuration } from '../../../lib/utils';
 export const useTaskExport = (tasks, chartElementId) => {
   const [exporting, setExporting] = useState(false);
 
-  const exportToCSV = () => {
+  const exportToCSV = (tasksToExport) => {
+    const data = tasksToExport || tasks;
     const headers = ['Title', 'Status', 'Priority', 'Category', 'Due Date', 'Time Spent (mins)'];
-    const rows = tasks.map(t => [
+    const rows = data.map(t => [
       `"${(t.title || '').replace(/"/g, '""')}"`,
       t.status,
       t.priority,
       t.category,
-      t.dueDate || '',
+      t.dueDate?.toDate ? t.dueDate.toDate().toLocaleDateString('en-CA') : t.dueDate,
       t.timeSpent
     ].join(','));
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
@@ -27,9 +28,10 @@ export const useTaskExport = (tasks, chartElementId) => {
     document.body.removeChild(link);
   };
 
-  const exportToPDF = async (activeTab) => {
+  const exportToPDF = async (activeTab, tasksToExport) => {
     setExporting(true);
     try {
+      const data = tasksToExport || tasks;
       const doc = new jsPDF();
       
       // Header
@@ -70,7 +72,7 @@ export const useTaskExport = (tasks, chartElementId) => {
 
       autoTable(doc, {
         head: [['Title', 'Status', 'Priority', 'Category', 'Time']],
-        body: tasks.map(t => [t.title, t.status, t.priority, t.category, formatDuration(t.timeSpent)]),
+        body: data.map(t => [t.title, t.status, t.priority, t.category, formatDuration(t.timeSpent)]),
         startY: yPos,
         styles: { fontSize: 9 },
         headStyles: { fillColor: [79, 70, 229] }

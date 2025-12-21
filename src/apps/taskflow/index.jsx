@@ -25,6 +25,22 @@ const TaskFlowApp = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [dateRange, setDateRange] = useState({
+    from: new Date(new Date().setDate(new Date().getDate() - 30)),
+    to: new Date(),
+  });
+
+  const handleDateChange = (range) => {
+    setDateRange(range);
+  };
+
+  const filteredTasks = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return tasks;
+    return tasks.filter(task => {
+      const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+      return taskDate >= dateRange.from && taskDate <= dateRange.to;
+    });
+  }, [tasks, dateRange]);
 
   const memoizedEditingTask = useMemo(() => editingTask, [editingTask]);
 
@@ -109,8 +125,8 @@ const TaskFlowApp = ({ user }) => {
           ))}
         </div>
         <div className="flex gap-2 pr-2">
-          <button onClick={exportToCSV} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
-          <button onClick={() => exportToPDF(activeTab, `taskflow-${activeTab}`)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
+          <button onClick={() => exportToCSV(activeTab === 'report' ? filteredTasks : tasks)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
+          <button onClick={() => exportToPDF(activeTab, activeTab === 'report' ? filteredTasks : tasks)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
             {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
           </button>
           <button onClick={handleCreateNew} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"><Plus size={16}/> New Task</button>
@@ -150,7 +166,11 @@ const TaskFlowApp = ({ user }) => {
         
         {activeTab === 'report' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <TimeReport tasks={tasks} />
+            <TimeReport 
+              tasks={filteredTasks} 
+              dateRange={dateRange}
+              onDateChange={handleDateChange}
+            />
           </div>
         )}
       </div>

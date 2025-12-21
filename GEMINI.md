@@ -6,11 +6,16 @@ This document provides a concise overview of the LifeSync application, its setup
 
 LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investments, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
 
+## Features (Incident Logger App)
+
+*   **Edit and Delete Incidents:** Users can now edit existing incident details and permanently delete reported incidents.
+
 ## Features (Taskflow App)
 
 *   **Create and Manage Tasks:** Add, edit, and delete tasks with details like priority, due date, and category.
 *   **Subtask Management:** Add, edit, delete, and mark subtasks as complete.
 *   **Time Logging:** Users can add new time log entries for tasks and subtasks, and delete existing ones. Direct editing of time logs is not supported; instead, users should delete and re-add entries if modifications are required.
+*   **Date Range Filtering for Reports:** The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options.
 
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)

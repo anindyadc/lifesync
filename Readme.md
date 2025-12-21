@@ -6,9 +6,9 @@ This guide details the complete process for setting up, securing, and deploying 
 
 LifeSync is a multi-module React application designed to help you organize different aspects of your life. It uses Firebase for a secure backend and includes several apps:
 
-*   **Taskflow:** A powerful task manager where you can create tasks, add detailed subtasks, and track completion progress. Progress can be automatically calculated from subtasks or set manually for greater control. Time logs can be added and deleted for both tasks and subtasks, but not directly edited. If changes are needed, users should delete and re-add the time entry.
+*   **Taskflow:** A powerful task manager where you can create tasks, add detailed subtasks, and track completion progress. Progress can be automatically calculated from subtasks or set manually for greater control. Time logs can be added and deleted for both tasks and subtasks, but not directly edited. If changes are needed, users should delete and re-add the time entry. The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options.
 *   **WalletWatch:** An expense tracker.
-*   **IncidentLogger:** A tool for logging incidents.
+*   **IncidentLogger:** A tool for logging incidents. Users can now edit existing incident details and permanently delete reported incidents.
 *   **ChangeManager:** A utility for managing changes.
 *   **Investments:** A module for tracking investments.
 

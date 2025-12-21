@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User } from 'lucide-react';
+import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2 } from 'lucide-react';
 
 const formatDate = (dateField) => {
   if (!dateField) return '-';
@@ -36,7 +36,7 @@ const PriorityBadge = ({ priority }) => {
   );
 };
 
-const IncidentCard = ({ incident, onResolve, onEdit }) => {
+const IncidentCard = ({ incident, onResolve, onEdit, onDelete }) => {
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
       {incident.status === 'open' && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>}
@@ -56,6 +56,13 @@ const IncidentCard = ({ incident, onResolve, onEdit }) => {
             title="Edit Details"
           >
             <Pencil size={18} />
+          </button>
+          <button 
+            onClick={() => onDelete(incident.id)}
+            className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+            title="Delete Incident"
+          >
+            <Trash2 size={18} />
           </button>
           <StatusBadge status={incident.status} />
         </div>

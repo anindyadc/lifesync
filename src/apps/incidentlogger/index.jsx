@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ShieldAlert, Plus, FileText, Download, Loader2, X, Save } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 // Modular Imports
@@ -52,6 +52,18 @@ const IncidentLoggerApp = ({ user }) => {
     });
     setEditingIncident(incident);
     setView('log');
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this incident?")) {
+      try {
+        const docRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents', id);
+        await deleteDoc(docRef);
+      } catch (error) {
+        console.error("Error deleting incident: ", error);
+        // Optionally, show a user-friendly error message
+      }
+    }
   };
 
   const handleSaveIncident = async (e) => {
@@ -135,6 +147,7 @@ const IncidentLoggerApp = ({ user }) => {
                     incident={incident} 
                     onResolve={setResolvingIncident}
                     onEdit={handleEdit}
+                    onDelete={handleDelete}
                   />
                 ))}
               </div>

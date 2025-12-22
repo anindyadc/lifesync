@@ -12,16 +12,16 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-      <div className="flex justify-between items-center mb-6 border-b pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
         <h2 className="text-xl font-bold text-slate-800">Time Report</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
           <label className="text-sm font-medium text-slate-600">From:</label>
           <input 
             type="date" 
             name="from"
             value={dateRange.from.toISOString().split('T')[0]}
             onChange={handleDateInputChange}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
+            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-auto"
           />
           <label className="text-sm font-medium text-slate-600">To:</label>
           <input 
@@ -29,7 +29,7 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
             name="to"
             value={dateRange.to.toISOString().split('T')[0]}
             onChange={handleDateInputChange}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
+            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-auto"
           />
         </div>
       </div>

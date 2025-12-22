@@ -107,7 +107,7 @@ const IncidentLoggerApp = ({ user }) => {
       />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="bg-red-50 p-2 rounded-lg text-red-600"><ShieldAlert size={20}/></div>
           <div>
             <h2 className="font-bold text-slate-800">Incident Logger</h2>
@@ -116,7 +116,7 @@ const IncidentLoggerApp = ({ user }) => {
         </div>
         <button 
           onClick={() => { resetForm(); setView('log'); }} 
-          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-all active:scale-95 shadow-sm w-full md:w-auto"
         >
           <Plus size={16}/> Report Incident
         </button>

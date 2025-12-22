@@ -112,7 +112,7 @@ const TaskFlowApp = ({ user }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center bg-slate-100 p-2 rounded-xl">
+      <div className="flex flex-wrap justify-between items-center bg-slate-100 p-2 rounded-xl gap-2">
         <div className="flex space-x-1">
           {['dashboard', 'tasks', 'report'].map(tab => (
             <button 

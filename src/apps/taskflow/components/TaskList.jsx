@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Tag, Calendar, Timer, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2, Tag, Calendar, Timer, Check, ChevronDown, ChevronRight, MoreVertical } from 'lucide-react';
 import { formatDuration } from '../../../lib/utils';
 
 const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFilterStatus }) => {
@@ -41,7 +41,7 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
           
           return (
             <div key={task.id}>
-              <div className="p-4 flex justify-between items-start hover:bg-slate-50 transition-colors group">
+              <div className="p-4 flex flex-col sm:flex-row justify-between items-start hover:bg-slate-50 transition-colors group">
                 <div className="flex gap-3 flex-1 min-w-0">
                    <button 
                      onClick={() => onStatusChange(task.id, task.status)} 
@@ -84,19 +84,24 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
                    </div>
                 </div>
                 
-                <div className="flex gap-1 items-center pl-4">
+                <div className="flex gap-1 items-center mt-4 sm:mt-0 sm:pl-4">
                   {subTotal > 0 && (
                     <button onClick={() => toggleExpand(task.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
                       {expandedTask === task.id ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                     </button>
                   )}
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(task)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
-                      <Edit2 size={16}/>
+                  <div className="relative">
+                    <button className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 sm:hidden">
+                      <MoreVertical size={16}/>
                     </button>
-                    <button onClick={() => onDelete(task.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600">
-                      <Trash2 size={16}/>
-                    </button>
+                    <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => onEdit(task)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+                        <Edit2 size={16}/>
+                      </button>
+                      <button onClick={() => onDelete(task.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600">
+                        <Trash2 size={16}/>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

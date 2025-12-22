@@ -154,7 +154,7 @@ const WalletWatchApp = ({ user }) => {
       )}
 
       {/* Navigation Header */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-50">
+      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-50 gap-2">
         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
           <button 
             onClick={() => setView('dashboard')} 

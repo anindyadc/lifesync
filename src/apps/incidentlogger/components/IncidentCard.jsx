@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2 } from 'lucide-react';
+import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2, MoreVertical } from 'lucide-react';
 
 const formatDate = (dateField) => {
   if (!dateField) return '-';
@@ -41,7 +41,7 @@ const IncidentCard = ({ incident, onResolve, onEdit, onDelete }) => {
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
       {incident.status === 'open' && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500"></div>}
       
-      <div className="flex justify-between items-start mb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <PriorityBadge priority={incident.priority} />
           <div className="flex items-center gap-1.5 text-slate-400 font-medium text-xs">
@@ -50,20 +50,27 @@ const IncidentCard = ({ incident, onResolve, onEdit, onDelete }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => onEdit(incident)}
-            className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-            title="Edit Details"
-          >
-            <Pencil size={18} />
-          </button>
-          <button 
-            onClick={() => onDelete(incident.id)}
-            className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-            title="Delete Incident"
-          >
-            <Trash2 size={18} />
-          </button>
+          <div className="relative sm:hidden">
+            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+              <MoreVertical size={18}/>
+            </button>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100">
+            <button 
+              onClick={() => onEdit(incident)}
+              className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+              title="Edit Details"
+            >
+              <Pencil size={18} />
+            </button>
+            <button 
+              onClick={() => onDelete(incident.id)}
+              className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+              title="Delete Incident"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
           <StatusBadge status={incident.status} />
         </div>
       </div>

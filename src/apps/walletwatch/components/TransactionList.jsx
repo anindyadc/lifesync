@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { CreditCard, Trash2, Pencil, RefreshCcw, Folder } from 'lucide-react';
+import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../../lib/utils';
 
 /**
@@ -70,7 +70,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
  * to ensure users can find it immediately.
  */
 const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
-  <div className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+  <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-colors group">
     <div className="flex items-center gap-4">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categories.find(c=>c.id===exp.category)?.bg || 'bg-slate-100'}`}>
         <CreditCard size={18} className="opacity-70" />
@@ -82,7 +82,7 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
         </p>
       </div>
     </div>
-    <div className="text-right flex items-center gap-4">
+    <div className="text-right flex items-center gap-4 mt-4 sm:mt-0">
       <div className="flex flex-col items-end">
         <span className={`font-black text-sm ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span>
         {exp.reimbursementStatus === 'pending' && (
@@ -102,7 +102,12 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
             <RefreshCcw size={16}/>
           </button>
         )}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="relative sm:hidden">
+          <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+            <MoreVertical size={16}/>
+          </button>
+        </div>
+        <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => onEdit(exp)} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14}/></button>
           <button onClick={() => onDelete(exp.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
         </div>

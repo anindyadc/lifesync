@@ -44,9 +44,19 @@ const TaskFlowApp = ({ user }) => {
 
   const memoizedEditingTask = useMemo(() => editingTask, [editingTask]);
 
-  // 3. Derived Stats
+  // 3. Derived Stats for Dashboard (Current Month)
+  const currentMonthTasks = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    return tasks.filter(task => {
+      const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+      return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
+    });
+  }, [tasks]);
+
   const totalTimeSpent = useMemo(() => {
-    return tasks.reduce((acc, task) => {
+    return currentMonthTasks.reduce((acc, task) => {
       const taskTime = task.timeLogs?.reduce((tAcc, log) => tAcc + log.minutes, 0) || 0;
       const subtaskTime = task.subtasks?.reduce((sAcc, s) => {
         const subtaskLogsTime = s.timeLogs?.reduce((slAcc, log) => slAcc + log.minutes, 0) || 0;
@@ -54,27 +64,27 @@ const TaskFlowApp = ({ user }) => {
       }, 0) || 0;
       return acc + taskTime + subtaskTime;
     }, 0);
-  }, [tasks]);
+  }, [currentMonthTasks]);
 
   const stats = useMemo(() => ({
-    total: tasks.length,
-    completed: tasks.filter(t => t.status === 'done').length,
-    completionRate: tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100) : 0,
+    total: currentMonthTasks.length,
+    completed: currentMonthTasks.filter(t => t.status === 'done').length,
+    completionRate: currentMonthTasks.length > 0 ? Math.round((currentMonthTasks.filter(t => t.status === 'done').length / currentMonthTasks.length) * 100) : 0,
     time: totalTimeSpent,
-    totalSubtasks: tasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0),
-    completedSubtasks: tasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.completed).length || 0), 0)
-  }), [tasks, totalTimeSpent]);
+    totalSubtasks: currentMonthTasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0),
+    completedSubtasks: currentMonthTasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.completed).length || 0), 0)
+  }), [currentMonthTasks, totalTimeSpent]);
 
   const priorityData = useMemo(() => {
-    const high = tasks.filter(t => t.priority === 'high').length;
-    const medium = tasks.filter(t => t.priority === 'medium').length;
-    const low = tasks.filter(t => t.priority === 'low').length;
+    const high = currentMonthTasks.filter(t => t.priority === 'high').length;
+    const medium = currentMonthTasks.filter(t => t.priority === 'medium').length;
+    const low = currentMonthTasks.filter(t => t.priority === 'low').length;
     return [
-      { name: 'High', value: high, color: '#ef4444' }, 
-      { name: 'Medium', value: medium, color: '#f59e0b' }, 
+      { name: 'High', value: high, color: '#ef4444' },
+      { name: 'Medium', value: medium, color: '#f59e0b' },
       { name: 'Low', value: low, color: '#10b981' }
     ];
-  }, [tasks]);
+  }, [currentMonthTasks]);
 
   // 4. Interaction Handlers
   const handleSave = async (data) => {
@@ -148,7 +158,7 @@ const TaskFlowApp = ({ user }) => {
                   <PriorityChart priorityData={priorityData} />
                 </div>
                 <div className="lg:col-span-2">
-                  <TaskReportTable tasks={tasks} />
+                  <TaskReportTable tasks={currentMonthTasks} />
                 </div>
               </div>
             </div>
@@ -157,10 +167,10 @@ const TaskFlowApp = ({ user }) => {
 
         {activeTab === 'tasks' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <TaskList 
-              tasks={tasks} 
-              onEdit={handleEdit} 
-              onDelete={handleDelete} 
+            <TaskList
+              tasks={tasks}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
               onStatusChange={handleStatusChange}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}

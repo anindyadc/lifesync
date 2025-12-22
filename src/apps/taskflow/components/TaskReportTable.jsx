@@ -31,6 +31,12 @@ const TaskReportTable = ({ tasks }) => {
               const subTotal = task.subtasks?.length || 0;
               const percent = subTotal ? (subDone/subTotal)*100 : 0;
               
+              const taskTime = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
+              const subtaskTime = (task.subtasks || []).reduce((acc, subtask) => {
+                return acc + (subtask.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0);
+              }, 0);
+              const totalTime = taskTime + subtaskTime;
+              
               return (
                 <tr key={task.id} className="hover:bg-slate-50">
                   <td className="px-6 py-3 font-medium text-slate-800">{task.title}</td>
@@ -47,7 +53,7 @@ const TaskReportTable = ({ tasks }) => {
                       <span className="text-xs">{subDone}/{subTotal}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-3 font-mono">{formatDuration(task.timeSpent || 0)}</td>
+                  <td className="px-6 py-3 font-mono">{formatDuration(totalTime)}</td>
                 </tr>
               );
             })}

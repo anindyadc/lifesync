@@ -47,8 +47,12 @@ const TaskFlowApp = ({ user }) => {
   // 3. Derived Stats
   const totalTimeSpent = useMemo(() => {
     return tasks.reduce((acc, task) => {
-      const subtaskTime = task.subtasks?.reduce((sAcc, s) => sAcc + (s.timeSpent || 0), 0) || 0;
-      return acc + (task.timeSpent || 0) + subtaskTime;
+      const taskTime = task.timeLogs?.reduce((tAcc, log) => tAcc + log.minutes, 0) || 0;
+      const subtaskTime = task.subtasks?.reduce((sAcc, s) => {
+        const subtaskLogsTime = s.timeLogs?.reduce((slAcc, log) => slAcc + log.minutes, 0) || 0;
+        return sAcc + subtaskLogsTime;
+      }, 0) || 0;
+      return acc + taskTime + subtaskTime;
     }, 0);
   }, [tasks]);
 

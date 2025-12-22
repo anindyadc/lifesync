@@ -92,6 +92,11 @@ export default function App() {
   const isAllowed = (appKey) => userProfile?.allowedApps?.includes(appKey) || userProfile?.role === 'admin';
   const isAdmin = userProfile?.role === 'admin';
 
+  const handleAppSwitch = (app) => {
+    setActiveApp(app);
+    setSidebarOpen(false); // Close sidebar on app selection
+  };
+
   const renderContent = () => {
     switch (activeApp) {
       case 'taskflow': return isAllowed('taskflow') ? <TaskFlowApp user={user} /> : null;
@@ -167,7 +172,7 @@ export default function App() {
         <div className={`fixed inset-0 z-20 md:relative md:flex flex-col md:w-64 ${isSidebarOpen ? 'flex' : 'hidden'}`}>
           <Sidebar
             activeApp={activeApp}
-            setActiveApp={setActiveApp}
+            setActiveApp={handleAppSwitch}
             user={user}
             userProfile={userProfile}
             handleSignOut={handleSignOut}

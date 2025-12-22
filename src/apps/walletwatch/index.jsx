@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Settings, Plus, X, Trash2, Loader2, RefreshCcw, CreditCard } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -29,6 +29,28 @@ const WalletWatchApp = ({ user }) => {
   const [relatedTxn, setRelatedTxn] = useState(null);
 
   const APP_ID = 'default-app-id';
+
+  // Filter for current month's expenses for the dashboard
+  const currentMonthExpenses = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    return expenses.filter(expense => {
+      let expenseDate;
+      if (expense.date?.toDate) {
+        expenseDate = expense.date.toDate();
+      } else if (typeof expense.date === 'string') {
+        expenseDate = new Date(expense.date);
+      } else if (expense.date instanceof Date) {
+        expenseDate = expense.date;
+      } else {
+        return false; // Skip if date is invalid or unexpected format
+      }
+      
+      return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+    });
+  }, [expenses]);
 
   if (loading) {
     return (
@@ -186,21 +208,21 @@ const WalletWatchApp = ({ user }) => {
       <div className="min-h-[400px]">
         {view === 'dashboard' && (
           <div className="animate-in slide-in-from-bottom-2 duration-300">
-            <SummaryCards expenses={expenses} />
+            <SummaryCards expenses={currentMonthExpenses} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                <NetTrendGraph expenses={expenses} />
-                <WeeklyBarChart expenses={expenses} />
+                <NetTrendGraph expenses={currentMonthExpenses} />
+                <WeeklyBarChart expenses={currentMonthExpenses} />
 
                 {/* Dashboard Recent Activity */}
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                   <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800">Recent Activity</h3>
+                    <h3 className="font-bold text-slate-800">Recent Activity (Current Month)</h3>
                     <button onClick={() => setView('history')} className="text-xs font-bold text-indigo-600">See All</button>
                   </div>
                   <div className="divide-y divide-slate-50">
-                    {expenses.slice(0, 5).map(exp => (
+                    {currentMonthExpenses.slice(0, 5).map(exp => (
                       <div key={exp.id} className="p-4 flex justify-between items-center group">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100`}>
@@ -227,9 +249,9 @@ const WalletWatchApp = ({ user }) => {
               </div>
 
               <div className="lg:col-span-1 space-y-6">
-                <GroupSubtotals expenses={expenses} />
-                <CategoryDistribution categories={categories} expenses={expenses} />
-                <CategorySubtotals categories={categories} expenses={expenses} />
+                <GroupSubtotals expenses={currentMonthExpenses} />
+                <CategoryDistribution categories={categories} expenses={currentMonthExpenses} />
+                <CategorySubtotals categories={categories} expenses={currentMonthExpenses} />
               </div>
             </div>
           </div>

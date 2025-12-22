@@ -83,12 +83,14 @@ export const GroupSubtotals = ({ expenses }) => {
 
 export const CategoryDistribution = ({ categories, expenses }) => {
   const data = useMemo(() => {
-    const totals = categories.map(cat => ({
-      ...cat,
-      value: expenses
-        .filter(e => e.category === cat.id && e.amount > 0)
-        .reduce((acc, curr) => acc + Number(curr.amount), 0)
-    })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+    const totals = categories.map(cat => {
+      const categoryExpenses = expenses.filter(e => {
+        const match = e.category === cat.id; // Filter only by category ID
+        return match;
+      });
+      const value = categoryExpenses.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0); // Sum absolute values
+      return { ...cat, value };
+    }).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
 
     const totalVal = totals.reduce((acc, curr) => acc + curr.value, 0);
     return { totals, totalVal };

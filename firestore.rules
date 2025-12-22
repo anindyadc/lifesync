@@ -45,6 +45,11 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
+    // Rule for WalletWatch settings, including categories
+    match /artifacts/default-app-id/users/{userId}/settings/walletConfig {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
     // 4. ServerLog (changelogs) Data
     match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('changemanager');

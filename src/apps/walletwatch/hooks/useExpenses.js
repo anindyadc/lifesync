@@ -25,10 +25,8 @@ export const useExpenses = (user, appId = 'default-app-id') => {
     const catRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig');
     const unsubCat = onSnapshot(catRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().categories) {
-        console.log("Categories from Firestore:", docSnap.data().categories); // DEBUG
         setCategories(docSnap.data().categories);
       } else {
-        console.log("Using DEFAULT_CATEGORIES:", DEFAULT_CATEGORIES); // DEBUG
         setCategories(DEFAULT_CATEGORIES);
       }
     }, (error) => {

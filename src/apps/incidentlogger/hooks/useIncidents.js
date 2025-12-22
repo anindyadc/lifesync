@@ -47,7 +47,6 @@ export const useIncidents = (user) => {
   }, [user]);
 
   const addIncident = async (incidentData) => {
-    console.log('addIncident: Attempting to add new incident with data:', incidentData);
     try {
       const docRef = await addDoc(
         collection(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents'),
@@ -57,7 +56,6 @@ export const useIncidents = (user) => {
           updatedAt: serverTimestamp(),
         }
       );
-      console.log('addIncident: Successfully added incident with ID:', docRef.id);
     } catch (error) {
       console.error('addIncident: Error writing new incident to Firestore:', error);
     }

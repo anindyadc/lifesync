@@ -42,7 +42,6 @@ export const useInvestments = (userId) => {
 
     setLoading(true);
     setError(null);
-    console.log("useInvestments: Listening for userId:", userId);
     const investmentsCollectionRef = collection(db, `artifacts/default-app-id/users/${userId}/investments`);
     const q = query(investmentsCollectionRef, orderBy('maturityDate', 'asc'));
 

@@ -16,8 +16,8 @@ export const SummaryCards = ({ expenses }) => {
   const stats = useMemo(() => {
     const total = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
     const spent = expenses
-      .filter(e => Number(e.amount) > 0)
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
+      .filter(e => Number(e.amount) < 0)
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
     return { net: total, spent };
   }, [expenses]);
 
@@ -49,8 +49,8 @@ export const GroupSubtotals = ({ expenses }) => {
   const groups = useMemo(() => {
     const map = {};
     expenses.forEach(e => {
-      if (e.group) {
-        map[e.group] = (map[e.group] || 0) + (Number(e.amount) || 0);
+      if (e.group && e.amount < 0) {
+        map[e.group] = (map[e.group] || 0) + Math.abs(Number(e.amount) || 0);
       }
     });
     return Object.entries(map)
@@ -154,8 +154,8 @@ export const CategorySubtotals = ({ categories, expenses }) => {
   const totals = useMemo(() => categories.map(cat => ({
     ...cat,
     total: expenses
-      .filter(e => e.category === cat.id && e.amount > 0)
-      .reduce((acc, curr) => acc + Number(curr.amount), 0)
+      .filter(e => e.category === cat.id && e.amount < 0)
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0)
   })).sort((a, b) => b.total - a.total).slice(0, 6), [categories, expenses]);
 
   const grandTotal = totals.reduce((acc, curr) => acc + curr.total, 0);

@@ -82,3 +82,87 @@ This project is configured for automated deployment to GitHub Pages.
 
 1.  **GitHub Secrets:** Add your Firebase environment variables as secrets to your GitHub repository under `Settings > Secrets and variables > Actions`.
 2.  **Push to `main`:** The GitHub Action defined in `.github/workflows/deploy.yml` will automatically trigger on a push to the `main` branch, building and deploying the application.
+
+## Firestore Data Structure
+
+All user-specific data is stored in a nested structure under the `artifacts/{appId}/users/{userId}/` path.
+
+### User Profile
+
+#### `userProfiles` collection
+*   **Path**: `/artifacts/default-app-id/public/data/userProfiles/{userId}`
+*   `uid` (string): The user's Firebase Authentication UID.
+*   `email` (string): The user's email address.
+*   `displayName` (string): The user's display name.
+*   `role` (string): The user's role (e.g., 'user', 'admin').
+*   `allowedApps` (array): A list of app modules the user can access.
+*   `joinedAt` (Timestamp): The timestamp when the user profile was created.
+
+### `walletwatch`
+
+#### `expenses` collection
+*   `amount` (number): The transaction amount.
+*   `description` (string): A brief description of the expense.
+*   `category` (string): The category of the expense (e.g., Food, Travel).
+*   `group` (string): A grouping for the expense.
+*   `paymentMode` (string): The method of payment.
+*   `date` (Timestamp): The date of the transaction.
+*   `reimbursementStatus` (string): Status of reimbursement.
+*   `relatedId` (string): ID of a related transaction.
+*   `createdAt` (Timestamp): Timestamp of creation.
+*   `updatedAt` (Timestamp): Timestamp of last update.
+
+#### `settings` collection
+This collection contains a single document `walletConfig` for user-specific settings.
+*   `categories` (array): An array of category objects, each with `{ id, label, color, bg }`.
+
+### `taskflow`
+
+#### `tasks` collection
+*   `title` (string): The title of the task.
+*   `description` (string): Detailed description of the task.
+*   `priority` (string): Priority level (e.g., Low, Medium, High).
+*   `status` (string): Current status (e.g., To Do, In Progress, Done).
+*   `dueDate` (string): The due date of the task.
+*   `category` (string): The category of the task.
+*   `progress` (number): The progress of the task (0-100).
+*   `subtasks` (array): An array of subtask objects.
+*   `timeLogs` (array): An array of time log objects.
+*   `createdAt` (Timestamp): Timestamp of creation.
+*   `updatedAt` (Timestamp): Timestamp of last update.
+
+### `investments`
+
+#### `investments` collection
+*   `holder` (string): Who holds the investment (e.g., Self, Joint).
+*   `type` (string): The type of investment (e.g., FD, Stocks).
+*   `name` (string): The name or identifier for the investment.
+*   `amountEncrypted` (string): The investment amount, AES encrypted.
+*   `maturityDate` (string): The date the investment matures.
+*   `details` (string): Additional details about the investment.
+*   `createdAt` (Timestamp): Timestamp of creation.
+*   `updatedAt` (Timestamp): Timestamp of last update.
+
+### `incidentlogger`
+
+#### `incidents` collection
+*   `title` (string): A summary of the incident.
+*   `status` (string): The current status (`open`, `progress`, `resolved`).
+*   `priority` (string): The priority level (`low`, `medium`, `high`, `critical`).
+*   `resolutionNotes` (string): Notes on how the incident was resolved.
+*   `reportedAt` (Timestamp): Timestamp when the incident was reported.
+*   `updatedAt` (Timestamp): Timestamp of last update.
+
+### `changemanager`
+
+#### `changelogs` collection
+*   `serverName` (string): The name of the server affected.
+*   `application` (string): The application affected (optional).
+*   `type` (string): The type of change (e.g., Update, Patch, Reboot).
+*   `status` (string): The status of the change (`success`, `pending`, `failed`).
+*   `title` (string): A summary of the change.
+*   `description` (string): A detailed description of the change.
+*   `parameters` (string): Any parameters that were changed.
+*   `date` (Timestamp): The date the change was implemented.
+*   `performedBy` (string): The user who performed the change.
+*   `createdAt` (Timestamp): Timestamp of creation.

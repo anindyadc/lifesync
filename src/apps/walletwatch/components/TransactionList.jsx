@@ -35,22 +35,31 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
       </div>
 
       {groupByEvent ? (
-        Object.entries(groupedData.groups).map(([name, data]) => (
-          <div key={name} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-4">
-             <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
-               <div className="flex items-center gap-3">
-                 <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
-                 <h4 className="font-bold text-slate-800">{name}</h4>
+        <>
+          {Object.entries(groupedData.groups).map(([name, data]) => (
+            <div key={name} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-4">
+               <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+                 <div className="flex items-center gap-3">
+                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
+                   <h4 className="font-bold text-slate-800">{name}</h4>
+                 </div>
+                 <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
                </div>
-               <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
-             </div>
-             <div className="divide-y divide-slate-50">
-                {data.items.map(exp => (
-                  <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-                ))}
-             </div>
+               <div className="divide-y divide-slate-50">
+                  {data.items.map(exp => (
+                    <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+                  ))}
+               </div>
+            </div>
+          ))}
+          <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+            <div className="divide-y divide-slate-50">
+              {groupedData.ungrouped.map(exp => (
+                <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+              ))}
+            </div>
           </div>
-        ))
+        </>
       ) : (
         <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
           <div className="divide-y divide-slate-50">

@@ -14,11 +14,15 @@ const formatCurrency = (amount) => {
 
 export const SummaryCards = ({ expenses }) => {
   const stats = useMemo(() => {
-    const total = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
     const spent = expenses
       .filter(e => Number(e.amount) < 0)
       .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
-    return { net: total, spent };
+    
+    const lent = expenses
+      .filter(e => e.reimbursementStatus === 'pending')
+      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
+    
+    return { net: lent, spent };
   }, [expenses]);
 
   return (
@@ -37,7 +41,7 @@ export const SummaryCards = ({ expenses }) => {
           <Wallet size={24} />
         </div>
         <div>
-          <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Net Balance</p>
+          <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Lent Amount</p>
           <p className="text-xl font-black text-white">{formatCurrency(stats.net)}</p>
         </div>
       </div>
@@ -85,7 +89,7 @@ export const CategoryDistribution = ({ categories, expenses }) => {
   const data = useMemo(() => {
     const totals = categories.map(cat => {
       const categoryExpenses = expenses.filter(e => {
-        const match = e.category === cat.id; // Filter only by category ID
+        const match = e.category === cat.id && e.amount < 0; // Filter only by category ID and ensure it's an expense
         return match;
       });
       const value = categoryExpenses.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0); // Sum absolute values

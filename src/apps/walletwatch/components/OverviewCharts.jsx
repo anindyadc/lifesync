@@ -10,11 +10,15 @@ export const NetTrendGraph = ({ expenses }) => {
     const daily = {};
     let total = 0;
     expenses.forEach(e => {
+      const amt = Number(e.amount) || 0;
+      if (amt >= 0) return; // Skip non-expense transactions
+
       const date = e.date?.toDate ? e.date.toDate() : new Date(e.date);
       const dateKey = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const amt = Number(e.amount) || 0;
-      daily[dateKey] = (daily[dateKey] || 0) + amt;
-      total += amt;
+      
+      const absAmt = Math.abs(amt);
+      daily[dateKey] = (daily[dateKey] || 0) + absAmt;
+      total += absAmt;
     });
     const sorted = Object.entries(daily).sort((a, b) => new Date(a[0]) - new Date(b[0])).slice(-7);
     return { chartData: sorted, netTotal: total };
@@ -22,19 +26,19 @@ export const NetTrendGraph = ({ expenses }) => {
 
   if (chartData.length === 0) return null;
   const vals = chartData.map(d => d[1]);
-  const max = Math.max(...vals.map(Math.abs), 1);
+  const max = Math.max(...vals, 1);
   const points = chartData.map((d, i) => {
     const x = (i / Math.max(chartData.length - 1, 1)) * 260 + 20;
-    const y = 100 - ((d[1] / max) * 40 + 50);
+    const y = 100 - ((d[1] / max) * 80 + 10); // Adjusted scale for better viz
     return `${x},${y}`;
   }).join(' ');
 
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
       <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest"><TrendingUp size={14}/> Balance velocity</div>
+        <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest"><TrendingUp size={14}/> Spend velocity</div>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Current Net</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Total Spent</p>
           <p className="text-xl font-black text-slate-900">{formatCurrency(netTotal)}</p>
         </div>
       </div>

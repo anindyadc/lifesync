@@ -31,15 +31,15 @@ const ChangeCard = ({ change, onClick, onEdit, onDelete }) => {
             {change.status}
           </span>
           <button 
-            onClick={(e) => { e.stopPropagation(); onEdit(change.id); }}
-            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+            onClick={(e) => { e.stopPropagation(); onEdit(change); }}
+            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors border border-transparent hover:border-indigo-200"
             title="Edit Change"
           >
             <Pencil size={14}/>
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(change.id); }}
-            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
             title="Delete Change"
           >
             <Trash2 size={14}/>

@@ -1,9 +1,7 @@
-import React, { useMemo } from 'react';
-import { Tag, Wallet, ArrowDownCircle, PieChart, Layers } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Tag, Wallet, ArrowDownCircle, PieChart, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useExpenses } from '../hooks/useExpenses';
 
-/**
- * UTILS
- */
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -11,6 +9,55 @@ const formatCurrency = (amount) => {
     maximumFractionDigits: 0,
   }).format(amount);
 };
+
+const MonthNavigator = ({ selectedMonth, setSelectedMonth }) => {
+  const handlePrevMonth = () => {
+    setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1));
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-4 mb-6">
+      <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-slate-100">
+        <ChevronLeft size={20} />
+      </button>
+      <h2 className="text-lg font-bold text-slate-800">
+        {selectedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+      </h2>
+      <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-slate-100">
+        <ChevronRight size={20} />
+      </button>
+    </div>
+  );
+};
+
+const Dashboard = ({ user, categories }) => {
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const { expenses, loading } = useExpenses(user, 'default-app-id', selectedMonth);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
+      <SummaryCards expenses={expenses} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <GroupSubtotals expenses={expenses} />
+          <CategoryDistribution categories={categories} expenses={expenses} />
+        </div>
+        <CategorySubtotals categories={categories} expenses={expenses} />
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
 
 export const SummaryCards = ({ expenses }) => {
   const stats = useMemo(() => {
@@ -191,3 +238,4 @@ export const CategorySubtotals = ({ categories, expenses }) => {
     </div>
   );
 };
+

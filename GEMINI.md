@@ -26,6 +26,8 @@ LifeSync is a React application that integrates with Firebase for backend servic
         *   When grouped, only the most recent groups are shown initially, with a "Show More" button to reveal older ones.
         *   Within each expanded group, only the first five transactions are shown, with another "Show More" button to see all transactions in that group.
         *   The individual transaction view also defaults to showing the last 10 transactions, with a "Show More" option.
+*   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
+*   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
 
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)

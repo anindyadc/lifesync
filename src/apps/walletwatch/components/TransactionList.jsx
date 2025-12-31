@@ -7,68 +7,127 @@ import { formatCurrency, formatDate } from '../../../lib/utils';
  * Optimized for clear settlement visibility.
  */
 const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) => {
-  const [groupByEvent, setGroupByEvent] = useState(false);
+  const [grouping, setGrouping] = useState('month'); // 'none', 'month', 'event'
 
   const groupedData = useMemo(() => {
-    const groups = {};
-    const ungrouped = [];
-    expenses.forEach(e => {
-      if (e.group) {
-        if (!groups[e.group]) groups[e.group] = { total: 0, items: [] };
-        groups[e.group].items.push(e);
-        groups[e.group].total += Number(e.amount);
-      } else ungrouped.push(e);
-    });
-    return { groups, ungrouped };
-  }, [expenses]);
+    if (grouping === 'month') {
+      const monthlyGroups = {};
+      expenses.forEach(expense => {
+        const date = expense.date.toDate();
+        const monthYear = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        if (!monthlyGroups[monthYear]) {
+          monthlyGroups[monthYear] = [];
+        }
+        monthlyGroups[monthYear].push(expense);
+      });
+      return { monthlyGroups };
+    }
+    
+    if (grouping === 'event') {
+      const eventGroups = {};
+      const ungrouped = [];
+      expenses.forEach(e => {
+        if (e.group) {
+          if (!eventGroups[e.group]) eventGroups[e.group] = { total: 0, items: [] };
+          eventGroups[e.group].items.push(e);
+          eventGroups[e.group].total += Number(e.amount);
+        } else {
+          ungrouped.push(e);
+        }
+      });
+      return { eventGroups, ungrouped };
+    }
+
+    return {};
+  }, [expenses, grouping]);
+
+  const renderGroupedByMonth = () => (
+    <div className="space-y-6">
+      {Object.entries(groupedData.monthlyGroups).map(([monthYear, monthExpenses]) => (
+        <div key={monthYear} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+          <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+            <h4 className="font-bold text-slate-800">{monthYear}</h4>
+            <span className="font-black text-slate-900">
+              {formatCurrency(monthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0))}
+            </span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {monthExpenses.map(exp => (
+              <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderGroupedByEvent = () => (
+    <>
+      {Object.entries(groupedData.eventGroups).map(([name, data]) => (
+        <div key={name} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-4">
+           <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+             <div className="flex items-center gap-3">
+               <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
+               <h4 className="font-bold text-slate-800">{name}</h4>
+             </div>
+             <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
+           </div>
+           <div className="divide-y divide-slate-50">
+              {data.items.map(exp => (
+                <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+              ))}
+           </div>
+        </div>
+      ))}
+      <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+        <div className="divide-y divide-slate-50">
+          {groupedData.ungrouped.map(exp => (
+            <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const renderIndividual = () => (
+    <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+      <div className="divide-y divide-slate-50">
+        {expenses.map(exp => (
+          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       <div className="flex justify-between items-center px-2">
         <h3 className="font-bold text-slate-800">Transaction History</h3>
-        <button 
-          onClick={() => setGroupByEvent(!groupByEvent)}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${groupByEvent ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
-        >
-          {groupByEvent ? 'View Individual' : 'Group by Event'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setGrouping('month')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
+          >
+            By Month
+          </button>
+          <button 
+            onClick={() => setGrouping('event')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'event' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
+          >
+            By Event
+          </button>
+          <button 
+            onClick={() => setGrouping('none')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'none' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
+          >
+            Individual
+          </button>
+        </div>
       </div>
 
-      {groupByEvent ? (
-        <>
-          {Object.entries(groupedData.groups).map(([name, data]) => (
-            <div key={name} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-4">
-               <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
-                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
-                   <h4 className="font-bold text-slate-800">{name}</h4>
-                 </div>
-                 <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
-               </div>
-               <div className="divide-y divide-slate-50">
-                  {data.items.map(exp => (
-                    <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-                  ))}
-               </div>
-            </div>
-          ))}
-          <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
-            <div className="divide-y divide-slate-50">
-              {groupedData.ungrouped.map(exp => (
-                <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-              ))}
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
-          <div className="divide-y divide-slate-50">
-            {expenses.map(exp => (
-              <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-            ))}
-          </div>
-        </div>
-      )}
+      {grouping === 'month' && renderGroupedByMonth()}
+      {grouping === 'event' && renderGroupedByEvent()}
+      {grouping === 'none' && renderIndividual()}
     </div>
   );
 };

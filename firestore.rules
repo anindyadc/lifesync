@@ -61,8 +61,8 @@ service cloud.firestore {
     }
 
     // 6. Investments Data
-    match /artifacts/default-app-id/users/{userId}/investments/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('investments');
+    match /artifacts/default-app-id/users/{userId}/investment/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('investment');
     }
     
     // Default Deny

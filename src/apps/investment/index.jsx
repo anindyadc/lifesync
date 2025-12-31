@@ -8,7 +8,7 @@ import { useInvestments } from './hooks/useInvestments';
 const InvestmentsApp = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
-  const [activeTab, setActiveTab] = useState('list'); // 'list', 'calendar'
+  const [activeTab, setActiveTab] = useState('investment'); // 'list', 'calendar'
   const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment } = useInvestments(user.uid);
 
   const handleSave = async (investmentData) => {
@@ -30,7 +30,7 @@ const InvestmentsApp = ({ user }) => {
     return (
       <div className="flex items-center justify-center h-48 bg-white rounded-2xl shadow-sm border border-slate-200">
         <Loader2 className="animate-spin text-indigo-500" size={24} />
-        <p className="ml-3 text-slate-600">Loading investments...</p>
+        <p className="ml-3 text-slate-600">Loading investment...</p>
       </div>
     );
   }
@@ -49,11 +49,7 @@ const InvestmentsApp = ({ user }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">My Investments</h2>
         <div className="flex space-x-2">
-          <button 
-            onClick={() => setActiveTab('list')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'list' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
-          >
-            <PiggyBank className="inline-block mr-2" size={18} /> List View
+          <button onClick={() => setActiveTab('investment')} className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'investment' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}>            <PiggyBank className="inline-block mr-2" size={18} /> List View
           </button>
           <button 
             onClick={() => setActiveTab('calendar')}
@@ -74,10 +70,10 @@ const InvestmentsApp = ({ user }) => {
         </div>
       )}
 
-      {investments.length === 0 && (activeTab === 'list' || activeTab === 'calendar') ? (
+      {investments.length === 0 && (activeTab === 'investment' || activeTab === 'calendar') ? (
         <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
           <PiggyBank size={40} className="mx-auto mb-4 text-slate-400" />
-          <p className="text-lg font-medium">No investments added yet.</p>
+          <p className="text-lg font-medium">No investment added yet.</p>
           <p className="text-sm mb-4">Add your first investment to start tracking maturities and amounts.</p>
           <button
             onClick={() => { setShowForm(true); setEditInvestment(null); }}
@@ -89,7 +85,7 @@ const InvestmentsApp = ({ user }) => {
         </div>
       ) : (
         <>
-          {activeTab === 'list' && (
+          {activeTab === 'investment' && (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-end mb-4">
                 <button

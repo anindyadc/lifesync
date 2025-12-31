@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../../../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, 
-         addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import CryptoJS from 'crypto-js';
 
 // IMPORTANT: For a production application, this key should NEVER be hardcoded.
@@ -33,16 +32,10 @@ export const useInvestments = (userId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!userId) {
-      setInvestments([]);
-      setLoading(false);
-      return;
-    }
 
-    setLoading(true);
-    setError(null);
-    const investmentsCollectionRef = collection(db, `artifacts/default-app-id/users/${userId}/investments`);
+
+  useEffect(() => {
+    const investmentsCollectionRef = collection(db, `artifacts/default-app-id/users/${userId}/investment`);
     const q = query(investmentsCollectionRef, orderBy('maturityDate', 'asc'));
 
     const unsubscribe = onSnapshot(q, 
@@ -58,8 +51,8 @@ export const useInvestments = (userId) => {
         setLoading(false);
       }, 
       (err) => {
-        console.error("Failed to fetch investments:", err);
-        setError("Failed to load investments.");
+        console.error("Failed to fetch investment:", err);
+        setError("Failed to load investment.");
         setLoading(false);
       }
     );
@@ -67,12 +60,14 @@ export const useInvestments = (userId) => {
     return () => unsubscribe();
   }, [userId]);
 
+
+
   const addInvestment = useCallback(async (investmentData) => {
     try {
       const { amount, ...rest } = investmentData;
       const amountEncrypted = encryptAmount(amount);
 
-      await addDoc(collection(db, `artifacts/default-app-id/users/${userId}/investments`), {
+      await addDoc(collection(db, `artifacts/default-app-id/users/${userId}/investment`), {
         ...rest,
         amountEncrypted, // Store encrypted amount
         createdAt: serverTimestamp(),
@@ -89,7 +84,7 @@ export const useInvestments = (userId) => {
       const { amount, ...rest } = investmentData;
       const amountEncrypted = encryptAmount(amount);
 
-      const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investments`, id);
+      const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investment`, id);
       await updateDoc(investmentRef, {
         ...rest,
         amountEncrypted, // Update with encrypted amount
@@ -103,7 +98,7 @@ export const useInvestments = (userId) => {
 
   const deleteInvestment = useCallback(async (id) => {
     try {
-      await deleteDoc(doc(db, `artifacts/default-app-id/users/${userId}/investments`, id));
+      await deleteDoc(doc(db, `artifacts/default-app-id/users/${userId}/investment`, id));
     } catch (e) {
       console.error("Error deleting investment: ", e);
       setError("Failed to delete investment.");

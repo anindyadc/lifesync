@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
 
@@ -6,7 +6,10 @@ const INVESTMENT_TYPES = ['NSC', 'FD', 'Mutual Fund', 'Stocks', 'Gold', 'Real Es
 const INVESTMENT_HOLDERS = ['Self', 'Wife', 'Mother', 'Joint', 'Other'];
 
 const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(initialData ? {
+    ...initialData,
+    amount: initialData.amount || '',
+  } : {
     holder: 'Self',
     type: 'FD',
     name: '',
@@ -15,18 +18,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     details: '',
   });
 
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        holder: initialData.holder || 'Self',
-        type: initialData.type || 'FD',
-        name: initialData.name || '',
-        amount: initialData.amount || '',
-        maturityDate: initialData.maturityDate || '',
-        details: initialData.details || '',
-      });
-    }
-  }, [initialData]);
+
 
   const handleSubmit = (e) => {
     e.preventDefault();

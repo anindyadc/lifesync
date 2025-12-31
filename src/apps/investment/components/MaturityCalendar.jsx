@@ -82,7 +82,7 @@ const MaturityCalendar = ({ investments }) => {
         <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 h-full flex flex-col items-center justify-center">
           <CalendarDays size={40} className="mx-auto mb-4 text-slate-400" />
           <p className="text-lg font-medium">No upcoming maturities.</p>
-          <p className="text-sm">Add investments to see them on the calendar.</p>
+          <p className="text-sm">Add investment to see them on the calendar.</p>
         </div>
       )}
     </div>

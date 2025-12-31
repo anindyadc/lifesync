@@ -4,7 +4,7 @@ This document provides a concise overview of the LifeSync application, its setup
 
 ## Project Overview
 
-LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investments, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
+LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investment, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
 
 ## Features (Incident Logger App)
 
@@ -131,9 +131,9 @@ This collection contains a single document `walletConfig` for user-specific sett
 *   `createdAt` (Timestamp): Timestamp of creation.
 *   `updatedAt` (Timestamp): Timestamp of last update.
 
-### `investments`
+### `investment`
 
-#### `investments` collection
+#### `investment` collection
 *   `holder` (string): Who holds the investment (e.g., Self, Joint).
 *   `type` (string): The type of investment (e.g., FD, Stocks).
 *   `name` (string): The name or identifier for the investment.

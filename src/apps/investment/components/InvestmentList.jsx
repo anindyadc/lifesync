@@ -7,7 +7,7 @@ const InvestmentList = ({ investments, onEdit, onDelete }) => {
     return (
       <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
         <PiggyBank size={40} className="mx-auto mb-4 text-slate-400" />
-        <p className="text-lg font-medium">No investments added yet.</p>
+        <p className="text-lg font-medium">No investment added yet.</p>
         <p className="text-sm">Add your first investment to start tracking.</p>
       </div>
     );

@@ -23,7 +23,7 @@ import WalletWatchApp from './apps/walletwatch';
 import ChangeManagerApp from './apps/changemanager';
 import IncidentLoggerApp from './apps/incidentlogger';
 import AdminPanelApp from './apps/admin';
-import InvestmentsApp from './apps/investments'; // New app import
+import InvestmentsApp from './apps/investment'; // New app import
 
 import Sidebar from './components/Sidebar';
 import { Menu } from 'lucide-react';
@@ -103,7 +103,7 @@ export default function App() {
       case 'walletwatch': return isAllowed('walletwatch') ? <WalletWatchApp user={user} /> : null;
       case 'changemanager': return isAllowed('changemanager') ? <ChangeManagerApp user={user} /> : null;
       case 'incidentlogger': return isAllowed('incidentlogger') ? <IncidentLoggerApp user={user} /> : null;
-      case 'investments': return isAllowed('investments') ? <InvestmentsApp user={user} /> : null; // New app case
+      case 'investment': return isAllowed('investment') ? <InvestmentsApp user={user} /> : null; // New app case
       case 'admin': return isAdmin ? <AdminPanelApp /> : null;
       default:
         return (
@@ -144,8 +144,8 @@ export default function App() {
               </button>
             )}
 
-            {isAllowed('investments') && (
-              <button onClick={() => setActiveApp('investments')} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+            {isAllowed('investment') && (
+              <button onClick={() => setActiveApp('investment')} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group relative overflow-hidden">
                 <PiggyBank size={100} className="absolute -right-4 -bottom-4 opacity-5 text-amber-500"/>
                 <PiggyBank size={24} className="text-amber-500 mb-4"/>
                 <h3 className="text-xl font-bold text-slate-800">Investments</h3>
@@ -190,10 +190,10 @@ export default function App() {
               </button>
               <div>
                 <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
-                  {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp)}
+                  {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp === 'investment' ? 'Investments' : activeApp)}
                 </h1>
                 <p className="text-slate-500 mt-1">
-                  {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp} activities.`}
+                  {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp === 'investment' ? 'Investments' : activeApp} activities.`}
                 </p>
               </div>
             </div>

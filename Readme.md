@@ -10,7 +10,7 @@ LifeSync is a multi-module React application designed to help you organize diffe
 *   **WalletWatch:** An expense tracker.
 *   **IncidentLogger:** A tool for logging incidents. Users can now edit existing incident details and permanently delete reported incidents.
 *   **ChangeManager:** A utility for managing changes.
-*   **Investments:** A module for tracking investments.
+*   **Investment:** A module for tracking investments.
 
 ## **Phase 1: Prerequisites & Installation**
 

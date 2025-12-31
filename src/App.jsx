@@ -130,7 +130,7 @@ export default function App() {
               <button onClick={() => setActiveApp('changemanager')} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group relative overflow-hidden">
                 <Server size={100} className="absolute -right-4 -bottom-4 opacity-5 text-blue-500"/>
                 <Server size={24} className="text-blue-500 mb-4"/>
-                <h3 className="text-xl font-bold text-slate-800">ServerLog</h3>
+                <h3 className="text-xl font-bold text-slate-800">ChangeLog</h3>
                 <p className="text-xs text-slate-400">Infrastructure changes</p>
               </button>
             )}

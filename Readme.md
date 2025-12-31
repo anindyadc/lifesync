@@ -107,7 +107,7 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
-    // 4. ServerLog (changelogs) Data
+    // 4. ChangeLog (changelogs) Data
     match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
     }

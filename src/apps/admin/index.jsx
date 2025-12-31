@@ -20,7 +20,7 @@ const AdminPanelApp = () => {
     { id: 'taskflow', label: 'TaskFlow', color: 'bg-emerald-100 text-emerald-700' },
     { id: 'walletwatch', label: 'WalletWatch', color: 'bg-indigo-100 text-indigo-700' },
     { id: 'investment', label: 'Investment', color: 'bg-rose-100 text-rose-700' },
-    { id: 'changemanager', label: 'ServerLog', color: 'bg-blue-100 text-blue-700' },
+    { id: 'changemanager', label: 'ChangeLog', color: 'bg-blue-100 text-blue-700' },
     { id: 'incidentlogger', label: 'Incidents', color: 'bg-red-100 text-red-700' },
   ];
 

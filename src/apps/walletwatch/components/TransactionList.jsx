@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../../lib/utils';
 
 /**
@@ -8,6 +8,10 @@ import { formatCurrency, formatDate } from '../../../lib/utils';
  */
 const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) => {
   const [grouping, setGrouping] = useState('month'); // 'none', 'month', 'event'
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [showAll, setShowAll] = useState(false);
+  const [showAllGroups, setShowAllGroups] = useState(false);
+  const [expandedTransactionGroups, setExpandedTransactionGroups] = useState({});
 
   const groupedData = useMemo(() => {
     if (grouping === 'month') {
@@ -41,63 +45,165 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     return {};
   }, [expenses, grouping]);
 
-  const renderGroupedByMonth = () => (
-    <div className="space-y-6">
-      {Object.entries(groupedData.monthlyGroups).map(([monthYear, monthExpenses]) => (
-        <div key={monthYear} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-          <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
-            <h4 className="font-bold text-slate-800">{monthYear}</h4>
-            <span className="font-black text-slate-900">
-              {formatCurrency(monthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0))}
-            </span>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {monthExpenses.map(exp => (
-              <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  useEffect(() => {
+    setShowAll(false);
+    setShowAllGroups(false);
+    setExpandedTransactionGroups({});
+    
+    const groupKeys = Object.keys(groupedData.monthlyGroups || groupedData.eventGroups || {});
+    const firstGroup = groupKeys[0];
+    const initialCollapsedState = {};
+    groupKeys.forEach(key => {
+      initialCollapsedState[key] = key !== firstGroup;
+    });
+    setCollapsedGroups(initialCollapsedState);
+  }, [grouping, expenses]);
 
-  const renderGroupedByEvent = () => (
-    <>
-      {Object.entries(groupedData.eventGroups).map(([name, data]) => (
-        <div key={name} className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm mb-4">
-           <div className="p-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
-             <div className="flex items-center gap-3">
-               <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
-               <h4 className="font-bold text-slate-800">{name}</h4>
-             </div>
-             <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
-           </div>
-           <div className="divide-y divide-slate-50">
-              {data.items.map(exp => (
-                <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-              ))}
-           </div>
-        </div>
-      ))}
+  const toggleGroup = (groupKey) => {
+    setCollapsedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
+  const toggleTransactionGroup = (groupKey) => {
+    setExpandedTransactionGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
+  const renderGroupedByMonth = () => {
+    const monthEntries = Object.entries(groupedData.monthlyGroups);
+    const groupsToShow = showAllGroups ? monthEntries : monthEntries.slice(0, 3);
+    return (
+      <div className="space-y-2">
+        {groupsToShow.map(([monthYear, monthExpenses]) => {
+          const isTransactionListExpanded = !!expandedTransactionGroups[monthYear];
+          const transactionsToShow = isTransactionListExpanded ? monthExpenses : monthExpenses.slice(0, 5);
+          
+          return (
+            <div key={monthYear} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm transition-all duration-300">
+              <button 
+                onClick={() => toggleGroup(monthYear)}
+                className="p-4 w-full flex justify-between items-center bg-slate-50/50 hover:bg-slate-100/50"
+              >
+                <h4 className="font-bold text-slate-800">{monthYear}</h4>
+                <div className="flex items-center gap-4">
+                  <span className="font-black text-slate-900">
+                    {formatCurrency(monthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0))}
+                  </span>
+                  <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[monthYear] && 'rotate-180'}`} />
+                </div>
+              </button>
+              {!collapsedGroups[monthYear] && (
+                <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
+                  {transactionsToShow.map(exp => (
+                    <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+                  ))}
+                  {monthExpenses.length > 5 && (
+                    <div className="p-2 text-center">
+                      <button 
+                        onClick={() => toggleTransactionGroup(monthYear)}
+                        className="text-indigo-600 font-bold text-xs hover:underline"
+                      >
+                        {isTransactionListExpanded ? 'Show Less' : `Show ${monthExpenses.length - 5} More`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {monthEntries.length > 3 && (
+          <div className="p-4 text-center">
+            <button 
+              onClick={() => setShowAllGroups(!showAllGroups)}
+              className="text-indigo-600 font-bold text-xs hover:underline"
+            >
+              {showAllGroups ? 'Show Less' : `Show ${monthEntries.length - 3} More Months`}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderGroupedByEvent = () => {
+    const eventEntries = Object.entries(groupedData.eventGroups);
+    const groupsToShow = showAllGroups ? eventEntries : eventEntries.slice(0, 3);
+    return (
+      <div className="space-y-2">
+        {groupsToShow.map(([name, data]) => {
+          const isTransactionListExpanded = !!expandedTransactionGroups[name];
+          const transactionsToShow = isTransactionListExpanded ? data.items : data.items.slice(0, 5);
+
+          return (
+            <div key={name} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm transition-all duration-300">
+              <button 
+                onClick={() => toggleGroup(name)}
+                className="p-4 w-full flex justify-between items-center bg-slate-50/50 hover:bg-slate-100/50"
+              >
+                 <div className="flex items-center gap-3">
+                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
+                   <h4 className="font-bold text-slate-800">{name}</h4>
+                 </div>
+                 <div className="flex items-center gap-4">
+                  <span className="font-black text-slate-900">{formatCurrency(data.total)}</span>
+                  <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[name] && 'rotate-180'}`} />
+                </div>
+              </button>
+               {!collapsedGroups[name] && (
+                <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
+                    {transactionsToShow.map(exp => (
+                      <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+                    ))}
+                    {data.items.length > 5 && (
+                      <div className="p-2 text-center">
+                        <button 
+                          onClick={() => toggleTransactionGroup(name)}
+                          className="text-indigo-600 font-bold text-xs hover:underline"
+                        >
+                          {isTransactionListExpanded ? 'Show Less' : `Show ${data.items.length - 5} More`}
+                        </button>
+                      </div>
+                    )}
+                </div>
+               )}
+            </div>
+          );
+        })}
+        {eventEntries.length > 3 && (
+          <div className="p-4 text-center">
+            <button 
+              onClick={() => setShowAllGroups(!showAllGroups)}
+              className="text-indigo-600 font-bold text-xs hover:underline"
+            >
+              {showAllGroups ? 'Show Less' : `Show ${eventEntries.length - 3} More Events`}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderIndividual = () => {
+    const transactionsToShow = showAll ? expenses : expenses.slice(0, 10);
+    return (
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
         <div className="divide-y divide-slate-50">
-          {groupedData.ungrouped.map(exp => (
+          {transactionsToShow.map(exp => (
             <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
           ))}
         </div>
+        {expenses.length > 10 && (
+          <div className="p-4 text-center">
+            <button 
+              onClick={() => setShowAll(!showAll)}
+              className="text-indigo-600 font-bold text-xs hover:underline"
+            >
+              {showAll ? 'Show Less' : `Show ${expenses.length - 10} More`}
+            </button>
+          </div>
+        )}
       </div>
-    </>
-  );
-
-  const renderIndividual = () => (
-    <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
-      <div className="divide-y divide-slate-50">
-        {expenses.map(exp => (
-          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -131,6 +237,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     </div>
   );
 };
+
 
 /**
  * TransactionRow

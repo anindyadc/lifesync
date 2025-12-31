@@ -17,6 +17,16 @@ LifeSync is a React application that integrates with Firebase for backend servic
 *   **Time Logging:** Users can add new time log entries for tasks and subtasks, and delete existing ones. Direct editing of time logs is not supported; instead, users should delete and re-add entries if modifications are required.
 *   **Date Range Filtering for Reports:** The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options.
 
+## Features (WalletWatch App)
+
+*   **Advanced Transaction History:**
+    *   Transactions are displayed in reverse chronological order.
+    *   Users can group transactions by month or by a custom event/grouping tag.
+    *   The history view is collapsible, showing a summary first to keep the UI clean.
+        *   When grouped, only the most recent groups are shown initially, with a "Show More" button to reveal older ones.
+        *   Within each expanded group, only the first five transactions are shown, with another "Show More" button to see all transactions in that group.
+        *   The individual transaction view also defaults to showing the last 10 transactions, with a "Show More" option.
+
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)
 *   **Styling:** Tailwind CSS

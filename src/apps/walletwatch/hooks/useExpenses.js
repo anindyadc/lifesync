@@ -14,7 +14,10 @@ export const useExpenses = (user, appId = 'default-app-id') => {
     // 1. Listen to Expenses
     const qExp = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
     const unsubExp = onSnapshot(qExp, (snapshot) => {
-      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const sortedExpenses = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => b.date.toDate() - a.date.toDate()); // Sort by date descending
+      setExpenses(sortedExpenses);
       setLoading(false);
     }, (error) => {
       console.error("Firestore Expenses Error:", error);

@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutGrid, 
-  User, 
-  LogOut, 
-  CheckCircle, 
-  Wallet, 
-  Loader2, 
-  Server, 
-  ShieldAlert, 
-  Shield, 
-  PiggyBank // New icon for Investments
-} from 'lucide-react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import {
+  LayoutGrid,
+  User,
+  LogOut,
+  CheckCircle,
+  Wallet,
+  Loader2,
+  Server,
+  ShieldAlert,
+  Shield,
+  PiggyBank, // New icon for Investments
+  Menu 
+} from 'lucide-react';import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
@@ -26,7 +26,7 @@ import AdminPanelApp from './apps/admin';
 import InvestmentsApp from './apps/investment'; // New app import
 
 import Sidebar from './components/Sidebar';
-import { Menu } from 'lucide-react';
+
 
 /**
  * Main Application Shell
@@ -167,43 +167,41 @@ export default function App() {
   };
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900">
-        <div className={`fixed inset-0 z-20 md:relative md:flex flex-col md:w-64 ${isSidebarOpen ? 'flex' : 'hidden'}`}>
-          <Sidebar
-            activeApp={activeApp}
-            setActiveApp={handleAppSwitch}
-            user={user}
-            userProfile={userProfile}
-            handleSignOut={handleSignOut}
-          />
-        </div>
-
-        <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen bg-slate-50">
-          <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 font-sans">
-            <div className="flex items-center gap-4">
-              <button
-                className="md:hidden p-2 rounded-md bg-slate-200"
-                onClick={() => setSidebarOpen(!isSidebarOpen)}
-              >
-                <Menu size={24} />
-              </button>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
-                  {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp === 'investment' ? 'Investments' : activeApp)}
-                </h1>
-                <p className="text-slate-500 mt-1">
-                  {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp === 'investment' ? 'Investments' : activeApp} activities.`}
-                </p>
-              </div>
-            </div>
-            <div className="hidden md:block text-sm font-medium text-slate-600 bg-white px-4 py-2 rounded-xl shadow-sm border">
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </div>
-          </header>
-          {renderContent()}
-        </main>
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-900">
+      <div className={`fixed inset-0 z-20 md:relative md:flex flex-col md:w-64 ${isSidebarOpen ? 'flex' : 'hidden'}`}>
+        <Sidebar
+          activeApp={activeApp}
+          setActiveApp={handleAppSwitch}
+          user={user}
+          userProfile={userProfile}
+          handleSignOut={handleSignOut}
+        />
       </div>
-    </Layout>
+
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen bg-slate-50">
+        <header className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 font-sans">
+          <div className="flex items-center gap-4">
+            <button
+              className="md:hidden p-2 rounded-md bg-slate-200"
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+            >
+              <Menu size={24} />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
+                {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp === 'investment' ? 'Investments' : activeApp)}
+              </h1>
+              <p className="text-slate-500 mt-1">
+                {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp === 'investment' ? 'Investments' : activeApp} activities.`}
+              </p>
+            </div>
+          </div>
+          <div className="hidden md:block text-sm font-medium text-slate-600 bg-white px-4 py-2 rounded-xl shadow-sm border">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </header>
+        {renderContent()}
+      </main>
+    </div>
   );
 }

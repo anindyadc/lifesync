@@ -1,12 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XCircle } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
 
-const ChangeForm = ({ onSubmit, onCancel }) => {
+const ChangeForm = ({ onSubmit, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
     serverName: '', application: '', type: 'Update', status: 'success',
     title: '', description: '', parameters: '', date: new Date().toISOString().split('T')[0]
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        ...initialData,
+        date: initialData.date?.toDate ? initialData.date.toDate().toISOString().split('T')[0] : initialData.date || new Date().toISOString().split('T')[0],
+      });
+    } else {
+      setFormData({
+        serverName: '', application: '', type: 'Update', status: 'success',
+        title: '', description: '', parameters: '', date: new Date().toISOString().split('T')[0]
+      });
+    }
+  }, [initialData]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -16,7 +30,7 @@ const ChangeForm = ({ onSubmit, onCancel }) => {
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl border border-slate-200 shadow-lg animate-in zoom-in-95">
       <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-        <h3 className="text-lg font-bold text-slate-800">Log New Change</h3>
+        <h3 className="text-lg font-bold text-slate-800">{initialData ? 'Edit Change Log' : 'Log New Change'}</h3>
         <button onClick={onCancel}><XCircle className="text-slate-400 hover:text-slate-600" /></button>
       </div>
       
@@ -64,7 +78,7 @@ const ChangeForm = ({ onSubmit, onCancel }) => {
 
         <div className="pt-4 flex justify-end gap-3">
           <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
-          <Button type="submit">Record Change</Button>
+          <Button type="submit">{initialData ? 'Update Change' : 'Record Change'}</Button>
         </div>
       </Form>
     </div>

@@ -168,6 +168,7 @@ This collection contains a single document `walletConfig` for user-specific sett
 ### `changemanager`
 
 #### `changelogs` collection
+*   **Add, Edit, and Delete Change Logs:** Users can now add new change log entries, edit existing ones, and permanently delete them.
 *   `serverName` (string): The name of the server affected.
 *   `application` (string): The application affected (optional).
 *   `type` (string): The type of change (e.g., Update, Patch, Reboot).
@@ -178,3 +179,4 @@ This collection contains a single document `walletConfig` for user-specific sett
 *   `date` (Timestamp): The date the change was implemented.
 *   `performedBy` (string): The user who performed the change.
 *   `createdAt` (Timestamp): Timestamp of creation.
+*   `updatedAt` (Timestamp): Timestamp of last update.

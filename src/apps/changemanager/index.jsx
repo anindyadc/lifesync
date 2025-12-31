@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Server, Plus, Search, FileText, Download, XCircle, Loader2, History 
+import {
+  Server, Plus, Search, FileText, Download, XCircle, Loader2, History,
+  Pencil, Trash2 
 } from 'lucide-react';
 
 // Hooks
@@ -13,15 +14,17 @@ import TimelineItem from './components/TimelineItem';
 import ChangeForm from './components/ChangeForm';
 import ChangeStats from './components/ChangeStats';
 import ServerFilter from './components/ServerFilter';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const ChangeManagerApp = ({ user }) => {
   // 1. Logic & Data Fetching
-  const { changes, loading, addChange } = useChanges(user);
+  const { changes, loading, addChange, updateChange, deleteChange } = useChanges(user);
   
   // 2. Local UI State
   const [view, setView] = useState('list'); // 'list' | 'add' | 'timeline'
   const [filterServer, setFilterServer] = useState('');
-
+  const [editingChangeId, setEditingChangeId] = useState(null);
+  const [deletingChangeId, setDeletingChangeId] = useState(null);
   // 3. Derived State (Filtering)
   const uniqueServers = useMemo(() => 
     [...new Set(changes.map(c => c.serverName))], 
@@ -40,7 +43,37 @@ const ChangeManagerApp = ({ user }) => {
 
   // 4. Handlers
   const handleSave = async (data) => {
-    await addChange(data);
+    if (editingChangeId) {
+      await updateChange(editingChangeId, data);
+      setEditingChangeId(null);
+    } else {
+      await addChange(data);
+    }
+    setView('list');
+  };
+
+  const handleEdit = (changeId) => {
+    setEditingChangeId(changeId);
+    setView('add');
+  };
+
+  const handleDeleteClick = (changeId) => {
+    setDeletingChangeId(changeId);
+  };
+
+  const confirmDelete = async () => {
+    if (deletingChangeId) {
+      await deleteChange(deletingChangeId);
+      setDeletingChangeId(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeletingChangeId(null);
+  };
+
+  const clearFilter = () => {
+    setFilterServer('');
     setView('list');
   };
 
@@ -49,16 +82,19 @@ const ChangeManagerApp = ({ user }) => {
     setView('timeline');
   };
 
-  const clearFilter = () => {
-    setFilterServer('');
-    setView('list');
-  };
-
   // 5. Render
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-indigo-600"/></div>;
 
   return (
     <div className="space-y-6">
+      <ConfirmModal 
+        isOpen={!!deletingChangeId} 
+        title="Delete Change Log" 
+        message="Are you sure you want to permanently delete this change log entry? This action cannot be undone." 
+        onConfirm={confirmDelete} 
+        onCancel={cancelDelete} 
+      />
+
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -87,7 +123,7 @@ const ChangeManagerApp = ({ user }) => {
           </div>
           <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export CSV"><FileText size={18}/></button>
           <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export PDF"><Download size={18}/></button>
-          <button onClick={() => setView('add')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md shadow-indigo-200"><Plus size={16}/> Log Change</button>
+          <button onClick={() => { setEditingChangeId(null); setView('add'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md shadow-indigo-200"><Plus size={16}/> Log Change</button>
         </div>
       </div>
 
@@ -97,7 +133,13 @@ const ChangeManagerApp = ({ user }) => {
           <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredChanges.length > 0 ? (
               filteredChanges.map(change => (
-                <ChangeCard key={change.id} change={change} onClick={() => handleServerClick(change.serverName)} />
+                <ChangeCard 
+                  key={change.id} 
+                  change={change} 
+                  onClick={() => handleServerClick(change.serverName)} 
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteClick}
+                />
               ))
             ) : (
               <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
@@ -146,11 +188,12 @@ const ChangeManagerApp = ({ user }) => {
         </div>
       )}
 
-      {/* VIEW: ADD FORM */}
+      {/* VIEW: ADD/EDIT FORM */}
       {view === 'add' && (
         <ChangeForm 
+          initialData={editingChangeId ? changes.find(c => c.id === editingChangeId) : null}
           onSubmit={handleSave} 
-          onCancel={() => setView('list')} 
+          onCancel={() => { setEditingChangeId(null); setView('list'); }} 
         />
       )}
     </div>

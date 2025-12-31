@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, addDoc, onSnapshot, serverTimestamp, Timestamp 
+import {
+  collection, addDoc, onSnapshot, serverTimestamp, Timestamp,
+  updateDoc, doc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
@@ -45,5 +46,21 @@ export const useChanges = (user) => {
     });
   };
 
-  return { changes, loading, addChange };
+  const updateChange = async (id, data) => {
+    const tsDate = new Date(data.date);
+    const now = new Date();
+    tsDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'changelogs', id), {
+      ...data,
+      date: Timestamp.fromDate(tsDate),
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  const deleteChange = async (id) => {
+    await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'changelogs', id));
+  };
+
+  return { changes, loading, addChange, updateChange, deleteChange };
 };

@@ -62,5 +62,12 @@ export const useChanges = (user) => {
     await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'changelogs', id));
   };
 
-  return { changes, loading, addChange, updateChange, deleteChange };
+  const archiveChange = async (id) => {
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'changelogs', id), {
+      status: 'archived',
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  return { changes, loading, addChange, updateChange, deleteChange, archiveChange };
 };

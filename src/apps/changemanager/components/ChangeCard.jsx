@@ -1,20 +1,21 @@
 import React from 'react';
-import { Server, Calendar, Activity, Pencil, Trash2 } from 'lucide-react';
+import { Server, Calendar, Activity, Pencil, Trash2, Archive } from 'lucide-react';
 import { formatDate } from '../../../lib/utils';
 
-const ChangeCard = ({ change, onClick, onEdit, onDelete }) => {
+const ChangeCard = ({ change, onClick, onEdit, onDelete, onArchive }) => {
   const getStatusColor = (status) => {
     switch(status) {
       case 'success': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'failed': return 'bg-red-100 text-red-700 border-red-200';
       case 'pending': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'archived': return 'bg-slate-100 text-slate-500 border-slate-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
   return (
     <div 
-      className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
+      className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group ${change.status === 'archived' ? 'opacity-60' : ''}`}
     >
       <div className="flex justify-between items-start mb-2">
         <div onClick={onClick} className="flex items-center gap-2 cursor-pointer">
@@ -30,6 +31,13 @@ const ChangeCard = ({ change, onClick, onEdit, onDelete }) => {
           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(change.status)}`}>
             {change.status}
           </span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onArchive(change.id); }}
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors border border-transparent hover:border-slate-200"
+            title="Archive Change"
+          >
+            <Archive size={14}/>
+          </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(change); }}
             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors border border-transparent hover:border-indigo-200"

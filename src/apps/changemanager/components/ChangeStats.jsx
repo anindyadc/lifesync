@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ChangeStats = ({ totalChanges, uniqueServersCount, failedCount }) => {
+const ChangeStats = ({ totalChanges, uniqueServersCount, failedCount, archivedCount }) => {
   return (
     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <h3 className="font-bold text-slate-800 mb-2">Stats</h3>
@@ -16,6 +16,10 @@ const ChangeStats = ({ totalChanges, uniqueServersCount, failedCount }) => {
         <div className="flex justify-between">
           <span>Failed Changes</span>
           <span className="font-bold text-red-500">{failedCount}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Archived</span>
+          <span className="font-bold text-slate-500">{archivedCount}</span>
         </div>
       </div>
     </div>

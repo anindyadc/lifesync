@@ -169,10 +169,11 @@ This collection contains a single document `walletConfig` for user-specific sett
 
 #### `changelogs` collection
 *   **Add, Edit, and Delete Change Logs:** Users can now add new change log entries, edit existing ones, and permanently delete them.
+*   **Archive Change Logs:** Users can archive change log entries to hide them from the main view and unarchive them when needed, helping to manage clutter.
 *   `serverName` (string): The name of the server affected.
 *   `application` (string): The application affected (optional).
 *   `type` (string): The type of change (e.g., Update, Patch, Reboot).
-*   `status` (string): The status of the change (`success`, `pending`, `failed`).
+*   `status` (string): The status of the change (`success`, `pending`, `failed`, `archived`).
 *   `title` (string): A summary of the change.
 *   `description` (string): A detailed description of the change.
 *   `parameters` (string): Any parameters that were changed.

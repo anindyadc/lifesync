@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Server, Plus, Search, FileText, Download, XCircle, Loader2, History,
-  Pencil, Trash2 
+  Archive, Eye, EyeOff
 } from 'lucide-react';
 
 // Hooks
@@ -18,47 +18,57 @@ import ConfirmModal from '../../components/ConfirmModal';
 
 const ChangeManagerApp = ({ user }) => {
   // 1. Logic & Data Fetching
-  const { changes, loading, addChange, updateChange, deleteChange } = useChanges(user);
+  const { changes, loading, addChange, updateChange, deleteChange, archiveChange } = useChanges(user);
   
   // 2. Local UI State
   const [view, setView] = useState('list'); // 'list' | 'add' | 'timeline'
   const [filterServer, setFilterServer] = useState('');
-  const [editingChangeId, setEditingChangeId] = useState(null);
+  const [editingChange, setEditingChange] = useState(null);
   const [deletingChangeId, setDeletingChangeId] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
+
   // 3. Derived State (Filtering)
+  const activeChanges = useMemo(() => changes.filter(c => c.status !== 'archived'), [changes]);
+  const archivedChanges = useMemo(() => changes.filter(c => c.status === 'archived'), [changes]);
+
   const uniqueServers = useMemo(() => 
     [...new Set(changes.map(c => c.serverName))], 
   [changes]);
   
   const filteredChanges = useMemo(() => {
-    if (!filterServer) return changes;
-    return changes.filter(c => 
+    const source = showArchived ? changes : activeChanges;
+    if (!filterServer) return source;
+    return source.filter(c => 
       c.serverName.toLowerCase().includes(filterServer.toLowerCase()) || 
       (c.application && c.application.toLowerCase().includes(filterServer.toLowerCase()))
     );
-  }, [changes, filterServer]);
+  }, [changes, filterServer, showArchived, activeChanges]);
 
   // Initialize Export Hook with filtered data
   const { exportPDF, exportCSV } = useChangeExport(filteredChanges, filterServer);
 
   // 4. Handlers
   const handleSave = async (data) => {
-    if (editingChangeId) {
-      await updateChange(editingChangeId, data);
-      setEditingChangeId(null);
+    if (editingChange) {
+      await updateChange(editingChange.id, data);
+      setEditingChange(null);
     } else {
       await addChange(data);
     }
     setView('list');
   };
 
-  const handleEdit = (changeId) => {
-    setEditingChangeId(changeId);
+  const handleEdit = (change) => {
+    setEditingChange(change);
     setView('add');
   };
 
   const handleDeleteClick = (changeId) => {
     setDeletingChangeId(changeId);
+  };
+
+  const handleArchive = async (changeId) => {
+    await archiveChange(changeId);
   };
 
   const confirmDelete = async () => {
@@ -121,9 +131,12 @@ const ChangeManagerApp = ({ user }) => {
               </button>
             )}
           </div>
+          <button onClick={() => setShowArchived(!showArchived)} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title={showArchived ? "Hide Archived" : "Show Archived"}>
+            {showArchived ? <EyeOff size={18}/> : <Eye size={18}/>}
+          </button>
           <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export CSV"><FileText size={18}/></button>
           <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export PDF"><Download size={18}/></button>
-          <button onClick={() => { setEditingChangeId(null); setView('add'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md shadow-indigo-200"><Plus size={16}/> Log Change</button>
+          <button onClick={() => { setEditingChange(null); setView('add'); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md shadow-indigo-200"><Plus size={16}/> Log Change</button>
         </div>
       </div>
 
@@ -139,6 +152,7 @@ const ChangeManagerApp = ({ user }) => {
                   onClick={() => handleServerClick(change.serverName)} 
                   onEdit={handleEdit}
                   onDelete={handleDeleteClick}
+                  onArchive={handleArchive}
                 />
               ))
             ) : (
@@ -151,9 +165,10 @@ const ChangeManagerApp = ({ user }) => {
           <div className="space-y-4">
             <ServerFilter servers={uniqueServers} onSelect={handleServerClick} />
             <ChangeStats 
-              totalChanges={changes.length} 
+              totalChanges={activeChanges.length} 
               uniqueServersCount={uniqueServers.length} 
-              failedCount={changes.filter(c => c.status === 'failed').length} 
+              failedCount={activeChanges.filter(c => c.status === 'failed').length}
+              archivedCount={archivedChanges.length}
             />
           </div>
         </div>
@@ -191,9 +206,9 @@ const ChangeManagerApp = ({ user }) => {
       {/* VIEW: ADD/EDIT FORM */}
       {view === 'add' && (
         <ChangeForm 
-          initialData={editingChangeId ? changes.find(c => c.id === editingChangeId) : null}
+          initialData={editingChange}
           onSubmit={handleSave} 
-          onCancel={() => { setEditingChangeId(null); setView('list'); }} 
+          onCancel={() => { setEditingChange(null); setView('list'); }} 
         />
       )}
     </div>

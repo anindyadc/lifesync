@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Tag, Wallet, ArrowDownCircle, PieChart, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useExpenses } from '../hooks/useExpenses';
+import { NetTrendGraph, WeeklyBarChart } from './OverviewCharts';
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-IN', {
@@ -48,10 +49,14 @@ const Dashboard = ({ user, categories }) => {
       <SummaryCards expenses={expenses} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
+          <WeeklyBarChart expenses={expenses} />
+          <NetTrendGraph expenses={expenses} />
+        </div>
+        <div>
           <GroupSubtotals expenses={expenses} />
           <CategoryDistribution categories={categories} expenses={expenses} />
+          <CategorySubtotals categories={categories} expenses={expenses} />
         </div>
-        <CategorySubtotals categories={categories} expenses={expenses} />
       </div>
     </div>
   );

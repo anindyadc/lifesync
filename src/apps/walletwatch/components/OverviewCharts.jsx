@@ -7,21 +7,35 @@ import { formatCurrency, toISODate } from '../../../lib/utils.js';
  */
 export const NetTrendGraph = ({ expenses }) => {
   const { chartData, netTotal } = useMemo(() => {
-    const daily = {};
+    const daily = new Map();
     let total = 0;
+
     expenses.forEach(e => {
       const amt = Number(e.amount) || 0;
-      if (amt >= 0) return; // Skip non-expense transactions
+      if (amt >= 0) return;
 
-      const date = e.date?.toDate ? e.date.toDate() : new Date(e.date);
-      const dateKey = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const expenseDate = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+      const isoKey = toISODate(expenseDate);
+      if (!isoKey) return;
       
       const absAmt = Math.abs(amt);
-      daily[dateKey] = (daily[dateKey] || 0) + absAmt;
+      daily.set(isoKey, (daily.get(isoKey) || 0) + absAmt);
       total += absAmt;
     });
-    const sorted = Object.entries(daily).sort((a, b) => new Date(a[0]) - new Date(b[0])).slice(-7);
-    return { chartData: sorted, netTotal: total };
+
+    const last7Days = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      const isoKey = toISODate(d);
+      last7Days.push([
+        d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        daily.get(isoKey) || 0
+      ]);
+    }
+    
+    return { chartData: last7Days, netTotal: total };
   }, [expenses]);
 
   if (chartData.length === 0) return null;

@@ -26,7 +26,7 @@ const TaskReportTable = ({ tasks }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {tasks.slice(0, 5).map(task => {
+            {tasks.map(task => {
               const subDone = task.subtasks?.filter(s => s.completed).length || 0; 
               const subTotal = task.subtasks?.length || 0;
               const percent = subTotal ? (subDone/subTotal)*100 : 0;

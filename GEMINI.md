@@ -15,7 +15,9 @@ LifeSync is a React application that integrates with Firebase for backend servic
 *   **Create and Manage Tasks:** Add, edit, and delete tasks with details like priority, due date, and category.
 *   **Subtask Management:** Add, edit, delete, and mark subtasks as complete.
 *   **Time Logging:** Users can add new time log entries for tasks and subtasks, and delete existing ones. Direct editing of time logs is not supported; instead, users should delete and re-add entries if modifications are required.
-*   **Date Range Filtering for Reports:** The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options.
+*   **Date Range Filtering for Reports:** The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options, and now includes a **Grand Total** for all logged time within the selected period.
+*   **Dashboard Month Navigation:** The dashboard now includes a month navigator, allowing users to view task statistics and details for any selected month.
+*   **Comprehensive Dashboard Reporting:** The dashboard's detailed report now accurately includes tasks whose subtasks have time logs within the selected month, regardless of the parent task's due date, and no longer limits the number of tasks displayed.
 
 ## Features (WalletWatch App)
 

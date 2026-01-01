@@ -45,9 +45,19 @@ const TaskFlowApp = ({ user }) => {
 
   const filteredTasks = useMemo(() => {
     if (!dateRange.from || !dateRange.to) return tasks;
+
     return tasks.filter(task => {
       const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
-      return taskDate >= dateRange.from && taskDate <= dateRange.to;
+      const taskInRange = taskDate >= dateRange.from && taskDate <= dateRange.to;
+
+      const subtaskInRange = task.subtasks?.some(subtask => 
+        subtask.timeLogs?.some(log => {
+          const logDate = new Date(log.date);
+          return logDate >= dateRange.from && logDate <= dateRange.to;
+        })
+      );
+
+      return taskInRange || subtaskInRange;
     });
   }, [tasks, dateRange]);
 

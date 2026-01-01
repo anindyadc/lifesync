@@ -1,11 +1,36 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { formatDuration } from '../../../lib/utils';
 import { Clock } from 'lucide-react';
 
 const TimeReport = ({ tasks, dateRange, onDateChange }) => {
-  const allTasksWithTime = tasks.filter(t => t.timeLogs?.length > 0 || t.subtasks?.some(s => s.timeLogs?.length > 0));
-  
-  const grandTotalMinutes = allTasksWithTime.reduce((total, task) => {
+
+  const tasksInReport = useMemo(() => {
+    return tasks.map(task => {
+      const taskTimeLogs = task.timeLogs?.filter(log => {
+        const logDate = new Date(log.date);
+        return logDate >= dateRange.from && logDate <= dateRange.to;
+      }) || [];
+
+      const subtasksWithTime = task.subtasks
+        ?.map(s => {
+          const subtaskTimeLogs = s.timeLogs?.filter(log => {
+            const logDate = new Date(log.date);
+            return logDate >= dateRange.from && logDate <= dateRange.to;
+          }) || [];
+          return { ...s, timeLogs: subtaskTimeLogs };
+        })
+        .filter(s => s.timeLogs.length > 0);
+
+      return {
+        ...task,
+        timeLogs: taskTimeLogs,
+        subtasks: subtasksWithTime,
+      };
+    }).filter(task => task.timeLogs.length > 0 || task.subtasks.length > 0);
+  }, [tasks, dateRange]);
+
+
+  const grandTotalMinutes = tasksInReport.reduce((total, task) => {
     const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
     const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
     return total + taskTime + subtaskTime;
@@ -46,7 +71,7 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
         </div>
       </div>
       <div className="space-y-4">
-        {allTasksWithTime.map(task => {
+        {tasksInReport.map(task => {
           const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
           const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
           const totalTaskTime = taskTime + subtaskTime;
@@ -76,7 +101,7 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
             </div>
           );
         })}
-        {allTasksWithTime.length === 0 && (
+        {tasksInReport.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             <Clock size={32} className="mx-auto mb-2"/>
             No time logged for any tasks in the selected date range.

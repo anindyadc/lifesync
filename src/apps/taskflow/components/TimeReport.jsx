@@ -5,6 +5,12 @@ import { Clock } from 'lucide-react';
 const TimeReport = ({ tasks, dateRange, onDateChange }) => {
   const allTasksWithTime = tasks.filter(t => t.timeLogs?.length > 0 || t.subtasks?.some(s => s.timeLogs?.length > 0));
   
+  const grandTotalMinutes = allTasksWithTime.reduce((total, task) => {
+    const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
+    const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
+    return total + taskTime + subtaskTime;
+  }, 0);
+
   const handleDateInputChange = (e) => {
     const { name, value } = e.target;
     onDateChange({ ...dateRange, [name]: new Date(value) });
@@ -13,7 +19,13 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
-        <h2 className="text-xl font-bold text-slate-800">Time Report</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold text-slate-800">Time Report</h2>
+          <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+            <Clock size={14}/> 
+            <span>Grand Total: {formatDuration(grandTotalMinutes)}</span>
+          </span>
+        </div>
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <label className="text-sm font-medium text-slate-600">From:</label>
           <input 

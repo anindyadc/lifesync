@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  CheckSquare, Plus, Download, FileText, Loader2, X 
+  CheckSquare, Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 
 // Custom Hooks
@@ -25,6 +25,7 @@ const TaskFlowApp = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [dashboardDate, setDashboardDate] = useState(new Date());
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
@@ -32,6 +33,14 @@ const TaskFlowApp = ({ user }) => {
 
   const handleDateChange = (range) => {
     setDateRange(range);
+  };
+
+  const handleMonthChange = (increment) => {
+    setDashboardDate(prevDate => {
+      const newDate = new Date(prevDate);
+      newDate.setMonth(newDate.getMonth() + increment);
+      return newDate;
+    });
   };
 
   const filteredTasks = useMemo(() => {
@@ -46,14 +55,13 @@ const TaskFlowApp = ({ user }) => {
 
   // 3. Derived Stats for Dashboard (Current Month)
   const currentMonthTasks = useMemo(() => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const currentMonth = dashboardDate.getMonth();
+    const currentYear = dashboardDate.getFullYear();
     return tasks.filter(task => {
       const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
       return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
     });
-  }, [tasks]);
+  }, [tasks, dashboardDate]);
 
   const totalTimeSpent = useMemo(() => {
     return currentMonthTasks.reduce((acc, task) => {
@@ -151,6 +159,15 @@ const TaskFlowApp = ({ user }) => {
       <div id={`taskflow-${activeTab}`}>
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+              <h3 className="font-bold text-lg text-slate-700">
+                Dashboard for: {dashboardDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </h3>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleMonthChange(-1)} className="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-100"><ChevronLeft size={16}/></button>
+                <button onClick={() => handleMonthChange(1)} className="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-100"><ChevronRight size={16}/></button>
+              </div>
+            </div>
             <div className="space-y-6 bg-slate-50 p-2 rounded-xl">
               <DashboardStats stats={stats} />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

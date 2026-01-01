@@ -57,22 +57,55 @@ const TaskFlowApp = ({ user }) => {
   const currentMonthTasks = useMemo(() => {
     const currentMonth = dashboardDate.getMonth();
     const currentYear = dashboardDate.getFullYear();
-    return tasks.filter(task => {
-      const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
-      return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
-    });
+    
+    return tasks.map(task => {
+      const filteredSubtasks = task.subtasks?.filter(subtask => 
+        subtask.timeLogs?.some(log => {
+          const logDate = new Date(log.date);
+          return logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
+        })
+      );
+
+      const taskInMonth = (() => {
+        const taskDate = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate);
+        return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
+      })();
+
+      if (taskInMonth || (filteredSubtasks && filteredSubtasks.length > 0)) {
+        return { ...task, subtasks: filteredSubtasks || [] };
+      }
+      return null;
+    }).filter(Boolean);
+
   }, [tasks, dashboardDate]);
 
   const totalTimeSpent = useMemo(() => {
-    return currentMonthTasks.reduce((acc, task) => {
-      const taskTime = task.timeLogs?.reduce((tAcc, log) => tAcc + log.minutes, 0) || 0;
+    const currentMonth = dashboardDate.getMonth();
+    const currentYear = dashboardDate.getFullYear();
+
+    return tasks.reduce((acc, task) => {
+      const taskTime = task.timeLogs?.reduce((tAcc, log) => {
+        const logDate = new Date(log.date);
+        if (logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear) {
+          return tAcc + log.minutes;
+        }
+        return tAcc;
+      }, 0) || 0;
+
       const subtaskTime = task.subtasks?.reduce((sAcc, s) => {
-        const subtaskLogsTime = s.timeLogs?.reduce((slAcc, log) => slAcc + log.minutes, 0) || 0;
+        const subtaskLogsTime = s.timeLogs?.reduce((slAcc, log) => {
+          const logDate = new Date(log.date);
+          if (logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear) {
+            return slAcc + log.minutes;
+          }
+          return slAcc;
+        }, 0) || 0;
         return sAcc + subtaskLogsTime;
       }, 0) || 0;
+      
       return acc + taskTime + subtaskTime;
     }, 0);
-  }, [currentMonthTasks]);
+  }, [tasks, dashboardDate]);
 
   const stats = useMemo(() => ({
     total: currentMonthTasks.length,

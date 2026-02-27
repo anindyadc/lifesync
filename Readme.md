@@ -399,3 +399,41 @@ git checkout main
 git pull origin main
 git branch -d feature/your-feature-name
 ```
+
+## **Phase 7: Release Management**
+
+To properly manage releases and track versions of your application in a production environment, adopt the following strategy:
+
+### **1. Semantic Versioning (SemVer)**
+Use standard versioning (Major.Minor.Patch):
+* **Major (e.g., 2.0.0):** Incompatible API changes or massive overhauls.
+* **Minor (e.g., 1.1.0):** Backward-compatible new features (like adding MediWatch).
+* **Patch (e.g., 1.0.1):** Backward-compatible bug fixes.
+
+Update the version using `npm`:
+```bash
+# This updates package.json and creates a git tag automatically
+npm version minor -m "chore(release): %s"
+```
+
+### **2. Generate a Changelog (Optional but Recommended)**
+Since you are using conventional commits (`feat:`, `fix:`), you can automatically generate release notes.
+You can use a tool like `standard-version`:
+```bash
+npx standard-version
+```
+
+### **3. Tagging and GitHub Releases**
+Once a version is ready to go to production (merged into `main`):
+1. Push your tags to GitHub:
+   ```bash
+   git push --follow-tags origin main
+   ```
+2. Go to your GitHub repository -> **Releases** -> **Draft a new release**.
+3. Select the tag you just pushed.
+4. Click **Generate release notes** (GitHub will automatically list the PRs and commits since the last release).
+5. Click **Publish release**.
+
+### **4. Environment Strategy**
+Currently, your app deploys directly to production (`gh-pages`) upon merging to `main`. As your team or project grows, consider:
+* **Staging Environment:** Use Firebase Hosting Preview Channels or a separate branch (like `develop`) that deploys to a different URL for testing before merging into `main`.

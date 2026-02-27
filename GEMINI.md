@@ -28,8 +28,10 @@ LifeSync is a React application that integrates with Firebase for backend servic
         *   When grouped, only the most recent groups are shown initially, with a "Show More" button to reveal older ones.
         *   Within each expanded group, only the first five transactions are shown, with another "Show More" button to see all transactions in that group.
         *   The individual transaction view also defaults to showing the last 10 transactions, with a "Show More" option.
-*   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
-*   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
+*   **Expense Tagging:** Users can easily organize and label transactions with one or more custom tags (e.g., "food, travel") to better identify specific types of expenses.
+*   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months. Interactive summary cards for Event Totals and Category Subtotals allow users to click and view a modal with a detailed list of transactions making up those totals.
+*   **Smart Autocomplete:** When adding transactions, users benefit from a smart dropdown that suggests historically used tags and group/event names (filtered by the currently selected month).
+*   **Color-Coded Tags:** Custom tags are automatically assigned consistent colors to make visual scanning of expenses easier across the application.
 
 ## Features (MediWatch App)
 
@@ -130,6 +132,7 @@ All user-specific data is stored in a nested structure under the `artifacts/{app
 *   `description` (string): A brief description of the expense.
 *   `category` (string): The category of the expense (e.g., Food, Travel).
 *   `group` (string): A grouping for the expense.
+*   `tags` (array): List of custom tag strings associated with the expense.
 *   `paymentMode` (string): The method of payment.
 *   `date` (Timestamp): The date of the transaction.
 *   `reimbursementStatus` (string): Status of reimbursement.

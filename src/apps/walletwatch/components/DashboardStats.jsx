@@ -102,15 +102,21 @@ export const SummaryCards = ({ expenses }) => {
 };
 
 export const GroupSubtotals = ({ expenses }) => {
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
   const groups = useMemo(() => {
     const map = {};
     expenses.forEach(e => {
       if (e.group && e.amount < 0) {
-        map[e.group] = (map[e.group] || 0) + Math.abs(Number(e.amount) || 0);
+        if (!map[e.group]) {
+          map[e.group] = { total: 0, items: [] };
+        }
+        map[e.group].total += Math.abs(Number(e.amount) || 0);
+        map[e.group].items.push(e);
       }
     });
     return Object.entries(map)
-      .map(([name, total]) => ({ name, total }))
+      .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 3); // Top 3 groups
   }, [expenses]);
@@ -118,22 +124,64 @@ export const GroupSubtotals = ({ expenses }) => {
   if (groups.length === 0) return null;
 
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6 font-sans animate-in slide-in-from-right-4">
-      <h3 className="font-bold text-slate-400 mb-4 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-        <Layers size={14} className="text-indigo-500" /> Event Totals
-      </h3>
-      <div className="space-y-4">
-        {groups.map((g, i) => (
-          <div key={i} className="flex justify-between items-center">
-            <div>
-              <p className="text-sm font-bold text-slate-800">{g.name}</p>
-              <p className="text-[10px] text-slate-400 font-medium">Accumulated spending</p>
+    <>
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-6 font-sans animate-in slide-in-from-right-4">
+        <h3 className="font-bold text-slate-400 mb-4 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+          <Layers size={14} className="text-indigo-500" /> Event Totals
+        </h3>
+        <div className="space-y-4">
+          {groups.map((g, i) => (
+            <div 
+              key={i} 
+              className="flex justify-between items-center cursor-pointer group"
+              onClick={() => setSelectedGroup(g)}
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{g.name}</p>
+                <p className="text-[10px] text-slate-400 font-medium">Accumulated spending</p>
+              </div>
+              <span className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{formatCurrency(g.total)}</span>
             </div>
-            <span className="text-sm font-black text-slate-900">{formatCurrency(g.total)}</span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+
+      {selectedGroup && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Layers size={20} className="text-indigo-600" />
+                  {selectedGroup.name}
+                </h3>
+                <p className="text-sm font-bold text-slate-600 mt-1">{formatCurrency(selectedGroup.total)} Total</p>
+              </div>
+              <button onClick={() => setSelectedGroup(null)} className="p-2 bg-white/50 hover:bg-white rounded-full transition-colors text-slate-500 shadow-sm">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {selectedGroup.items.length > 0 ? (
+                selectedGroup.items.map(exp => (
+                  <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{exp.description}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {exp.date?.toDate ? exp.date.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(exp.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-sm font-medium">No transactions found</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -207,40 +255,86 @@ export const CategoryDistribution = ({ categories, expenses }) => {
 };
 
 export const CategorySubtotals = ({ categories, expenses }) => {
-  const totals = useMemo(() => categories.map(cat => ({
-    ...cat,
-    total: expenses
-      .filter(e => e.category === cat.id && e.amount < 0)
-      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0)
-  })).sort((a, b) => b.total - a.total).slice(0, 6), [categories, expenses]);
+  const [selectedCat, setSelectedCat] = useState(null);
+
+  const totals = useMemo(() => categories.map(cat => {
+    const catExpenses = expenses.filter(e => e.category === cat.id && e.amount < 0);
+    return {
+      ...cat,
+      total: catExpenses.reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0),
+      items: catExpenses
+    };
+  }).sort((a, b) => b.total - a.total).slice(0, 6), [categories, expenses]);
 
   const grandTotal = totals.reduce((acc, curr) => acc + curr.total, 0);
 
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
-      <h3 className="font-bold text-slate-400 mb-6 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-        <Tag size={14} className="text-indigo-500" /> Subtotals
-      </h3>
-      <div className="space-y-5">
-        {totals.map(cat => (
-          <div key={cat.id} className="space-y-2">
-            <div className="flex justify-between items-center text-[11px] font-bold">
-              <span className="text-slate-600">{cat.label}</span>
-              <span className="text-slate-900">{formatCurrency(cat.total)}</span>
+    <>
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
+        <h3 className="font-bold text-slate-400 mb-6 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+          <Tag size={14} className="text-indigo-500" /> Subtotals
+        </h3>
+        <div className="space-y-5">
+          {totals.map(cat => (
+            <div 
+              key={cat.id} 
+              className="space-y-2 cursor-pointer group"
+              onClick={() => setSelectedCat(cat)}
+            >
+              <div className="flex justify-between items-center text-[11px] font-bold">
+                <span className="text-slate-600 group-hover:text-indigo-600 transition-colors">{cat.label}</span>
+                <span className="text-slate-900 group-hover:text-indigo-600 transition-colors">{formatCurrency(cat.total)}</span>
+              </div>
+              <div className="w-full bg-slate-50 h-1 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-700" 
+                  style={{ 
+                    width: `${grandTotal > 0 ? (cat.total / grandTotal) * 100 : 0}%`,
+                    backgroundColor: cat.color || '#6366f1'
+                  }}
+                />
+              </div>
             </div>
-            <div className="w-full bg-slate-50 h-1 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-700" 
-                style={{ 
-                  width: `${grandTotal > 0 ? (cat.total / grandTotal) * 100 : 0}%`,
-                  backgroundColor: cat.color || '#6366f1'
-                }}
-              />
+          ))}
+        </div>
+      </div>
+
+      {selectedCat && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center" style={{ backgroundColor: selectedCat.bg || '#f8fafc' }}>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: selectedCat.color || '#6366f1' }}></div>
+                  {selectedCat.label}
+                </h3>
+                <p className="text-sm font-bold text-slate-600 mt-1">{formatCurrency(selectedCat.total)} Total</p>
+              </div>
+              <button onClick={() => setSelectedCat(null)} className="p-2 bg-white/50 hover:bg-white rounded-full transition-colors text-slate-500 shadow-sm">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {selectedCat.items.length > 0 ? (
+                selectedCat.items.map(exp => (
+                  <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{exp.description}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {exp.date?.toDate ? exp.date.toDate().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(exp.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-sm font-medium">No transactions found</div>
+              )}
             </div>
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 };
 

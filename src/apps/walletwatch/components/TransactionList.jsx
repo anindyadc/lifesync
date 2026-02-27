@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../../lib/utils';
+import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown, Tag, Filter } from 'lucide-react';
+import { formatCurrency, formatDate, getTagColor } from '../../../lib/utils';
 
 /**
  * TransactionList Component
@@ -12,11 +12,31 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
   const [showAll, setShowAll] = useState(false);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [expandedTransactionGroups, setExpandedTransactionGroups] = useState({});
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterTag, setFilterTag] = useState('');
+
+  const availableTags = useMemo(() => {
+    const tagsSet = new Set();
+    expenses.forEach(exp => {
+      if (exp.tags && Array.isArray(exp.tags)) {
+        exp.tags.forEach(t => tagsSet.add(t));
+      }
+    });
+    return Array.from(tagsSet).sort();
+  }, [expenses]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(exp => {
+      if (filterCategory && exp.category !== filterCategory) return false;
+      if (filterTag && (!exp.tags || !exp.tags.includes(filterTag))) return false;
+      return true;
+    });
+  }, [expenses, filterCategory, filterTag]);
 
   const groupedData = useMemo(() => {
     if (grouping === 'month') {
       const monthlyGroups = {};
-      expenses.forEach(expense => {
+      filteredExpenses.forEach(expense => {
         const date = expense.date.toDate();
         const monthYear = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
         if (!monthlyGroups[monthYear]) {
@@ -30,7 +50,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     if (grouping === 'event') {
       const eventGroups = {};
       const ungrouped = [];
-      expenses.forEach(e => {
+      filteredExpenses.forEach(e => {
         if (e.group) {
           if (!eventGroups[e.group]) eventGroups[e.group] = { total: 0, items: [] };
           eventGroups[e.group].items.push(e);
@@ -43,7 +63,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     }
 
     return {};
-  }, [expenses, grouping]);
+  }, [filteredExpenses, grouping]);
 
   useEffect(() => {
     setShowAll(false);
@@ -57,7 +77,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
       initialCollapsedState[key] = key !== firstGroup;
     });
     setCollapsedGroups(initialCollapsedState);
-  }, [grouping, expenses]);
+  }, [grouping, filteredExpenses, groupedData]);
 
   const toggleGroup = (groupKey) => {
     setCollapsedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -183,7 +203,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
   };
 
   const renderIndividual = () => {
-    const transactionsToShow = showAll ? expenses : expenses.slice(0, 10);
+    const transactionsToShow = showAll ? filteredExpenses : filteredExpenses.slice(0, 10);
     return (
       <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
         <div className="divide-y divide-slate-50">
@@ -191,13 +211,13 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
           ))}
         </div>
-        {expenses.length > 10 && (
+        {filteredExpenses.length > 10 && (
           <div className="p-4 text-center">
             <button 
               onClick={() => setShowAll(!showAll)}
               className="text-indigo-600 font-bold text-xs hover:underline"
             >
-              {showAll ? 'Show Less' : `Show ${expenses.length - 10} More`}
+              {showAll ? 'Show Less' : `Show ${filteredExpenses.length - 10} More`}
             </button>
           </div>
         )}
@@ -207,33 +227,82 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
-      <div className="flex justify-between items-center px-2">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center px-2 gap-4">
         <h3 className="font-bold text-slate-800">Transaction History</h3>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setGrouping('month')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
-          >
-            By Month
-          </button>
-          <button 
-            onClick={() => setGrouping('event')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'event' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
-          >
-            By Event
-          </button>
-          <button 
-            onClick={() => setGrouping('none')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${grouping === 'none' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm'}`}
-          >
-            Individual
-          </button>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filters */}
+          <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200">
+            <Filter size={14} className="text-slate-400 ml-2" />
+            <select 
+              value={filterCategory} 
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-2 py-1.5 bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer max-w-[120px] truncate"
+            >
+              <option value="">All Categories</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+            
+            {availableTags.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                <select 
+                  value={filterTag} 
+                  onChange={(e) => setFilterTag(e.target.value)}
+                  className="px-2 py-1.5 bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer max-w-[100px] truncate"
+                >
+                  <option value="">All Tags</option>
+                  {availableTags.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 hidden sm:block"></div>
+
+          {/* Grouping */}
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={() => setGrouping('month')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${grouping === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm hover:bg-slate-50'}`}
+            >
+              By Month
+            </button>
+            <button 
+              onClick={() => setGrouping('event')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${grouping === 'event' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm hover:bg-slate-50'}`}
+            >
+              By Event
+            </button>
+            <button 
+              onClick={() => setGrouping('none')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${grouping === 'none' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 shadow-sm hover:bg-slate-50'}`}
+            >
+              Individual
+            </button>
+          </div>
         </div>
       </div>
 
-      {grouping === 'month' && renderGroupedByMonth()}
-      {grouping === 'event' && renderGroupedByEvent()}
-      {grouping === 'none' && renderIndividual()}
+      {filteredExpenses.length === 0 ? (
+        <div className="bg-white rounded-[2rem] border border-slate-100 p-10 text-center shadow-sm">
+          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Filter size={28} className="text-slate-300" />
+          </div>
+          <h4 className="text-base font-bold text-slate-800">No transactions match your filters</h4>
+          <p className="text-sm text-slate-500 mt-2">Try changing or clearing the category and tag filters above.</p>
+        </div>
+      ) : (
+        <>
+          {grouping === 'month' && renderGroupedByMonth()}
+          {grouping === 'event' && renderGroupedByEvent()}
+          {grouping === 'none' && renderIndividual()}
+        </>
+      )}
     </div>
   );
 };
@@ -252,9 +321,21 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
       </div>
       <div>
         <h4 className="text-sm font-bold text-slate-800">{exp.description}</h4>
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
           {formatDate(exp.date)} • {categories.find(c=>c.id===exp.category)?.label || exp.category}
         </p>
+        {exp.tags && exp.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {exp.tags.map(tag => {
+              const colors = getTagColor(tag);
+              return (
+                <span key={tag} className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${colors.bg} ${colors.text} border-opacity-50`}>
+                  <Tag size={8} /> {tag}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
     <div className="text-right flex items-center gap-4 mt-4 sm:mt-0">

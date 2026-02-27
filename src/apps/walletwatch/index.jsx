@@ -183,6 +183,7 @@ const WalletWatchApp = ({ user }) => {
           <TransactionForm 
             initialData={editingId ? expenses.find(e => e.id === editingId) : (relatedTxn ? { ...relatedTxn, description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' } : null)}
             categories={categories} 
+            expenses={expenses}
             isSettling={!!relatedTxn}
             onSubmit={handleSave} 
             onCancel={() => setView('dashboard')}

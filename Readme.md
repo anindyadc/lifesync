@@ -11,6 +11,7 @@ LifeSync is a multi-module React application designed to help you organize diffe
 *   **IncidentLogger:** A tool for logging incidents. Users can now edit existing incident details and permanently delete reported incidents.
 *   **ChangeManager:** A utility for managing changes, now with full functionality to add, edit, delete, and archive change log entries. The previous network connection issues related to Firebase environment variables have also been resolved.
 *   **Investment:** A module for tracking investments.
+*   **MediWatch:** A medical record tracker for storing prescription photos, listing medicines with alternate name options, and managing family health data. It features automatic archiving of old prescriptions for the same condition and storage-optimized photo uploads (2MB limit).
 
 ## **Phase 1: Prerequisites & Installation**
 
@@ -115,6 +116,11 @@ service cloud.firestore {
     // 5. IncidentLogger (incidents) Data
     match /artifacts/default-app-id/users/{userId}/incidents/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('incidentlogger');
+    }
+
+    // 6. MediWatch Data
+    match /artifacts/default-app-id/users/{userId}/prescriptions/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('mediwatch');
     }
     
     // Default Deny
@@ -347,3 +353,49 @@ jobs:
    * Go to **Settings** \> **Pages**.  
    * Under "Build and deployment", ensure the source is "Deploy from a branch" and the branch is set to gh-pages / root.  
    * Your live link will appear at the top of the Pages settings.
+
+## **Phase 6: Best Practices for Git Repository Maintenance**
+
+To maintain this repository at a production standard, avoid committing directly to the `main` branch. Instead, follow a standard Git feature-branch workflow:
+
+### **1. Sync your local repository**
+Always start by ensuring your local `main` branch is up to date:
+```bash
+git checkout main
+git pull origin main
+```
+
+### **2. Create a Feature Branch**
+Create a new branch for every new feature, bug fix, or update:
+```bash
+git checkout -b feature/your-feature-name
+# Use 'bugfix/...' for bug fixes, or 'chore/...' for maintenance tasks
+```
+
+### **3. Commit Changes**
+Make your changes, stage them, and write clear, descriptive commit messages following conventional commits:
+```bash
+git status
+git add .
+git commit -m "feat: add new medical tracking module"
+# Or: git commit -m "fix: resolve image upload bug"
+```
+
+### **4. Push to GitHub**
+Push your feature branch to the remote repository:
+```bash
+git push -u origin feature/your-feature-name
+```
+
+### **5. Create a Pull Request (PR)**
+* Go to your repository on GitHub.
+* Click **Compare & pull request**.
+* Review your changes and merge them into `main` using the GitHub UI.
+
+### **6. Clean Up**
+Once merged, switch back to `main`, pull the latest changes, and delete your local feature branch to keep your environment clean:
+```bash
+git checkout main
+git pull origin main
+git branch -d feature/your-feature-name
+```

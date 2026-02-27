@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   Shield,
   PiggyBank, // New icon for Investments
+  Stethoscope, // New icon for Medical
   Menu 
 } from 'lucide-react';import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -24,6 +25,7 @@ import ChangeManagerApp from './apps/changemanager';
 import IncidentLoggerApp from './apps/incidentlogger';
 import AdminPanelApp from './apps/admin';
 import InvestmentsApp from './apps/investment'; // New app import
+import MediWatchApp from './apps/mediwatch'; // New mediwatch app import
 
 import Sidebar from './components/Sidebar';
 
@@ -104,6 +106,7 @@ export default function App() {
       case 'changemanager': return isAllowed('changemanager') ? <ChangeManagerApp user={user} /> : null;
       case 'incidentlogger': return isAllowed('incidentlogger') ? <IncidentLoggerApp user={user} /> : null;
       case 'investment': return isAllowed('investment') ? <InvestmentsApp user={user} /> : null; // New app case
+      case 'mediwatch': return isAllowed('mediwatch') ? <MediWatchApp user={user} /> : null; // New app case
       case 'admin': return isAdmin ? <AdminPanelApp /> : null;
       default:
         return (
@@ -153,6 +156,15 @@ export default function App() {
               </button>
             )}
 
+            {isAllowed('mediwatch') && (
+              <button onClick={() => setActiveApp('mediwatch')} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group relative overflow-hidden">
+                <Stethoscope size={100} className="absolute -right-4 -bottom-4 opacity-5 text-teal-500"/>
+                <Stethoscope size={24} className="text-teal-500 mb-4"/>
+                <h3 className="text-xl font-bold text-slate-800">MediWatch</h3>
+                <p className="text-xs text-slate-400">Prescriptions & medicines</p>
+              </button>
+            )}
+
             {isAdmin && (
               <button onClick={() => setActiveApp('admin')} className="bg-slate-800 p-6 rounded-2xl shadow-xl transition-all text-left group relative overflow-hidden text-white hover:bg-slate-900">
                 <Shield size={100} className="absolute -right-4 -bottom-4 opacity-10"/>
@@ -189,10 +201,10 @@ export default function App() {
             </button>
             <div>
               <h1 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">
-                {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp === 'investment' ? 'Investments' : activeApp)}
+                {activeApp === 'dashboard' ? 'Workspace Overview' : (activeApp === 'admin' ? 'Admin Hub' : activeApp === 'investment' ? 'Investments' : activeApp === 'mediwatch' ? 'MediWatch' : activeApp)}
               </h1>
               <p className="text-slate-500 mt-1">
-                {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp === 'investment' ? 'Investments' : activeApp} activities.`}
+                {activeApp === 'dashboard' ? `Welcome back, ${displayName}!` : `Manage your ${activeApp === 'admin' ? 'team and app' : activeApp === 'investment' ? 'Investments' : activeApp === 'mediwatch' ? 'MediWatch' : activeApp} activities.`}
               </p>
             </div>
           </div>

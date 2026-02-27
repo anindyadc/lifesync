@@ -64,6 +64,11 @@ service cloud.firestore {
     match /artifacts/default-app-id/users/{userId}/investment/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('investment');
     }
+
+    // 7. MediWatch Data
+    match /artifacts/default-app-id/users/{userId}/prescriptions/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('mediwatch');
+    }
     
     // Default Deny
     match /{allPaths=**} {

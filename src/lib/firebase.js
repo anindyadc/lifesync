@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const getFirebaseConfig = () => {
   // 1. Try Vite Environment Variables (Standard Local Dev with Vite)
@@ -44,6 +45,7 @@ const app = initializeApp(firebaseConfig);
 // Export services for use in App.jsx and other modules
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 /** * appId: Unique identifier for this specific deployment instance.
  * The Incident Logger and other apps use this to namespace Firestore collections.

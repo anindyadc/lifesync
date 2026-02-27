@@ -4,7 +4,7 @@ This document provides a concise overview of the LifeSync application, its setup
 
 ## Project Overview
 
-LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, and investment, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
+LifeSync is a React application that integrates with Firebase for backend services. It includes several modules for managing tasks, expenses, incidents, medical records, and investment, all secured by user authentication and Firestore rules. The Taskflow app within LifeSync now includes advanced features like subtask management and progress tracking.
 
 ## Features (Incident Logger App)
 
@@ -30,6 +30,17 @@ LifeSync is a React application that integrates with Firebase for backend servic
         *   The individual transaction view also defaults to showing the last 10 transactions, with a "Show More" option.
 *   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
 *   **Monthly Dashboard View:** The dashboard defaults to the current month and includes a navigator to view the dashboard for other months.
+
+## Features (MediWatch App)
+
+*   **Prescription Management:**
+    *   **Mobile Camera Integration:** Capture prescription photos directly using a mobile camera or upload existing images from the gallery.
+    *   **Medicine Tracking:** Store medicines from prescriptions, including dosage, frequency, duration, and optional alternate medicine names.
+    *   **Relative Data:** Option to store and manage medical records for relatives (Self, Spouse, Father, Mother, Child, etc.).
+    *   **Disease/Condition Context:** Associate prescriptions with specific diseases or conditions.
+    *   **Smart Archiving:** Automatically archive older prescriptions when a new one is uploaded for the same doctor and disease to keep the active list focused.
+    *   **Manual Archiving & Deletion:** Archive records manually to keep the UI clean or permanently delete them when no longer needed.
+    *   **Storage Optimization:** Enforces a 2MB file size limit for prescription photos to ensure optimal performance and storage usage.
 
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)
@@ -154,6 +165,20 @@ This collection contains a single document `walletConfig` for user-specific sett
 *   `amountEncrypted` (string): The investment amount, AES encrypted.
 *   `maturityDate` (string): The date the investment matures.
 *   `details` (string): Additional details about the investment.
+*   `createdAt` (Timestamp): Timestamp of creation.
+*   `updatedAt` (Timestamp): Timestamp of last update.
+
+### `mediwatch`
+
+#### `prescriptions` collection
+*   `patientName` (string): Name of the patient.
+*   `relation` (string): Relation to the user (e.g., Self, Parent).
+*   `doctorName` (string): Name of the consulting doctor.
+*   `disease` (string): The diagnosed disease or condition.
+*   `date` (string): Date of the prescription.
+*   `medicines` (array): List of medicine objects, each with `{ name, alternateName, dosage, frequency, duration }`.
+*   `photoUrl` (string): Firebase Storage URL for the prescription photo.
+*   `archived` (boolean): Whether the prescription is archived.
 *   `createdAt` (Timestamp): Timestamp of creation.
 *   `updatedAt` (Timestamp): Timestamp of last update.
 

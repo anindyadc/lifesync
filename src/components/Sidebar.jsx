@@ -8,7 +8,8 @@ import {
   Server, 
   ShieldAlert, 
   Shield, 
-  PiggyBank 
+  PiggyBank,
+  Stethoscope
 } from 'lucide-react';
 
 const Sidebar = ({ activeApp, setActiveApp, user, userProfile, handleSignOut }) => {
@@ -36,6 +37,7 @@ const Sidebar = ({ activeApp, setActiveApp, user, userProfile, handleSignOut }) 
           {isAllowed('changemanager') && <button onClick={() => setActiveApp('changemanager')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'changemanager' ? 'text-indigo-400 bg-slate-800 font-bold border border-indigo-500/20' : ''}`}><Server size={18} /> ChangeLog</button>}
           {isAllowed('incidentlogger') && <button onClick={() => setActiveApp('incidentlogger')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'incidentlogger' ? 'text-indigo-400 bg-slate-800 font-bold border border-indigo-500/20' : ''}`}><ShieldAlert size={18} /> Incidents</button>}
           {isAllowed('investment') && <button onClick={() => setActiveApp('investment')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'investment' ? 'text-amber-400 bg-slate-800 font-bold border border-amber-500/20' : ''}`}><PiggyBank size={18} /> Investments</button>}
+          {isAllowed('mediwatch') && <button onClick={() => setActiveApp('mediwatch')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors ${activeApp === 'mediwatch' ? 'text-teal-400 bg-slate-800 font-bold border border-teal-500/20' : ''}`}><Stethoscope size={18} /> MediWatch</button>}
           {isAdmin && <button onClick={() => setActiveApp('admin')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 border border-indigo-500/20 mt-4 text-indigo-400 transition-all ${activeApp === 'admin' ? 'bg-indigo-600 text-white border-transparent' : ''}`}><Shield size={18} /> Admin Hub</button>}
         </div>
       </div>

@@ -12,67 +12,45 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Safely check if a profile exists and get its data
     function getProfile() {
       return get(/databases/$(database)/documents/artifacts/default-app-id/public/data/userProfiles/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      return isAuthenticated() && getProfile().role == 'admin';
+      return isAuthenticated() && 'role' in getProfile() && getProfile().role == 'admin';
     }
 
+    // Securely checks for app permissions.
+    // It now verifies that 'allowedApps' exists before checking for the appName.
     function hasAppPermission(appName) {
-      // Admins get everything, users check their array
-      return isAdmin() || (isAuthenticated() && appName in getProfile().allowedApps);
+      let profile = getProfile();
+      return isAdmin() || (
+        isAuthenticated() &&
+        'allowedApps' in profile &&
+        appName in profile.allowedApps
+      );
     }
 
     // --- RULES ---
 
     // 1. User Profiles Rule
     match /artifacts/default-app-id/public/data/userProfiles/{userId} {
-      allow read: if isAuthenticated(); // Allow reading profile directory
+      allow read: if isAuthenticated();
       allow create: if isOwner(userId);
       allow update, delete: if isAdmin();
     }
 
-    // 2. TaskFlow Data
-    match /artifacts/default-app-id/users/{userId}/tasks/{docId} {
-      allow read, write: if isOwner(userId);
+    // 2. Generic, Secure Rule for All App Data
+    // This single rule replaces the multiple, verbose rules for each app.
+    // It dynamically checks permission based on the collection name.
+    match /artifacts/default-app-id/users/{userId}/{appName}/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission(appName);
     }
-
-    // 3. WalletWatch Data
-    match /artifacts/default-app-id/users/{userId}/expenses/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
-    }
-
-    // Rule for WalletWatch settings, including categories
+    
+    // 3. Specific rule for WalletWatch settings (as it has a unique path)
     match /artifacts/default-app-id/users/{userId}/settings/walletConfig {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
-    // 4. ChangeLog (changelogs) Data
-    match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
-    }
-
-    // 5. IncidentLogger (incidents) Data
-    match /artifacts/default-app-id/users/{userId}/incidents/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('incidentlogger');
-    }
-
-    // 6. Investments Data
-    match /artifacts/default-app-id/users/{userId}/investment/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('investment');
-    }
-
-    // 7. MediWatch Data
-    match /artifacts/default-app-id/users/{userId}/prescriptions/{docId} {
-      allow read, write: if isOwner(userId) && hasAppPermission('mediwatch');
-    }
-    
-    // Default Deny
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
   }
 }

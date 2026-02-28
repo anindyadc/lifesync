@@ -36,13 +36,13 @@ LifeSync is a React application that integrates with Firebase for backend servic
 ## Features (MediWatch App)
 
 *   **Prescription Management:**
-    *   **Mobile Camera Integration:** Capture prescription photos directly using a mobile camera or upload existing images from the gallery.
+    *   **Mobile Camera Integration:** Capture multi-page prescription photos directly using a mobile camera or upload existing images from the gallery.
     *   **Medicine Tracking:** Store medicines from prescriptions, including dosage, frequency, duration, and optional alternate medicine names.
     *   **Relative Data:** Option to store and manage medical records for relatives (Self, Spouse, Father, Mother, Child, etc.).
     *   **Disease/Condition Context:** Associate prescriptions with specific diseases or conditions.
     *   **Smart Archiving:** Automatically archive older prescriptions when a new one is uploaded for the same doctor and disease to keep the active list focused.
     *   **Manual Archiving & Deletion:** Archive records manually to keep the UI clean or permanently delete them when no longer needed.
-    *   **Storage Optimization:** Enforces a 2MB file size limit for prescription photos to ensure optimal performance and storage usage.
+    *   **Storage Optimization & Viewer:** Automatically compresses and stores images as secure Base64 strings directly in Firestore (bypassing Firebase Storage). Includes a built-in full-screen image viewer with swipe navigation and native sharing capabilities.
 
 *   **Frontend:** React (with Vite)
 *   **Backend:** Firebase (Authentication, Firestore)

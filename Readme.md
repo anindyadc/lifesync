@@ -11,7 +11,7 @@ LifeSync is a multi-module React application designed to help you organize diffe
 *   **IncidentLogger:** A tool for logging incidents. Users can now edit existing incident details and permanently delete reported incidents.
 *   **ChangeManager:** A utility for managing changes, now with full functionality to add, edit, delete, and archive change log entries. The previous network connection issues related to Firebase environment variables have also been resolved.
 *   **Investment:** A module for tracking investments.
-*   **MediWatch:** A medical record tracker for storing prescription photos, listing medicines with alternate name options, and managing family health data. It features automatic archiving of old prescriptions for the same condition and storage-optimized photo uploads (2MB limit).
+*   **MediWatch:** A medical record tracker for storing multi-page prescription photos, listing medicines with alternate name options, and managing family health data. It features automatic archiving of old prescriptions for the same condition, highly optimized Base64 image storage directly in Firestore (no Firebase Storage required), a built-in full-screen swipeable image viewer, and native sharing capabilities.
 
 ## **Phase 1: Prerequisites & Installation**
 

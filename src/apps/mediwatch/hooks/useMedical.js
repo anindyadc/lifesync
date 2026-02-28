@@ -65,40 +65,42 @@ export function useMedical(user) {
     }
   };
 
-  const addPrescription = async (prescriptionData, photoFile) => {
-    if (!user?.uid) return;
+  const addPrescription = async (prescriptionData) => {
+    console.log("addPrescription started", { prescriptionData });
+    if (!user?.uid) {
+      console.log("No user uid, returning");
+      return;
+    }
     try {
-      let photoUrl = '';
-      if (photoFile) {
-        const fileExtension = photoFile.name.split('.').pop() || 'jpg';
-        const fileName = `prescriptions/${user.uid}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-        const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, photoFile);
-        photoUrl = await getDownloadURL(storageRef);
-      }
-
-      const { archiveOld, ...dataToSave } = prescriptionData;
+      const { archiveOld, newPhotos = [], ...dataToSave } = prescriptionData;
+      
+      // Since photos are now Base64 strings, we store them directly in the document
+      const photoUrls = newPhotos; 
 
       if (archiveOld && dataToSave.disease) {
+        console.log("Archiving old prescriptions...");
         const toArchive = prescriptions.filter(p => 
           !p.archived && 
           p.patientName === dataToSave.patientName && 
           p.doctorName === dataToSave.doctorName && 
           p.disease === dataToSave.disease
         );
-        for (const p of toArchive) {
-          await archivePrescription(p.id, true);
-        }
+        const archivePromises = toArchive.map(p => archivePrescription(p.id, true));
+        await Promise.all(archivePromises);
+        console.log("Archived", toArchive.length, "prescriptions");
       }
 
+      console.log("Adding document to Firestore...");
       const prescriptionsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'prescriptions');
-      await addDoc(prescriptionsRef, {
+      const docRef = await addDoc(prescriptionsRef, {
         ...dataToSave,
-        photoUrl,
+        photoUrl: photoUrls.length > 0 ? photoUrls[0] : '',
+        photoUrls: photoUrls,
         archived: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      console.log("Document added with ID:", docRef.id);
     } catch (err) {
       console.error('Error adding prescription:', err);
       throw err;
@@ -108,9 +110,16 @@ export function useMedical(user) {
   const updatePrescription = async (id, updatedData) => {
     if (!user?.uid || !id) return;
     try {
+      const { existingPhotos = [], newPhotos = [], ...dataToSave } = updatedData;
+      
+      // Combine existing photos (URLs) and new photos (Base64 strings)
+      const finalPhotoUrls = [...existingPhotos, ...newPhotos];
+
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'prescriptions', id);
       await updateDoc(docRef, {
-        ...updatedData,
+        ...dataToSave,
+        photoUrls: finalPhotoUrls,
+        photoUrl: finalPhotoUrls.length > 0 ? finalPhotoUrls[0] : '',
         updatedAt: serverTimestamp(),
       });
     } catch (err) {
@@ -119,24 +128,25 @@ export function useMedical(user) {
     }
   };
 
-  const deletePrescription = async (id, photoUrl) => {
+  const deletePrescription = async (id, photoUrl, photoUrls = []) => {
     if (!user?.uid || !id) return;
     try {
       // Delete document
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'prescriptions', id);
       await deleteDoc(docRef);
 
-      // Attempt to delete photo from storage if exists
-      if (photoUrl) {
+      // Attempt to delete photos from storage if exists
+      const urlsToDelete = (photoUrls && photoUrls.length > 0) ? photoUrls : (photoUrl ? [photoUrl] : []);
+      const deletePromises = urlsToDelete.map(async (url) => {
         try {
-          // A bit hacky way to extract path from download URL or we can just try creating ref from URL
-          const fileRef = ref(storage, photoUrl);
+          const fileRef = ref(storage, url);
           await deleteObject(fileRef);
         } catch (storageErr) {
           console.error('Error deleting photo from storage:', storageErr);
           // Don't throw here, document is already deleted
         }
-      }
+      });
+      await Promise.all(deletePromises);
     } catch (err) {
       console.error('Error deleting prescription:', err);
       throw err;

@@ -37,22 +37,30 @@ import Sidebar from './components/Sidebar';
 export default function App() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [activeApp, setActiveApp] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   const appId = 'default-app-id';
 
   useEffect(() => {
+    console.log("App.jsx: Setting up auth state listener.");
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      console.log("App.jsx: Auth state changed.", { uid: currentUser?.uid });
+      setLoadingProfile(true); 
       if (currentUser) {
+        setUser(currentUser);
         try {
+          console.log("App.jsx: Fetching profile for UID:", currentUser.uid);
           const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'userProfiles', currentUser.uid);
           const snap = await getDoc(profileRef);
           
           if (snap.exists()) {
+            console.log("App.jsx: Profile document found:", snap.data());
             setUserProfile(snap.data());
           } else {
+            console.warn("App.jsx: Profile document NOT found for user. Creating a default profile.");
             setUserProfile({ 
               role: 'user', 
               allowedApps: [], 
@@ -60,25 +68,32 @@ export default function App() {
             });
           }
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("App.jsx: Critical error fetching user profile:", error);
           setUserProfile({ role: 'user', allowedApps: [] });
         }
-        setUser(currentUser);
       } else {
+        console.log("App.jsx: User is signed out.");
         setUser(null);
         setUserProfile(null);
       }
-      setLoading(false);
+      console.log("App.jsx: Setting all loading states to false.");
+      setLoadingAuth(false);
+      setLoadingProfile(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("App.jsx: Cleaning up auth state listener.");
+      unsubscribe();
+    };
   }, []);
 
   const handleSignOut = () => {
     signOut(auth);
   };
 
-  if (loading) {
+  const isLoading = loadingAuth || loadingProfile;
+
+  if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50 text-indigo-600">
         <Loader2 size={48} className="animate-spin" />

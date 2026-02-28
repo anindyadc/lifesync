@@ -16,16 +16,16 @@ export default function MediWatchApp({ user }) {
     await addPrescription(data, photoFile);
   };
 
-  const handleEditSubmit = async (data, photoFile) => {
-    // Note: This simple implementation doesn't handle photo updates yet.
-    // For full support, you'd need to upload the new photo, delete the old one, and update the URL.
-    await updatePrescription(editingPrescription.id, data);
+  const handleEditSubmit = async (data, photoFiles) => {
+    // We now properly support photo updates: we will upload the new ones 
+    // and the useMedical hook will update the photoUrls list.
+    await updatePrescription(editingPrescription.id, data, photoFiles);
     setEditingPrescription(null);
   };
 
-  const handleDelete = async (id, photoUrl) => {
+  const handleDelete = async (id, photoUrl, photoUrls) => {
     if (window.confirm('Are you sure you want to delete this prescription? This action cannot be undone.')) {
-      await deletePrescription(id, photoUrl);
+      await deletePrescription(id, photoUrl, photoUrls);
     }
   };
 
@@ -85,6 +85,7 @@ export default function MediWatchApp({ user }) {
         <PrescriptionForm
           onSubmit={handleAddSubmit}
           onCancel={() => setShowForm(false)}
+          prescriptions={prescriptions}
         />
       )}
 
@@ -93,12 +94,13 @@ export default function MediWatchApp({ user }) {
           initialData={editingPrescription}
           onSubmit={handleEditSubmit}
           onCancel={() => setEditingPrescription(null)}
+          prescriptions={prescriptions}
         />
       )}
 
       {/* List Area */}
       {!showForm && !editingPrescription && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-6">
           {filteredPrescriptions.length > 0 ? (
             filteredPrescriptions.map((prescription) => (
               <PrescriptionCard

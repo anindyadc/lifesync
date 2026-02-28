@@ -1,0 +1,14 @@
+[
+  {
+    "origin": ["https://lifesync.dizikloud.top"],
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Authorization",
+      "X-Requested-With",
+      "x-goog-resumable"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -27,9 +27,9 @@ const TaskReportTable = ({ tasks }) => {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {tasks.map(task => {
-              const subDone = task.subtasks?.filter(s => s.completed).length || 0; 
+              const subDone = task.subtasks?.filter(s => s.completed).length || 0;
               const subTotal = task.subtasks?.length || 0;
-              const percent = subTotal ? (subDone/subTotal)*100 : 0;
+              const percent = subTotal > 0 ? (subDone/subTotal)*100 : (task.progress ?? 0);
               
               const taskTime = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
               const subtaskTime = (task.subtasks || []).reduce((acc, subtask) => {
@@ -50,7 +50,7 @@ const TaskReportTable = ({ tasks }) => {
                       <div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
                         <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${percent}%` }}/>
                       </div>
-                      <span className="text-xs">{subDone}/{subTotal}</span>
+                      <span className="text-xs">{subTotal > 0 ? `${subDone}/${subTotal}` : 'Manual'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-3 font-mono">{formatDuration(totalTime)}</td>

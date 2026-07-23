@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShieldAlert, Plus, FileText, Download, Loader2, X, Save } from 'lucide-react';
+import { ShieldAlert, Plus, FileText, Download, Loader2, X, Save, Search, XCircle } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -7,6 +7,7 @@ import { db } from '../../lib/firebase';
 import StatSummary from './components/StatSummary';
 import IncidentCard from './components/IncidentCard';
 import ResolveModal from './components/ResolveModal';
+import { useIncidentExport } from './hooks/useIncidentExport';
 
 const IncidentLoggerApp = ({ user }) => {
   const [incidents, setIncidents] = useState([]);
@@ -14,7 +15,8 @@ const IncidentLoggerApp = ({ user }) => {
   const [view, setView] = useState('dashboard');
   const [resolvingIncident, setResolvingIncident] = useState(null);
   const [editingIncident, setEditingIncident] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('open'); 
+  const [filterStatus, setFilterStatus] = useState('open');
+  const [filterSearch, setFilterSearch] = useState('');
 
   const [formData, setFormData] = useState({
     title: '', serverName: '', application: '', priority: 'medium',
@@ -89,9 +91,16 @@ const IncidentLoggerApp = ({ user }) => {
   };
 
   const filteredIncidents = useMemo(() => {
-    if (filterStatus === 'all') return incidents;
-    return incidents.filter(i => i.status === filterStatus);
-  }, [incidents, filterStatus]);
+    const byStatus = filterStatus === 'all' ? incidents : incidents.filter(i => i.status === filterStatus);
+    if (!filterSearch) return byStatus;
+    const term = filterSearch.toLowerCase();
+    return byStatus.filter(i =>
+      i.serverName?.toLowerCase().includes(term) ||
+      i.application?.toLowerCase().includes(term)
+    );
+  }, [incidents, filterStatus, filterSearch]);
+
+  const { exportPDF, exportCSV } = useIncidentExport(filteredIncidents);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6">
@@ -114,12 +123,33 @@ const IncidentLoggerApp = ({ user }) => {
             <p className="text-xs text-slate-500">Track & Resolve System Issues</p>
           </div>
         </div>
-        <button 
-          onClick={() => { resetForm(); setView('log'); }} 
-          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-all active:scale-95 shadow-sm w-full md:w-auto"
-        >
-          <Plus size={16}/> Report Incident
-        </button>
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search server or app..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              aria-label="Search incidents by server or application"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+            {filterSearch && (
+              <button onClick={() => setFilterSearch('')} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <XCircle size={14} />
+              </button>
+            )}
+          </div>
+          <button onClick={exportCSV} aria-label="Export CSV" title="Export CSV" className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm"><FileText size={18}/></button>
+          <button onClick={exportPDF} aria-label="Export PDF" title="Export PDF" className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm"><Download size={18}/></button>
+          <button
+            onClick={() => { resetForm(); setView('log'); }}
+            aria-label="Report new incident"
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+          >
+            <Plus size={16}/> Report Incident
+          </button>
+        </div>
       </div>
 
       {loading ? <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-600" size={40}/></div> : (

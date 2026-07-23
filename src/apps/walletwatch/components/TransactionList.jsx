@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown, Tag, Filter } from 'lucide-react';
-import { formatCurrency, formatDate, getTagColor } from '../../../lib/utils';
+import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown, Tag, Filter, XCircle, Link2 } from 'lucide-react';
+import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
 
 /**
  * TransactionList Component
@@ -25,6 +25,12 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     return Array.from(tagsSet).sort();
   }, [expenses]);
 
+  const expenseById = useMemo(() => {
+    const map = {};
+    expenses.forEach(e => { map[e.id] = e; });
+    return map;
+  }, [expenses]);
+
   const filteredExpenses = useMemo(() => {
     return expenses.filter(exp => {
       if (filterCategory && exp.category !== filterCategory) return false;
@@ -37,7 +43,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     if (grouping === 'month') {
       const monthlyGroups = {};
       filteredExpenses.forEach(expense => {
-        const date = expense.date.toDate();
+        const date = safeGetDate(expense.date);
         const monthYear = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
         if (!monthlyGroups[monthYear]) {
           monthlyGroups[monthYear] = [];
@@ -65,19 +71,26 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     return {};
   }, [filteredExpenses, grouping]);
 
+  const groupKeysSignature = useMemo(
+    () => Object.keys(groupedData.monthlyGroups || groupedData.eventGroups || {}).join('|'),
+    [groupedData]
+  );
+
   useEffect(() => {
     setShowAll(false);
     setShowAllGroups(false);
     setExpandedTransactionGroups({});
-    
-    const groupKeys = Object.keys(groupedData.monthlyGroups || groupedData.eventGroups || {});
+
+    const groupKeys = groupKeysSignature ? groupKeysSignature.split('|') : [];
     const firstGroup = groupKeys[0];
     const initialCollapsedState = {};
     groupKeys.forEach(key => {
       initialCollapsedState[key] = key !== firstGroup;
     });
     setCollapsedGroups(initialCollapsedState);
-  }, [grouping, filteredExpenses, groupedData]);
+    // Depend on the group-label signature, not groupedData itself, so a
+    // snapshot echo with the same groups doesn't re-collapse everything.
+  }, [grouping, groupKeysSignature]);
 
   const toggleGroup = (groupKey) => {
     setCollapsedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -113,7 +126,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
               {!collapsedGroups[monthYear] && (
                 <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
                   {transactionsToShow.map(exp => (
-                    <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+                    <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedExpense={exp.relatedId ? expenseById[exp.relatedId] : null} />
                   ))}
                   {monthExpenses.length > 5 && (
                     <div className="p-2 text-center">
@@ -171,7 +184,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
                {!collapsedGroups[name] && (
                 <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
                     {transactionsToShow.map(exp => (
-                      <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} />
+                      <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedExpense={exp.relatedId ? expenseById[exp.relatedId] : null} />
                     ))}
                     {data.items.length > 5 && (
                       <div className="p-2 text-center">
@@ -260,6 +273,15 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
                 </select>
               </>
             )}
+            {(filterCategory || filterTag) && (
+              <button
+                onClick={() => { setFilterCategory(''); setFilterTag(''); }}
+                className="p-1.5 mr-1 text-slate-400 hover:text-red-500 transition-colors"
+                title="Clear filters"
+              >
+                <XCircle size={16} />
+              </button>
+            )}
           </div>
 
           <div className="w-px h-6 bg-slate-200 hidden sm:block"></div>
@@ -313,7 +335,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
  * Settlement button (RefreshCcw) is now always visible for 'pending' items 
  * to ensure users can find it immediately.
  */
-const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
+const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => (
   <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-slate-50 transition-colors group">
     <div className="flex items-center gap-4">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categories.find(c=>c.id===exp.category)?.bg || 'bg-slate-100'}`}>
@@ -324,6 +346,11 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle }) => (
         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
           {formatDate(exp.date)} • {categories.find(c=>c.id===exp.category)?.label || exp.category}
         </p>
+        {relatedExpense && (
+          <p className="flex items-center gap-1 text-[9px] text-indigo-500 font-bold uppercase tracking-wider mt-1">
+            <Link2 size={9} /> Refund for "{relatedExpense.description}"
+          </p>
+        )}
         {exp.tags && exp.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
             {exp.tags.map(tag => {

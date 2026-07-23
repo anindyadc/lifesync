@@ -26,7 +26,7 @@ export const useChangeExport = (changes, filterServer) => {
         c.serverName,
         c.application || '-',
         c.type,
-        c.title,
+        c.title || '',
         c.status
       ]),
       headStyles: { fillColor: [79, 70, 229] }
@@ -41,8 +41,8 @@ export const useChangeExport = (changes, filterServer) => {
       c.serverName, 
       c.application || '', 
       c.type, 
-      `"${c.title.replace(/"/g, '""')}"`, 
-      `"${c.description.replace(/"/g, '""')}"`, 
+      `"${(c.title || '').replace(/"/g, '""')}"`,
+      `"${(c.description || '').replace(/"/g, '""')}"`,
       `"${(c.parameters || '').replace(/"/g, '""')}"`, 
       c.status,
       c.performedBy || ''

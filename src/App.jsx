@@ -17,7 +17,6 @@ import { doc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
 
-import Layout from './components/Layout';
 import AuthScreen from './components/AuthScreen';
 import TaskFlowApp from './apps/taskflow';
 import WalletWatchApp from './apps/walletwatch';

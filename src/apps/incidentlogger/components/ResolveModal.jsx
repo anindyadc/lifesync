@@ -26,8 +26,9 @@ const ResolveModal = ({ incident, onClose, onConfirm }) => {
             <CheckCircle size={18} className="text-emerald-600" />
             Resolve Incident
           </h3>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
+            aria-label="Close"
             className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
           >
             <X size={20} />

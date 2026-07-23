@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import { formatCurrency, formatDate } from '../../../lib/utils';
-import { CATEGORIES, PAYMENT_MODES } from '../constants';
+import { formatDate } from '../../../lib/utils';
+import { PAYMENT_MODES } from '../constants';
 
-export const useExport = (expenses, chartElementId) => {
+export const useExport = (expenses, categories, chartElementId) => {
   const [exporting, setExporting] = useState(false);
 
   const exportToCSV = () => {
@@ -13,7 +13,7 @@ export const useExport = (expenses, chartElementId) => {
     const rows = expenses.map(e => [
       formatDate(e.date),
       `"${(e.description || '').replace(/"/g, '""')}"`,
-      CATEGORIES.find(c => c.id === e.category)?.label || e.category,
+      categories.find(c => c.id === e.category)?.label || e.category,
       PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
       e.amount
     ].join(','));
@@ -72,7 +72,7 @@ export const useExport = (expenses, chartElementId) => {
         body: expenses.map(e => [
           formatDate(e.date),
           e.description,
-          CATEGORIES.find(c => c.id === e.category)?.label || e.category,
+          categories.find(c => c.id === e.category)?.label || e.category,
           PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode,
           `INR ${Number(e.amount).toLocaleString('en-IN')}` 
         ]),

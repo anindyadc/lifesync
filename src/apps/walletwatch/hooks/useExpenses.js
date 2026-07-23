@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { DEFAULT_CATEGORIES } from '../constants';
+import { DEFAULT_CATEGORIES, getCategoryColor } from '../constants';
 
 export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null) => {
   const [expenses, setExpenses] = useState([]);
@@ -54,11 +54,25 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
   }, [selectedMonth, allExpenses]);
 
   const addCategory = async (label) => {
-    // ... (rest of the function remains the same)
+    const trimmed = (label || '').trim();
+    if (!trimmed || !user) return;
+
+    const id = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `cat-${Date.now()}`;
+    if (categories.some(c => c.id === id)) return;
+
+    const { color, bg } = getCategoryColor(trimmed);
+    const updated = [...categories, { id, label: trimmed, color, bg }];
+
+    const catRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig');
+    await setDoc(catRef, { categories: updated }, { merge: true });
   };
 
   const removeCategory = async (id) => {
-    // ... (rest of the function remains the same)
+    if (!user) return;
+    const updated = categories.filter(c => c.id !== id);
+
+    const catRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig');
+    await setDoc(catRef, { categories: updated }, { merge: true });
   };
 
   return { expenses, categories, loading, addCategory, removeCategory, setExpenses };

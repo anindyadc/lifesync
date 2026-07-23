@@ -4,15 +4,18 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 import { CalendarDays } from 'lucide-react';
+import { safeGetDate } from '../../../lib/utils';
 
 // FullCalendar CSS imports moved to index.css
 import './MaturityCalendar.css'; // Import custom styles
 
 const MaturityCalendar = ({ investments }) => {
   const events = investments.map(inv => {
-    const startDate = inv.maturityDate ? new Date(inv.maturityDate) : new Date();
+    const startDate = inv.maturityDate ? safeGetDate(inv.maturityDate) : new Date();
     const eventName = inv.name ? String(inv.name) : 'Unnamed Investment';
-    const eventAmount = inv.amount ? `₹${inv.amount.toLocaleString('en-IN')}` : '₹0';
+    const eventAmount = inv.amount === null
+      ? '⚠ Unable to decrypt'
+      : (inv.amount ? `₹${inv.amount.toLocaleString('en-IN')}` : '₹0');
     const eventTitle = `${eventName} - ${eventAmount}`;
 
     return {
@@ -43,15 +46,6 @@ const MaturityCalendar = ({ investments }) => {
     events: events,
     eventDisplay: 'block',
     eventColor: '#4F46E5', // Indigo color for events
-    // eventContent: // You can customize event rendering further here if needed
-    //   eventInfo => (
-    //     <div className="fc-event-main-frame">
-    //       <div className="fc-event-time">{eventInfo.timeText}</div>
-    //       <div className="fc-event-title-container">
-    //         <div className="fc-event-title fc-sticky">{eventInfo.event.title}</div>
-    //       </div>
-    //     </div>
-    //   ),
     views: {
       listYear: {
         type: 'listYear',

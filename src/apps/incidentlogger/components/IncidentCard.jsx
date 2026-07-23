@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2, MoreVertical } from 'lucide-react';
+import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2 } from 'lucide-react';
 
 const formatDate = (dateField) => {
   if (!dateField) return '-';
@@ -50,23 +50,20 @@ const IncidentCard = ({ incident, onResolve, onEdit, onDelete }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative sm:hidden">
-            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-              <MoreVertical size={18}/>
-            </button>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100">
-            <button 
+          <div className="flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+            <button
               onClick={() => onEdit(incident)}
-              className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+              aria-label="Edit incident details"
               title="Edit Details"
+              className="p-2 text-slate-400 sm:text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
             >
               <Pencil size={18} />
             </button>
-            <button 
+            <button
               onClick={() => onDelete(incident.id)}
-              className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+              aria-label="Delete incident"
               title="Delete Incident"
+              className="p-2 text-slate-400 sm:text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
             >
               <Trash2 size={18} />
             </button>

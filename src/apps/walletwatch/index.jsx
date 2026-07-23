@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, X, Trash2, Loader2 } from 'lucide-react';
+import { Settings, Plus, X, Trash2, Loader2, FileText, Download } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import Dashboard from './components/DashboardStats';
@@ -7,10 +7,12 @@ import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import ConfirmModal from './components/ConfirmModal';
 import { useExpenses } from './hooks/useExpenses';
+import { useExport } from './hooks/useExport';
 
 const WalletWatchApp = ({ user }) => {
   const { expenses, categories, loading, addCategory, removeCategory } = useExpenses(user);
-  
+  const { exportToCSV, exportToPDF, exporting } = useExport(expenses, categories, 'walletwatch-dashboard-charts');
+
   const [view, setView] = useState('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -158,15 +160,23 @@ const WalletWatchApp = ({ user }) => {
             <Plus size={16} /> Add Entry
           </button>
         </div>
-        <button 
-          onClick={() => setIsSettingsOpen(true)} 
-          className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
-        >
-          <Settings size={20}/>
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportToCSV} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" title="Export CSV">
+            <FileText size={20}/>
+          </button>
+          <button onClick={exportToPDF} disabled={exporting} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50" title="Export PDF">
+            {exporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20}/>}
+          </button>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
+          >
+            <Settings size={20}/>
+          </button>
+        </div>
       </div>
 
-      <div className="min-h-[400px]">
+      <div className="min-h-[400px]" id="walletwatch-dashboard-charts">
         {view === 'dashboard' && <Dashboard user={user} categories={categories} />}
 
         {view === 'history' && (

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { formatDuration } from '../../../lib/utils';
+import { formatDuration, safeGetDate, toISODate } from '../../../lib/utils';
 import { Clock } from 'lucide-react';
 
 const TimeReport = ({ tasks, dateRange, onDateChange }) => {
@@ -7,15 +7,15 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
   const tasksInReport = useMemo(() => {
     return tasks.map(task => {
       const taskTimeLogs = task.timeLogs?.filter(log => {
-        const logDate = new Date(log.date);
-        return logDate >= dateRange.from && logDate <= dateRange.to;
+        const logDate = safeGetDate(log.date);
+        return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
       }) || [];
 
       const subtasksWithTime = task.subtasks
         ?.map(s => {
           const subtaskTimeLogs = s.timeLogs?.filter(log => {
-            const logDate = new Date(log.date);
-            return logDate >= dateRange.from && logDate <= dateRange.to;
+            const logDate = safeGetDate(log.date);
+            return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
           }) || [];
           return { ...s, timeLogs: subtaskTimeLogs };
         })
@@ -56,7 +56,7 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
           <input 
             type="date" 
             name="from"
-            value={dateRange.from.toISOString().split('T')[0]}
+            value={toISODate(dateRange.from)}
             onChange={handleDateInputChange}
             className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-auto"
           />
@@ -64,7 +64,7 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
           <input 
             type="date" 
             name="to"
-            value={dateRange.to.toISOString().split('T')[0]}
+            value={toISODate(dateRange.to)}
             onChange={handleDateInputChange}
             className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-full sm:w-auto"
           />

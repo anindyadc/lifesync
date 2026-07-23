@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  CheckSquare, Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight 
+import {
+  CheckSquare, Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { safeGetDate } from '../../lib/utils';
 
 // Custom Hooks
 import { useTasks } from './hooks/useTasks';
@@ -42,22 +43,6 @@ const TaskFlowApp = ({ user }) => {
       return newDate;
     });
   };
-
-  const safeGetDate = (date) => {
-    if (!date) return null;
-    // Firestore timestamp
-    if (date.toDate) return date.toDate();
-    // String 'YYYY-MM-DD'
-    if (typeof date === 'string') {
-      const parts = date.split('-');
-      if (parts.length === 3) {
-        // new Date(year, monthIndex, day) - treats as local time
-        return new Date(parts[0], parts[1] - 1, parts[2]);
-      }
-    }
-    // Fallback
-    return new Date(date);
-  }
 
   const filteredTasks = useMemo(() => {
     if (!dateRange.from || !dateRange.to) return tasks;

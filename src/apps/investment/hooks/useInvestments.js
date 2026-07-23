@@ -7,7 +7,14 @@ import CryptoJS from 'crypto-js';
 // It should be securely derived from the user's password (e.g., using PBKDF2)
 // or managed via a secure backend/key management service. Storing it client-side
 // even obfuscated, is insecure for real-world sensitive data.
-const SECRET_KEY = 'your-super-secret-key'; // Replace with a strong, securely managed key
+const ENV_SECRET_KEY = import.meta.env.VITE_INVESTMENT_SECRET_KEY;
+if (!ENV_SECRET_KEY) {
+  console.warn(
+    'VITE_INVESTMENT_SECRET_KEY is not set. Falling back to an insecure default key — ' +
+    'investment amounts have no real confidentiality until this env var is configured.'
+  );
+}
+const SECRET_KEY = ENV_SECRET_KEY || 'your-super-secret-key';
 
 const encryptAmount = (amount) => {
   if (!amount) return '';
@@ -15,15 +22,18 @@ const encryptAmount = (amount) => {
   return encrypted;
 };
 
+// Returns null (not 0) when the value can't be trusted, so callers can tell
+// "decryption failed / key mismatch" apart from a real zero-amount investment.
 const decryptAmount = (encryptedAmount) => {
   if (!encryptedAmount) return 0;
   try {
     const decryptedBytes = CryptoJS.AES.decrypt(encryptedAmount, SECRET_KEY);
     const decryptedAmount = decryptedBytes.toString(CryptoJS.enc.Utf8);
-    return parseFloat(decryptedAmount);
+    const parsed = parseFloat(decryptedAmount);
+    return isNaN(parsed) ? null : parsed;
   } catch (error) {
     console.error("Decryption failed:", error);
-    return 0; // Return 0 or handle error appropriately
+    return null;
   }
 };
 
@@ -31,8 +41,6 @@ export const useInvestments = (userId) => {
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-
 
   useEffect(() => {
     const investmentsCollectionRef = collection(db, `artifacts/default-app-id/users/${userId}/investment`);
@@ -59,8 +67,6 @@ export const useInvestments = (userId) => {
 
     return () => unsubscribe();
   }, [userId]);
-
-
 
   const addInvestment = useCallback(async (investmentData) => {
     try {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pill, User, Calendar, Trash2, Edit2, Image as ImageIcon, ExternalLink, ChevronDown, ChevronUp, Archive, ArchiveRestore, Activity, X, Share2 } from 'lucide-react';
+import { safeGetDate } from '../../../lib/utils';
 
 const PrescriptionCard = ({ prescription, onDelete, onEdit, onArchive }) => {
   const [showMedicines, setShowMedicines] = useState(false);
@@ -9,7 +10,6 @@ const PrescriptionCard = ({ prescription, onDelete, onEdit, onArchive }) => {
 
   const openModal = () => {
     if (urls.length > 0) {
-      setCurrentPhotoIndex(0);
       setIsImageModalOpen(true);
     }
   };
@@ -106,9 +106,9 @@ const PrescriptionCard = ({ prescription, onDelete, onEdit, onArchive }) => {
               {urls.length > 1 && (
                 <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                   {urls.map((_, idx) => (
-                    <button 
+                    <button
                       key={idx}
-                      onClick={() => setCurrentPhotoIndex(idx)}
+                      onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(idx); }}
                       className={`w-2 h-2 rounded-full ${idx === currentPhotoIndex ? 'bg-indigo-500' : 'bg-white/60 hover:bg-white'}`}
                     />
                   ))}
@@ -158,7 +158,7 @@ const PrescriptionCard = ({ prescription, onDelete, onEdit, onArchive }) => {
           <div className="flex items-center gap-4 text-sm text-slate-500 mb-4 mt-auto">
             <div className="flex items-center gap-1.5">
               <Calendar size={14} />
-              {new Date(prescription.date).toLocaleDateString()}
+              {safeGetDate(prescription.date)?.toLocaleDateString() || '-'}
             </div>
             {prescription.medicines?.length > 0 && (
               <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 font-medium">

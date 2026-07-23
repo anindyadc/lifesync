@@ -1,8 +1,8 @@
 import React from 'react';
-import { Server, Calendar, Activity, Pencil, Trash2, Archive } from 'lucide-react';
+import { Server, Calendar, Activity, Pencil, Trash2, Archive, ArchiveRestore } from 'lucide-react';
 import { formatDate } from '../../../lib/utils';
 
-const ChangeCard = ({ change, onClick, onEdit, onDelete, onArchive }) => {
+const ChangeCard = ({ change, onClick, onEdit, onDelete, onArchive, onUnarchive }) => {
   const getStatusColor = (status) => {
     switch(status) {
       case 'success': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
@@ -31,24 +31,38 @@ const ChangeCard = ({ change, onClick, onEdit, onDelete, onArchive }) => {
           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(change.status)}`}>
             {change.status}
           </span>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onArchive(change.id); }}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors border border-transparent hover:border-slate-200"
-            title="Archive Change"
-          >
-            <Archive size={14}/>
-          </button>
-          <button 
+          {change.status === 'archived' ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onUnarchive(change); }}
+              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors border border-transparent hover:border-emerald-200"
+              title="Unarchive Change"
+              aria-label="Unarchive change"
+            >
+              <ArchiveRestore size={14}/>
+            </button>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); onArchive(change); }}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors border border-transparent hover:border-slate-200"
+              title="Archive Change"
+              aria-label="Archive change"
+            >
+              <Archive size={14}/>
+            </button>
+          )}
+          <button
             onClick={(e) => { e.stopPropagation(); onEdit(change); }}
             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors border border-transparent hover:border-indigo-200"
             title="Edit Change"
+            aria-label="Edit change"
           >
             <Pencil size={14}/>
           </button>
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); onDelete(change.id); }}
             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
             title="Delete Change"
+            aria-label="Delete change"
           >
             <Trash2 size={14}/>
           </button>

@@ -67,7 +67,7 @@ export default Dashboard;
 export const SummaryCards = ({ expenses }) => {
   const stats = useMemo(() => {
     const spent = expenses
-      .filter(e => Number(e.amount) < 0)
+      .filter(e => Number(e.amount) < 0 && e.reimbursementStatus !== 'pending')
       .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
     
     const lent = expenses

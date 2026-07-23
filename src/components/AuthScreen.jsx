@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Layers, CheckCircle } from 'lucide-react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   updateProfile,
   setPersistence,
   browserLocalPersistence,
-  browserSessionPersistence 
+  browserSessionPersistence,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -20,6 +21,7 @@ const AuthScreen = () => {
   const [name, setName] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const APP_ID = 'default-app-id';
 
@@ -27,6 +29,7 @@ const AuthScreen = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setInfo('');
 
     try {
       const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
@@ -57,7 +60,27 @@ const AuthScreen = () => {
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
       if (err.code === 'auth/email-already-in-use') msg = "An account with this email already exists.";
       if (err.code === 'auth/weak-password') msg = "Password must be at least 6 characters long.";
+      if (err.code === 'auth/too-many-requests') msg = "Too many attempts. Please wait a moment and try again.";
       setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError('');
+    setInfo('');
+    if (!email) {
+      setError('Enter your email address above, then click "Forgot Password?" again.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setInfo('Password reset email sent — check your inbox.');
+    } catch (err) {
+      console.error('Failed to send password reset email:', err);
+      setError('Could not send reset email. Please check the address and try again.');
     } finally {
       setLoading(false);
     }
@@ -82,6 +105,12 @@ const AuthScreen = () => {
             {error && (
               <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2">
                 <AlertCircle size={16} /> {error}
+              </div>
+            )}
+
+            {info && (
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 text-sm rounded-lg flex items-center gap-2">
+                <CheckCircle size={16} /> {info}
               </div>
             )}
 
@@ -144,7 +173,7 @@ const AuthScreen = () => {
                   <input type="checkbox" className="sr-only" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                   <span className="text-sm text-muted-foreground font-medium">Remember me</span>
                 </Label>
-                <button type="button" className="text-sm text-primary font-bold hover:underline">
+                <button type="button" onClick={handleForgotPassword} className="text-sm text-primary font-bold hover:underline">
                   Forgot Password?
                 </button>
               </div>

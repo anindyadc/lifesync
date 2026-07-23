@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, Stethoscope, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Stethoscope, Loader2, Search, XCircle, FileText, Download } from 'lucide-react';
 import { useMedical } from './hooks/useMedical';
+import { useMedicalExport } from './hooks/useMedicalExport';
 import PrescriptionForm from './components/PrescriptionForm';
 import PrescriptionCard from './components/PrescriptionCard';
 
@@ -9,8 +10,20 @@ export default function MediWatchApp({ user }) {
   const [showForm, setShowForm] = useState(false);
   const [editingPrescription, setEditingPrescription] = useState(null);
   const [filter, setFilter] = useState('active'); // 'active' or 'archived'
-  
-  const filteredPrescriptions = prescriptions.filter(p => filter === 'active' ? !p.archived : p.archived);
+  const [search, setSearch] = useState('');
+
+  const filteredPrescriptions = useMemo(() => {
+    const byStatus = prescriptions.filter(p => filter === 'active' ? !p.archived : p.archived);
+    const term = search.trim().toLowerCase();
+    if (!term) return byStatus;
+    return byStatus.filter(p =>
+      p.patientName?.toLowerCase().includes(term) ||
+      p.doctorName?.toLowerCase().includes(term) ||
+      p.disease?.toLowerCase().includes(term)
+    );
+  }, [prescriptions, filter, search]);
+
+  const { exportCSV, exportPDF } = useMedicalExport(filteredPrescriptions);
 
   const handleAddSubmit = async (data, photoFile) => {
     await addPrescription(data, photoFile);
@@ -50,26 +63,45 @@ export default function MediWatchApp({ user }) {
         </div>
         {!showForm && !editingPrescription && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder="Search patient, doctor, disease..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <XCircle size={14} />
+                </button>
+              )}
+            </div>
             <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button 
-                onClick={() => setFilter('active')} 
+              <button
+                onClick={() => setFilter('active')}
                 className={`flex-1 px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${filter === 'active' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Active
               </button>
-              <button 
-                onClick={() => setFilter('archived')} 
+              <button
+                onClick={() => setFilter('archived')}
                 className={`flex-1 px-4 py-1.5 text-sm font-bold rounded-lg transition-all ${filter === 'archived' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 Archived
               </button>
             </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95 whitespace-nowrap"
-            >
-              <Plus size={18} /> Add Prescription
-            </button>
+            <div className="flex gap-2">
+              <button onClick={exportCSV} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 shadow-sm" title="Export CSV"><FileText size={18} /></button>
+              <button onClick={exportPDF} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 shadow-sm" title="Export PDF"><Download size={18} /></button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95 whitespace-nowrap"
+              >
+                <Plus size={18} /> Add Prescription
+              </button>
+            </div>
           </div>
         )}
       </div>

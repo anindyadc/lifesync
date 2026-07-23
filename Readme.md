@@ -224,7 +224,10 @@ Now we will create the React application on your computer and configure Tailwind
      VITE\_FIREBASE\_PROJECT\_ID=your\_project\_id  
      VITE\_FIREBASE\_STORAGE\_BUCKET=your\_project\_id.firebasestorage.app  
      VITE\_FIREBASE\_MESSAGING\_SENDER\_ID=your\_sender\_id  
-     VITE\_FIREBASE\_APP\_ID=your\_app\_id
+     VITE\_FIREBASE\_APP\_ID=your\_app\_id  
+     VITE\_INVESTMENT\_SECRET\_KEY=a\_long\_random\_string\_you\_generate
+
+   * `VITE_INVESTMENT_SECRET_KEY` is used by the Investment app to AES-encrypt investment amounts client-side before they're written to Firestore. Generate a long random value yourself (e.g. `openssl rand -hex 32`) — if this variable is missing, the app falls back to an insecure default and logs a warning to the console.
 
    * **Important:** Open .gitignore and ensure .env is listed there.  
 8. **Run Locally:**  
@@ -268,6 +271,7 @@ To secure your app online, we will store the database credentials in GitHub's se
 | VITE\_FIREBASE\_STORAGE\_BUCKET | Your Storage Bucket |
 | VITE\_FIREBASE\_MESSAGING\_SENDER\_ID | Your Sender ID |
 | VITE\_FIREBASE\_APP\_ID | Your App ID |
+| VITE\_INVESTMENT\_SECRET\_KEY | Random secret used to encrypt Investment amounts |
 
 ## **Phase 5: GitHub Pages Deployment**
 

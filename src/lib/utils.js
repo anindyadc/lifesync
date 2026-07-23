@@ -31,6 +31,20 @@ export const formatCurrency = (amount, locale = 'en-IN', currency = 'INR') => {
   }).format(amount);
 };
 
+export const safeGetDate = (dateInput) => {
+  if (!dateInput) return null;
+  // Firestore Timestamp
+  if (dateInput.toDate) return dateInput.toDate();
+  // String 'YYYY-MM-DD' - construct as local time, not UTC
+  if (typeof dateInput === 'string') {
+    const parts = dateInput.split('-');
+    if (parts.length === 3) {
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+  }
+  return new Date(dateInput);
+};
+
 export const toISODate = (dateInput) => {
   if (!dateInput) return '';
   const date = new Date(dateInput);

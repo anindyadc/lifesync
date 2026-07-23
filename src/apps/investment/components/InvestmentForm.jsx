@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
 
 const INVESTMENT_TYPES = ['NSC', 'FD', 'Mutual Fund', 'Stocks', 'Gold', 'Real Estate', 'Other'];
@@ -17,12 +17,23 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     maturityDate: '',
     details: '',
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    const amountValue = Number(formData.amount);
+    if (!formData.amount || isNaN(amountValue) || amountValue <= 0) {
+      setError('Amount must be greater than 0.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -74,14 +85,17 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
 
           <FormGroup>
             <Label htmlFor="amount">Amount (₹)</Label>
-            <Input 
+            <Input
               id="amount"
-              type="number" 
-              placeholder="e.g. 50000" 
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 50000"
               required
-              value={formData.amount} 
-              onChange={e => setFormData({...formData, amount: e.target.value})} 
+              value={formData.amount}
+              onChange={e => setFormData({...formData, amount: e.target.value})}
             />
+            {error && <p className="text-xs text-red-600">{error}</p>}
           </FormGroup>
 
           <FormGroup>
@@ -109,8 +123,11 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
       </div>
       
       <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
-        <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
-        <Button type="submit" form="investment-form">Save Investment</Button>
+        <Button type="button" onClick={onCancel} disabled={submitting} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
+        <Button type="submit" form="investment-form" disabled={submitting}>
+          {submitting && <Loader2 size={16} className="animate-spin mr-2" />}
+          {submitting ? 'Saving...' : 'Save Investment'}
+        </Button>
       </div>
     </div>
   );

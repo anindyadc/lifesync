@@ -1,6 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import imageCompression from 'browser-image-compression';
 import { Camera, Plus, Save, Trash2, X, Upload } from 'lucide-react';
+
+const MAX_PHOTOS = 8;
+// Firestore documents cap out at 1MiB; Base64 encoding adds ~37% overhead on top of the
+// compressed image bytes, so we keep the combined photo payload well under that limit.
+const MAX_TOTAL_BASE64_BYTES = 700 * 1024;
+
+const AutocompleteDropdown = ({ options, value, onSelect, isOpen }) => {
+  if (!isOpen || options.length === 0) return null;
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(value.toLowerCase()) && opt !== value
+  );
+
+  if (filteredOptions.length === 0) return null;
+
+  return (
+    <ul className="absolute z-10 w-full bg-white border border-slate-200 shadow-lg rounded-xl mt-1 max-h-48 overflow-y-auto overflow-x-hidden">
+      {filteredOptions.map((opt, idx) => (
+        <li
+          key={idx}
+          className="px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer border-b border-slate-50 last:border-0"
+          onClick={() => onSelect(opt)}
+        >
+          {opt}
+        </li>
+      ))}
+    </ul>
+  );
+};
 
 const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescriptions = [] }) => {
   const [patientName, setPatientName] = useState(initialData?.patientName || '');
@@ -27,54 +56,48 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
   // State for controlling custom dropdown visibility
   const [activeDropdown, setActiveDropdown] = useState(null);
 
-  const AutocompleteDropdown = ({ options, value, onSelect, isOpen }) => {
-    if (!isOpen || options.length === 0) return null;
-    
-    const filteredOptions = options.filter(opt => 
-      opt.toLowerCase().includes(value.toLowerCase()) && opt !== value
-    );
-
-    if (filteredOptions.length === 0) return null;
-
-    return (
-      <ul className="absolute z-10 w-full bg-white border border-slate-200 shadow-lg rounded-xl mt-1 max-h-48 overflow-y-auto overflow-x-hidden">
-        {filteredOptions.map((opt, idx) => (
-          <li 
-            key={idx}
-            className="px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer border-b border-slate-50 last:border-0"
-            onClick={() => onSelect(opt)}
-          >
-            {opt}
-          </li>
-        ))}
-      </ul>
-    );
-  };
+  const photoPreviewsRef = useRef(photoPreviews);
+  useEffect(() => { photoPreviewsRef.current = photoPreviews; }, [photoPreviews]);
+  useEffect(() => () => {
+    photoPreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
+  }, []);
 
   const handlePhotoChange = async (e) => {
     const files = Array.from(e.target.files);
     setFileError('');
     setSubmitError('');
-    
-    if (files.length > 0) {
+
+    const remainingSlots = MAX_PHOTOS - existingPhotos.length - photoFiles.length;
+    if (remainingSlots <= 0) {
+      setFileError(`You can attach up to ${MAX_PHOTOS} photos per prescription.`);
+      e.target.value = '';
+      return;
+    }
+
+    const filesToProcess = files.slice(0, remainingSlots);
+    if (files.length > filesToProcess.length) {
+      setFileError(`Only the first ${remainingSlots} photo(s) were added — the limit is ${MAX_PHOTOS} per prescription.`);
+    }
+
+    if (filesToProcess.length > 0) {
       const compressionOptions = {
         maxSizeMB: 0.15,          // Target 150KB per page for Firestore document limit (safely fits 6 pages)
         maxWidthOrHeight: 1024, // Optimized dimensions for mobile viewing and storage
-        useWebWorker: true,    
+        useWebWorker: true,
       };
 
       // We'll process compressions in parallel for speed
-      const compressionPromises = files.map(async (file) => {
+      const compressionPromises = filesToProcess.map(async (file) => {
         console.log(`Starting compression for ${file.name}, original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
         try {
           const compressedFile = await imageCompression(file, compressionOptions);
           console.log(`Finished compression for ${file.name}, new size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
-          
+
           if (compressedFile.size > MAX_FILE_SIZE) {
             setFileError(`File "${file.name}" is still too large after compression.`);
             return null;
           }
-          
+
           setPhotoFiles(prev => [...prev, compressedFile]);
           setPhotoPreviews(prev => [...prev, URL.createObjectURL(compressedFile)]);
 
@@ -83,7 +106,7 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
           setFileError(`Could not process file: ${file.name}`);
         }
       });
-      
+
       await Promise.all(compressionPromises);
     }
     e.target.value = ''; // Reset input
@@ -101,7 +124,8 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
     setPhotoFiles(newFiles);
 
     const newPreviews = [...photoPreviews];
-    newPreviews.splice(index, 1);
+    const [removedPreview] = newPreviews.splice(index, 1);
+    if (removedPreview) URL.revokeObjectURL(removedPreview);
     setPhotoPreviews(newPreviews);
   };
 
@@ -138,6 +162,18 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
 
       // Convert all new photo files to Base64 strings
       const base64Photos = await Promise.all(photoFiles.map(file => fileToBase64(file)));
+
+      const totalBase64Bytes = [...existingPhotos, ...base64Photos].reduce(
+        (sum, photo) => sum + (typeof photo === 'string' && photo.startsWith('data:') ? photo.length : 0),
+        0
+      );
+      if (totalBase64Bytes > MAX_TOTAL_BASE64_BYTES) {
+        setSubmitError(
+          `Total photo size (~${Math.round(totalBase64Bytes / 1024)}KB) exceeds the ${Math.round(MAX_TOTAL_BASE64_BYTES / 1024)}KB limit for a single prescription record. Remove a photo to continue.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
 
       // Add a timeout to prevent hanging indefinitely
       const timeoutPromise = new Promise((_, reject) => 
@@ -350,7 +386,7 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
               <div className="text-sm text-slate-500 flex-1">
                 Take photos of the physical prescription pages with your mobile camera or upload existing images.
                 {fileError && <p className="text-red-500 mt-2 font-medium animate-pulse">{fileError}</p>}
-                <p className="text-[10px] mt-1 text-slate-400 uppercase tracking-wider font-bold">Max size per file: 2MB</p>
+                <p className="text-[10px] mt-1 text-slate-400 uppercase tracking-wider font-bold">Max {MAX_PHOTOS} photos • 2MB per file</p>
               </div>
             </div>
           </div>

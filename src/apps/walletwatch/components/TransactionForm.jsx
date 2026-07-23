@@ -26,6 +26,7 @@ const TransactionForm = ({ initialData, onSubmit, categories, isSettling, expens
 
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [showGroupSuggestions, setShowGroupSuggestions] = useState(false);
+  const [amountError, setAmountError] = useState('');
 
   const availableTags = React.useMemo(() => {
     const tagsSet = new Set();
@@ -91,11 +92,18 @@ const TransactionForm = ({ initialData, onSubmit, categories, isSettling, expens
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.amount || !formData.category) return;
-    
+    if (!formData.category) return;
+
+    const amountNum = Number(formData.amount);
+    if (!formData.amount || isNaN(amountNum) || amountNum <= 0) {
+      setAmountError('Enter an amount greater than 0');
+      return;
+    }
+    setAmountError('');
+
     onSubmit({
       ...formData,
-      amount: Number(formData.amount),
+      amount: amountNum,
       tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       reimbursementStatus: formData.isReimbursable ? 'pending' : 'none'
     });
@@ -126,14 +134,16 @@ const TransactionForm = ({ initialData, onSubmit, categories, isSettling, expens
               <input
                 type="number"
                 step="0.01"
+                min="0.01"
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); setAmountError(''); }}
                 placeholder="0.00"
                 className="w-full pl-10 pr-4 py-3 text-2xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 required
                 autoFocus={!initialData}
               />
             </div>
+            {amountError && <p className="text-xs font-bold text-red-500 mt-1.5">{amountError}</p>}
           </div>
 
           {/* Description & Group */}

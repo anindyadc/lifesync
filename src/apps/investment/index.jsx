@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { PlusCircle, PiggyBank, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
+import { PlusCircle, PiggyBank, CalendarDays, Loader2, AlertCircle, FileText, Download } from 'lucide-react';
 import InvestmentList from './components/InvestmentList';
 import InvestmentForm from './components/InvestmentForm';
 import MaturityCalendar from './components/MaturityCalendar';
+import InvestmentStats from './components/InvestmentStats';
 import { useInvestments } from './hooks/useInvestments';
+import { useInvestmentExport } from './hooks/useInvestmentExport';
 
 const InvestmentsApp = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
   const [activeTab, setActiveTab] = useState('investment'); // 'list', 'calendar'
   const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment } = useInvestments(user.uid);
+  const { exportPDF, exportCSV } = useInvestmentExport(investments);
 
   const handleSave = async (investmentData) => {
     if (editInvestment) {
@@ -48,17 +51,21 @@ const InvestmentsApp = ({ user }) => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800">My Investments</h2>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setActiveTab('investment')} className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'investment' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}>            <PiggyBank className="inline-block mr-2" size={18} /> List View
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('calendar')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
           >
             <CalendarDays className="inline-block mr-2" size={18} /> Calendar
           </button>
+          <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export CSV" aria-label="Export CSV"><FileText size={18}/></button>
+          <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export PDF" aria-label="Export PDF"><Download size={18}/></button>
         </div>
       </div>
+
+      {investments.length > 0 && <InvestmentStats investments={investments} />}
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import { X, CheckSquare, Plus, Edit2, Check, Clock, Trash2 } from 'lucide-react';
-import { formatDuration } from '../../../lib/utils';
+import { formatDuration, toISODate } from '../../../lib/utils';
 import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
 
 const TimeLogModal = ({ onLog, onCancel, subtask }) => {
   const [time, setTime] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(toISODate(new Date()));
+  const [error, setError] = useState('');
 
   const handleLog = () => {
-    if (time) {
-      onLog({ minutes: parseInt(time), date });
+    const minutes = Number(time);
+    if (!time || !Number.isFinite(minutes) || minutes <= 0) {
+      setError('Enter a positive number of minutes.');
+      return;
     }
+    setError('');
+    onLog({ minutes: Math.round(minutes), date });
   };
 
   const title = subtask && !subtask.isMainTask ? `Log Time for: ${subtask.title}` : 'Log Time for Task';
@@ -26,9 +31,10 @@ const TimeLogModal = ({ onLog, onCancel, subtask }) => {
             min="1" 
             placeholder="Minutes" 
             value={time} 
-            onChange={e => setTime(e.target.value)}
+            onChange={e => { setTime(e.target.value); if (error) setError(''); }}
             className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           />
+          {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
         </FormGroup>
         <FormGroup>
           <Label>Date</Label>
@@ -85,7 +91,12 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
     }
   };
   const toggleSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.map(s => s.id === id ? {...s, completed: !s.completed} : s)});
-  const removeSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.filter(s => s.id !== id)});
+  const removeSubtask = (id) => {
+    const subtask = formData.subtasks.find(s => s.id === id);
+    const hasTimeLogs = subtask?.timeLogs?.length > 0;
+    if (hasTimeLogs && !window.confirm('This subtask has logged time. Delete it and its time logs?')) return;
+    setFormData({...formData, subtasks: formData.subtasks.filter(s => s.id !== id)});
+  };
   const startEditSubtask = (subtask) => {
     setEditingSubtaskId(subtask.id);
     setEditingSubtaskText(subtask.title);

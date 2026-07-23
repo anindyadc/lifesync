@@ -55,9 +55,18 @@ const ChangeForm = ({ onSubmit, onCancel, initialData }) => {
           </FormGroup>
           <FormGroup>
             <Label htmlFor="status">Status</Label>
-            <Select id="status" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+            <Select
+              id="status"
+              value={formData.status}
+              onChange={e => setFormData({...formData, status: e.target.value})}
+              disabled={initialData?.status === 'archived'}
+            >
               <option value="success">Success</option><option value="pending">Pending</option><option value="failed">Failed</option>
+              {initialData?.status === 'archived' && <option value="archived">Archived</option>}
             </Select>
+            {initialData?.status === 'archived' && (
+              <p className="text-xs text-slate-400">Unarchive this change from the list view to change its status.</p>
+            )}
           </FormGroup>
         </div>
 

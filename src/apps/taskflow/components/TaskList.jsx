@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Tag, Calendar, Timer, Check, ChevronDown, ChevronRight, MoreVertical } from 'lucide-react';
-import { formatDuration } from '../../../lib/utils';
+import { Edit2, Trash2, Tag, Calendar, Timer, Check, ChevronDown, ChevronRight, MoreVertical, AlertTriangle } from 'lucide-react';
+import { formatDuration, safeGetDate } from '../../../lib/utils';
 
 const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFilterStatus }) => {
   const [expandedTask, setExpandedTask] = useState(null);
@@ -35,10 +35,19 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
       
       <div className="divide-y divide-slate-100">
         {displayedTasks.map(task => {
-          const subCompleted = task.subtasks?.filter(s => s.completed).length || 0; 
-          const subTotal = task.subtasks?.length || 0; 
-          const progress = task.progress ?? (subTotal > 0 ? (subCompleted / subTotal) * 100 : 0);
-          
+          const subCompleted = task.subtasks?.filter(s => s.completed).length || 0;
+          const subTotal = task.subtasks?.length || 0;
+          const progress = subTotal > 0 ? (subCompleted / subTotal) * 100 : (task.progress ?? 0);
+
+          const taskTimeSpent = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
+          const subtaskTimeSpent = (task.subtasks || []).reduce((acc, s) => acc + (s.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0), 0);
+          const timeSpent = taskTimeSpent + subtaskTimeSpent;
+
+          const dueDateObj = task.dueDate ? safeGetDate(task.dueDate) : null;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const isOverdue = task.status !== 'done' && dueDateObj && dueDateObj < today;
+
           return (
             <div key={task.id}>
               <div className="p-4 flex flex-col sm:flex-row justify-between items-start hover:bg-slate-50 transition-colors group">
@@ -71,13 +80,18 @@ const TaskList = ({ tasks, onEdit, onDelete, onStatusChange, filterStatus, setFi
                           <Tag size={12}/> {task.category}
                         </span>
                         {task.dueDate && (
-                          <span className="inline-flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${isOverdue ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
                             <Calendar size={12}/> {task.dueDate}
                           </span>
                         )}
-                        {task.timeSpent > 0 && (
+                        {isOverdue && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border text-red-600 bg-red-50 border-red-200 font-semibold">
+                            <AlertTriangle size={12}/> Overdue
+                          </span>
+                        )}
+                        {timeSpent > 0 && (
                           <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded flex items-center gap-1 font-medium border border-emerald-100">
-                            <Timer size={10}/> {formatDuration(task.timeSpent)}
+                            <Timer size={10}/> {formatDuration(timeSpent)}
                           </span>
                         )}
                       </div>

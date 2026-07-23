@@ -7,14 +7,16 @@ import { formatDuration } from '../../../lib/utils';
 export const useTaskExport = (tasks, chartElementId) => {
   const [exporting, setExporting] = useState(false);
 
+  const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
   const exportToCSV = (tasksToExport) => {
     const data = tasksToExport || tasks;
     const headers = ['Title', 'Status', 'Priority', 'Category', 'Due Date', 'Time Spent (mins)'];
     const rows = data.map(t => [
-      `"${(t.title || '').replace(/"/g, '""')}"`,
-      t.status,
-      t.priority,
-      t.category,
+      csvEscape(t.title),
+      csvEscape(t.status),
+      csvEscape(t.priority),
+      csvEscape(t.category),
       t.dueDate?.toDate ? t.dueDate.toDate().toLocaleDateString('en-CA') : t.dueDate,
       t.timeSpent
     ].join(','));

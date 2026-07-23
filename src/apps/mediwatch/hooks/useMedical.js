@@ -10,11 +10,9 @@ import {
   serverTimestamp, 
   updateDoc 
 } from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL, 
-  deleteObject 
+import {
+  ref,
+  deleteObject
 } from 'firebase/storage';
 import { db, storage } from '../../../lib/firebase';
 
@@ -79,11 +77,12 @@ export function useMedical(user) {
 
       if (archiveOld && dataToSave.disease) {
         console.log("Archiving old prescriptions...");
-        const toArchive = prescriptions.filter(p => 
-          !p.archived && 
-          p.patientName === dataToSave.patientName && 
-          p.doctorName === dataToSave.doctorName && 
-          p.disease === dataToSave.disease
+        const normalize = (s) => (s || '').trim().toLowerCase();
+        const toArchive = prescriptions.filter(p =>
+          !p.archived &&
+          normalize(p.patientName) === normalize(dataToSave.patientName) &&
+          normalize(p.doctorName) === normalize(dataToSave.doctorName) &&
+          normalize(p.disease) === normalize(dataToSave.disease)
         );
         const archivePromises = toArchive.map(p => archivePrescription(p.id, true));
         await Promise.all(archivePromises);
@@ -111,9 +110,17 @@ export function useMedical(user) {
     if (!user?.uid || !id) return;
     try {
       const { existingPhotos = [], newPhotos = [], ...dataToSave } = updatedData;
-      
+
       // Combine existing photos (URLs) and new photos (Base64 strings)
       const finalPhotoUrls = [...existingPhotos, ...newPhotos];
+
+      // Any previously-saved Storage-backed photo (legacy, pre-Base64) that the user removed
+      // during this edit needs to be cleaned up, or it's orphaned in Storage forever.
+      const priorPrescription = prescriptions.find((p) => p.id === id);
+      const priorPhotoUrls = priorPrescription?.photoUrls || (priorPrescription?.photoUrl ? [priorPrescription.photoUrl] : []);
+      const removedStorageUrls = priorPhotoUrls.filter(
+        (url) => !existingPhotos.includes(url) && !url.startsWith('data:')
+      );
 
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'prescriptions', id);
       await updateDoc(docRef, {
@@ -122,6 +129,16 @@ export function useMedical(user) {
         photoUrl: finalPhotoUrls.length > 0 ? finalPhotoUrls[0] : '',
         updatedAt: serverTimestamp(),
       });
+
+      await Promise.all(
+        removedStorageUrls.map(async (url) => {
+          try {
+            await deleteObject(ref(storage, url));
+          } catch (storageErr) {
+            console.error('Error deleting removed photo from storage:', storageErr);
+          }
+        })
+      );
     } catch (err) {
       console.error('Error updating prescription:', err);
       throw err;

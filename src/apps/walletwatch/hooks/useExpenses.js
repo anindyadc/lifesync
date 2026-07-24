@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { DEFAULT_CATEGORIES, getCategoryColor } from '../constants';
 
 export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null) => {
-  const [expenses, setExpenses] = useState([]);
   const [allExpenses, setAllExpenses] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
@@ -40,17 +39,13 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
     return () => { unsubExp(); unsubCat(); };
   }, [user, appId]);
 
-  useEffect(() => {
-    if (selectedMonth) {
-      const filtered = allExpenses.filter(exp => {
-        const expDate = exp.date.toDate();
-        return expDate.getMonth() === selectedMonth.getMonth() &&
-               expDate.getFullYear() === selectedMonth.getFullYear();
-      });
-      setExpenses(filtered);
-    } else {
-      setExpenses(allExpenses);
-    }
+  const expenses = useMemo(() => {
+    if (!selectedMonth) return allExpenses;
+    return allExpenses.filter(exp => {
+      const expDate = exp.date.toDate();
+      return expDate.getMonth() === selectedMonth.getMonth() &&
+             expDate.getFullYear() === selectedMonth.getFullYear();
+    });
   }, [selectedMonth, allExpenses]);
 
   const addCategory = async (label) => {
@@ -60,7 +55,7 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
     const id = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `cat-${Date.now()}`;
     if (categories.some(c => c.id === id)) return;
 
-    const { color, bg } = getCategoryColor(trimmed);
+    const { color, bg } = getCategoryColor(categories.length);
     const updated = [...categories, { id, label: trimmed, color, bg }];
 
     const catRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'walletConfig');
@@ -75,5 +70,5 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
     await setDoc(catRef, { categories: updated }, { merge: true });
   };
 
-  return { expenses, categories, loading, addCategory, removeCategory, setExpenses };
+  return { expenses, allExpenses, categories, loading, addCategory, removeCategory };
 };

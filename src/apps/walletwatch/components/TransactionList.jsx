@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, MoreVertical, ChevronDown, Tag, Filter, XCircle, Link2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { CreditCard, Trash2, Pencil, RefreshCcw, Folder, ChevronDown, Tag, Filter, XCircle, Link2, MapPin } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
 
 /**
@@ -14,6 +14,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
   const [expandedTransactionGroups, setExpandedTransactionGroups] = useState({});
   const [filterCategory, setFilterCategory] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [filterGroup, setFilterGroup] = useState('');
 
   const availableTags = useMemo(() => {
     const tagsSet = new Set();
@@ -23,6 +24,14 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
       }
     });
     return Array.from(tagsSet).sort();
+  }, [expenses]);
+
+  // Every expense's `group` field doubles as a trip/event tag (e.g. "Trip: Goa Dec 2025"),
+  // so this filter lets a frequent traveler isolate one trip's transactions to review/export.
+  const availableGroups = useMemo(() => {
+    const groupsSet = new Set();
+    expenses.forEach(exp => { if (exp.group) groupsSet.add(exp.group); });
+    return Array.from(groupsSet).sort();
   }, [expenses]);
 
   const expenseById = useMemo(() => {
@@ -35,9 +44,10 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     return expenses.filter(exp => {
       if (filterCategory && exp.category !== filterCategory) return false;
       if (filterTag && (!exp.tags || !exp.tags.includes(filterTag))) return false;
+      if (filterGroup && exp.group !== filterGroup) return false;
       return true;
     });
-  }, [expenses, filterCategory, filterTag]);
+  }, [expenses, filterCategory, filterTag, filterGroup]);
 
   const groupedData = useMemo(() => {
     if (grouping === 'month') {
@@ -76,7 +86,15 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     [groupedData]
   );
 
-  useEffect(() => {
+  // Reset expand/collapse state whenever the grouping mode or the set of group
+  // labels changes — adjusted during render (React's documented pattern for
+  // "state depends on a changed prop", same as TransactionForm's lastCheckedGroup)
+  // rather than in an effect, so the same-groups snapshot echo doesn't re-collapse
+  // everything and there's no extra render pass.
+  const groupResetKey = `${grouping}|${groupKeysSignature}`;
+  const [lastGroupResetKey, setLastGroupResetKey] = useState(groupResetKey);
+  if (groupResetKey !== lastGroupResetKey) {
+    setLastGroupResetKey(groupResetKey);
     setShowAll(false);
     setShowAllGroups(false);
     setExpandedTransactionGroups({});
@@ -88,9 +106,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
       initialCollapsedState[key] = key !== firstGroup;
     });
     setCollapsedGroups(initialCollapsedState);
-    // Depend on the group-label signature, not groupedData itself, so a
-    // snapshot echo with the same groups doesn't re-collapse everything.
-  }, [grouping, groupKeysSignature]);
+  }
 
   const toggleGroup = (groupKey) => {
     setCollapsedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -261,8 +277,8 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             {availableTags.length > 0 && (
               <>
                 <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                <select 
-                  value={filterTag} 
+                <select
+                  value={filterTag}
                   onChange={(e) => setFilterTag(e.target.value)}
                   className="px-2 py-1.5 bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer max-w-[100px] truncate"
                 >
@@ -273,10 +289,28 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
                 </select>
               </>
             )}
-            {(filterCategory || filterTag) && (
+            {availableGroups.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                <MapPin size={14} className="text-slate-400" />
+                <select
+                  value={filterGroup}
+                  onChange={(e) => setFilterGroup(e.target.value)}
+                  aria-label="Filter by trip or event"
+                  className="px-2 py-1.5 bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer max-w-[120px] truncate"
+                >
+                  <option value="">All Trips</option>
+                  {availableGroups.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            {(filterCategory || filterTag || filterGroup) && (
               <button
-                onClick={() => { setFilterCategory(''); setFilterTag(''); }}
+                onClick={() => { setFilterCategory(''); setFilterTag(''); setFilterGroup(''); }}
                 className="p-1.5 mr-1 text-slate-400 hover:text-red-500 transition-colors"
+                aria-label="Clear filters"
                 title="Clear filters"
               >
                 <XCircle size={16} />
@@ -316,7 +350,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             <Filter size={28} className="text-slate-300" />
           </div>
           <h4 className="text-base font-bold text-slate-800">No transactions match your filters</h4>
-          <p className="text-sm text-slate-500 mt-2">Try changing or clearing the category and tag filters above.</p>
+          <p className="text-sm text-slate-500 mt-2">Try changing or clearing the category, tag, or trip filters above.</p>
         </div>
       ) : (
         <>
@@ -374,6 +408,9 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedEx
         {exp.reimbursementStatus === 'settled' && (
           <span className="text-[8px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Settled</span>
         )}
+        {exp.isOfficial && (
+          <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Official</span>
+        )}
       </div>
       <div className="flex items-center gap-1">
         {exp.reimbursementStatus === 'pending' && (
@@ -385,14 +422,9 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedEx
             <RefreshCcw size={16}/>
           </button>
         )}
-        <div className="relative sm:hidden">
-          <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-            <MoreVertical size={16}/>
-          </button>
-        </div>
-        <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(exp)} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14}/></button>
-          <button onClick={() => onDelete(exp.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+        <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(exp)} aria-label="Edit transaction" title="Edit" className="p-2 text-slate-400 sm:text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14}/></button>
+          <button onClick={() => onDelete(exp.id)} aria-label="Delete transaction" title="Delete" className="p-2 text-slate-400 sm:text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
         </div>
       </div>
     </div>

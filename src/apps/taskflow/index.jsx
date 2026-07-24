@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  CheckSquare, Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight
+  Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
 import { safeGetDate } from '../../lib/utils';
 
@@ -11,19 +11,68 @@ import { useTaskExport } from './hooks/useTaskExport';
 // Local Components
 import DashboardStats from './components/DashboardStats';
 import PriorityChart from './components/PriorityChart';
+import CategoryChart from './components/CategoryChart';
 import TaskReportTable from './components/TaskReportTable';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import TimeReport from './components/TimeReport';
 
+// Pure, reusable so the Dashboard's current month and its month-over-month delta can
+// both be computed the same way without duplicating the filtering logic.
+const getTasksForMonth = (tasks, date) => {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+
+  return tasks
+    .map(task => {
+      const monthlyTaskTimeLogs = (task.timeLogs || []).filter(log => {
+        const logDate = safeGetDate(log.date);
+        return logDate && logDate.getMonth() === month && logDate.getFullYear() === year;
+      });
+
+      const monthlySubtasks = (task.subtasks || [])
+        .map(subtask => {
+          const monthlySubtaskTimeLogs = (subtask.timeLogs || []).filter(log => {
+            const logDate = safeGetDate(log.date);
+            return logDate && logDate.getMonth() === month && logDate.getFullYear() === year;
+          });
+
+          if (monthlySubtaskTimeLogs.length > 0) {
+            return { ...subtask, timeLogs: monthlySubtaskTimeLogs };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      const taskDate = safeGetDate(task.dueDate);
+      const isTaskDateInMonth = taskDate && taskDate.getMonth() === month && taskDate.getFullYear() === year;
+
+      if (isTaskDateInMonth || monthlyTaskTimeLogs.length > 0 || monthlySubtasks.length > 0) {
+        return {
+          ...task,
+          timeLogs: monthlyTaskTimeLogs,
+          subtasks: monthlySubtasks,
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+};
+
+const getCompletionRate = (monthTasks) =>
+  monthTasks.length > 0 ? Math.round((monthTasks.filter(t => t.status === 'done').length / monthTasks.length) * 100) : 0;
+
 const TaskFlowApp = ({ user }) => {
   // 1. Initialize Hooks
-  const { tasks, loading, addTask, updateTask, deleteTask } = useTasks(user);
+  const { tasks, categories, loading, addTask, updateTask, deleteTask, addCategory, removeCategory } = useTasks(user);
   const { exportToCSV, exportToPDF, exporting } = useTaskExport(tasks, 'taskflow-dashboard-charts');
 
   // 2. Local State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
   const [editingTask, setEditingTask] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [dashboardDate, setDashboardDate] = useState(new Date());
@@ -51,7 +100,7 @@ const TaskFlowApp = ({ user }) => {
       const taskDate = safeGetDate(task.dueDate);
       const taskInRange = taskDate && taskDate >= dateRange.from && taskDate <= dateRange.to;
 
-      const subtaskInRange = task.subtasks?.some(subtask => 
+      const subtaskInRange = task.subtasks?.some(subtask =>
         subtask.timeLogs?.some(log => {
           const logDate = safeGetDate(log.date);
           return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
@@ -65,51 +114,18 @@ const TaskFlowApp = ({ user }) => {
   const memoizedEditingTask = useMemo(() => editingTask, [editingTask]);
 
   // 3. Derived Stats for Dashboard (Current Month)
-  const currentMonthTasks = useMemo(() => {
-    const currentMonth = dashboardDate.getMonth();
-    const currentYear = dashboardDate.getFullYear();
+  const currentMonthTasks = useMemo(() => getTasksForMonth(tasks, dashboardDate), [tasks, dashboardDate]);
 
-    return tasks
-      .map(task => {
-        const monthlyTaskTimeLogs = (task.timeLogs || []).filter(log => {
-          const logDate = safeGetDate(log.date);
-          return logDate && logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
-        });
-
-        const monthlySubtasks = (task.subtasks || [])
-          .map(subtask => {
-            const monthlySubtaskTimeLogs = (subtask.timeLogs || []).filter(log => {
-              const logDate = safeGetDate(log.date);
-              return logDate && logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
-            });
-
-            if (monthlySubtaskTimeLogs.length > 0) {
-              return { ...subtask, timeLogs: monthlySubtaskTimeLogs };
-            }
-            return null;
-          })
-          .filter(Boolean);
-
-        const taskDate = safeGetDate(task.dueDate);
-        const isTaskDateInMonth = taskDate && taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
-
-        if (isTaskDateInMonth || monthlyTaskTimeLogs.length > 0 || monthlySubtasks.length > 0) {
-          return {
-            ...task,
-            timeLogs: monthlyTaskTimeLogs,
-            subtasks: monthlySubtasks,
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean);
+  const previousCompletionRate = useMemo(() => {
+    const prevDate = new Date(dashboardDate.getFullYear(), dashboardDate.getMonth() - 1, 1);
+    const prevMonthTasks = getTasksForMonth(tasks, prevDate);
+    return prevMonthTasks.length > 0 ? getCompletionRate(prevMonthTasks) : null;
   }, [tasks, dashboardDate]);
-  
+
   const totalTimeSpent = useMemo(() => {
     return currentMonthTasks.reduce((total, task) => {
       const taskTime = (task.timeLogs || []).reduce((acc, log) => acc + log.minutes, 0);
-      const subtaskTime = (task.subtasks || []).reduce((acc, subtask) => 
+      const subtaskTime = (task.subtasks || []).reduce((acc, subtask) =>
         acc + (subtask.timeLogs || []).reduce((sAcc, log) => sAcc + log.minutes, 0), 0);
       return total + taskTime + subtaskTime;
     }, 0);
@@ -118,7 +134,7 @@ const TaskFlowApp = ({ user }) => {
   const stats = useMemo(() => ({
     total: currentMonthTasks.length,
     completed: currentMonthTasks.filter(t => t.status === 'done').length,
-    completionRate: currentMonthTasks.length > 0 ? Math.round((currentMonthTasks.filter(t => t.status === 'done').length / currentMonthTasks.length) * 100) : 0,
+    completionRate: getCompletionRate(currentMonthTasks),
     time: totalTimeSpent,
     totalSubtasks: currentMonthTasks.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0),
     completedSubtasks: currentMonthTasks.reduce((acc, t) => acc + (t.subtasks?.filter(s => s.completed).length || 0), 0)
@@ -167,6 +183,28 @@ const TaskFlowApp = ({ user }) => {
     setIsModalOpen(true);
   };
 
+  const handleToggleSubtask = async (taskId, subtaskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const updatedSubtasks = (task.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s);
+    await updateTask(taskId, { subtasks: updatedSubtasks });
+  };
+
+  const handleBulkComplete = async (ids) => {
+    await Promise.all(ids.map(id => updateTask(id, { status: 'done' })));
+  };
+
+  const handleBulkDelete = async (ids) => {
+    await Promise.all(ids.map(id => deleteTask(id)));
+  };
+
+  const handleAddCategory = () => {
+    if (newCatName.trim()) {
+      addCategory(newCatName);
+      setNewCatName('');
+    }
+  };
+
   // 5. Render
   if (loading) {
     return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-indigo-600"/></div>;
@@ -178,9 +216,9 @@ const TaskFlowApp = ({ user }) => {
       <div className="flex flex-wrap justify-between items-center bg-slate-100 p-2 rounded-xl gap-2">
         <div className="flex space-x-1">
           {['dashboard', 'tasks', 'report'].map(tab => (
-            <button 
-              key={tab} 
-              onClick={() => setActiveTab(tab)} 
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               {tab === 'tasks' ? 'My Tasks' : tab}
@@ -192,6 +230,7 @@ const TaskFlowApp = ({ user }) => {
           <button onClick={() => exportToPDF(activeTab, activeTab === 'report' ? filteredTasks : tasks)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
             {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
           </button>
+          <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Manage Categories"><Settings size={16}/></button>
           <button onClick={handleCreateNew} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"><Plus size={16}/> New Task</button>
         </div>
       </div>
@@ -210,10 +249,11 @@ const TaskFlowApp = ({ user }) => {
               </div>
             </div>
             <div className="space-y-6 bg-slate-50 p-2 rounded-xl">
-              <DashboardStats stats={stats} />
+              <DashboardStats stats={stats} previousCompletionRate={previousCompletionRate} />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 space-y-6">
                   <PriorityChart priorityData={priorityData} />
+                  <CategoryChart tasks={currentMonthTasks} categories={categories} />
                 </div>
                 <div className="lg:col-span-2">
                   <TaskReportTable tasks={currentMonthTasks} />
@@ -227,19 +267,23 @@ const TaskFlowApp = ({ user }) => {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             <TaskList
               tasks={tasks}
+              categories={categories}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}
+              onToggleSubtask={handleToggleSubtask}
+              onBulkComplete={handleBulkComplete}
+              onBulkDelete={handleBulkDelete}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
             />
           </div>
         )}
-        
+
         {activeTab === 'report' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <TimeReport 
-              tasks={filteredTasks} 
+            <TimeReport
+              tasks={filteredTasks}
               dateRange={dateRange}
               onDateChange={handleDateChange}
             />
@@ -250,11 +294,65 @@ const TaskFlowApp = ({ user }) => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <TaskForm 
-            initialData={memoizedEditingTask} 
-            onSubmit={handleSave} 
-            onCancel={() => setIsModalOpen(false)} 
+          <TaskForm
+            initialData={memoizedEditingTask}
+            categories={categories}
+            onSubmit={handleSave}
+            onCancel={() => setIsModalOpen(false)}
           />
+        </div>
+      )}
+
+      {/* Manage Categories */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-lg font-bold text-slate-800">Manage Categories</h3>
+              <button onClick={() => setIsSettingsOpen(false)} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                <X size={20}/>
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 font-medium mb-5">{categories.length} categories &middot; tap &times; to remove</p>
+
+            <div className="flex gap-2 mb-5">
+              <input
+                type="text"
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                placeholder="New category..."
+                className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
+              />
+              <button onClick={handleAddCategory} aria-label="Add category" className="shrink-0 p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-90 transition-all">
+                <Plus size={18}/>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-1 custom-scrollbar">
+              {categories.map(c => (
+                <div key={c.id} className="group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                  <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{c.label}</span>
+                  <button
+                    onClick={() => removeCategory(c.id)}
+                    aria-label={`Remove ${c.label}`}
+                    title={`Remove ${c.label}`}
+                    className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  >
+                    <X size={12}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="mt-6 w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-colors"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
     </div>

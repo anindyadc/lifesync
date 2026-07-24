@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-// SVG Donut Chart for Tasks
-const SimpleDonutChart = ({ data }) => {
+// SVG Donut Chart, shared by PriorityChart and CategoryChart — hover a slice or a
+// legend row to highlight it; the legend shows both count and share of the total.
+export const SimpleDonutChart = ({ data, hovered, onHover }) => {
   const total = data.reduce((acc, item) => acc + item.value, 0);
   if (total === 0) return <div className="h-40 flex items-center justify-center text-slate-400 text-sm">No data available</div>;
 
@@ -34,7 +35,19 @@ const SimpleDonutChart = ({ data }) => {
         {isSingleSlice ? (
           <circle cx="0" cy="0" r="1" fill={nonZeroSlices[0].color} />
         ) : (
-          slices.map((slice) => <path key={slice.key} d={slice.path} fill={slice.color} stroke="white" strokeWidth="0.05" />)
+          slices.map((slice) => (
+            <path
+              key={slice.key}
+              d={slice.path}
+              fill={slice.color}
+              stroke="white"
+              strokeWidth="0.05"
+              opacity={hovered === null || hovered === slice.key ? 1 : 0.35}
+              onMouseEnter={() => onHover?.(slice.key)}
+              onMouseLeave={() => onHover?.(null)}
+              className="transition-opacity cursor-pointer"
+            />
+          ))
         )}
         <circle cx="0" cy="0" r="0.6" fill="white" />
       </svg>
@@ -43,16 +56,30 @@ const SimpleDonutChart = ({ data }) => {
 };
 
 const PriorityChart = ({ priorityData }) => {
+  const [hovered, setHovered] = useState(null);
+  const total = priorityData.reduce((acc, d) => acc + d.value, 0);
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
       <h3 className="font-bold text-slate-800 mb-6">Task Priority</h3>
       <div className="flex flex-col items-center">
-        <SimpleDonutChart data={priorityData} />
-        <div className="flex gap-4 mt-6">
-          {priorityData.map((d) => (
-            <div key={d.name} className="flex items-center gap-2 text-xs font-medium text-slate-600">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>
-              {d.name}
+        <SimpleDonutChart data={priorityData} hovered={hovered} onHover={setHovered} />
+        <div className="w-full mt-4 space-y-1.5">
+          {priorityData.map((d, i) => (
+            <div
+              key={d.name}
+              className="flex items-center justify-between text-xs font-medium text-slate-600 px-1 py-0.5 rounded transition-opacity"
+              style={{ opacity: hovered === null || hovered === i ? 1 : 0.4 }}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <span className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span>
+                {d.name}
+              </span>
+              <span className="text-slate-400">
+                {d.value} · {total > 0 ? Math.round((d.value / total) * 100) : 0}%
+              </span>
             </div>
           ))}
         </div>

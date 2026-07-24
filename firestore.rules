@@ -52,5 +52,10 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
+    // 4. Specific rule for TaskFlow settings (custom categories), same unique-path reason
+    match /artifacts/default-app-id/users/{userId}/settings/taskConfig {
+      allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
+    }
+
   }
 }

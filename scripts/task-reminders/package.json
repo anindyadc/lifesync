@@ -1,0 +1,10 @@
+{
+  "name": "task-reminders",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone script (run by .github/workflows/task-reminders.yml) — sends a Telegram digest of TaskFlow's pending planned tasks. Deliberately isolated from the root package.json so firebase-admin never ends up in the Vite app bundle.",
+  "main": "send-reminders.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

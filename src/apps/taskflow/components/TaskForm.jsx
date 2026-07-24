@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { X, CheckSquare, Plus, Edit2, Check, Clock, Trash2 } from 'lucide-react';
+import { X, CheckSquare, Plus, Edit2, Check, Clock, Trash2, ClipboardList, ListChecks } from 'lucide-react';
 import { formatDuration, toISODate } from '../../../lib/utils';
-import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
+
+const labelClass = "block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1";
+const fieldClass = "w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none font-medium text-sm transition-all";
 
 const TimeLogModal = ({ onLog, onCancel, subtask }) => {
   const [time, setTime] = useState('');
@@ -22,43 +24,45 @@ const TimeLogModal = ({ onLog, onCancel, subtask }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
-        <h3 className="text-lg font-bold mb-4">{title}</h3>
-        <FormGroup>
-          <Label>Minutes</Label>
-          <input 
-            type="number" 
-            min="1" 
-            placeholder="Minutes" 
-            value={time} 
-            onChange={e => { setTime(e.target.value); if (error) setError(''); }}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          />
-          {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-        </FormGroup>
-        <FormGroup>
-          <Label>Date</Label>
-          <input 
-            type="date" 
-            value={date} 
-            onChange={e => setDate(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          />
-        </FormGroup>
-        <div className="flex justify-end gap-3 mt-4">
-          <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
-          <Button type="button" onClick={handleLog}>Log Time</Button>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5">
+        <h3 className="text-[15px] font-semibold text-slate-800 mb-4 flex items-center gap-1.5"><Clock className="text-indigo-600" size={16} />{title}</h3>
+        <div className="space-y-3">
+          <div>
+            <label className={labelClass}>Minutes</label>
+            <input
+              type="number"
+              min="1"
+              placeholder="Minutes"
+              value={time}
+              onChange={e => { setTime(e.target.value); if (error) setError(''); }}
+              className={fieldClass}
+            />
+            {error && <p className="text-[11px] font-semibold text-red-500 mt-1">{error}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button type="button" onClick={onCancel} className="px-3.5 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold text-sm rounded-lg transition-colors">Cancel</button>
+          <button type="button" onClick={handleLog} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors">Log Time</button>
         </div>
       </div>
     </div>
   );
 };
 
-const TaskForm = ({ initialData, onSubmit, onCancel }) => {
+const TaskForm = ({ initialData, onSubmit, onCancel, categories = [] }) => {
   const [formData, setFormData] = useState(() => {
-    const baseData = { 
-      title: '', description: '', priority: 'medium', status: 'todo', 
-      dueDate: '', category: 'General', subtasks: [], timeLogs: [], progress: 0
+    const baseData = {
+      title: '', description: '', priority: 'medium', status: 'todo',
+      dueDate: '', category: categories[0]?.id || 'General', subtasks: [], timeLogs: [], progress: 0
     };
     if (initialData) {
       return { ...baseData, ...initialData };
@@ -77,17 +81,19 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
     onSubmit(formData);
   };
 
+  const hasSubtasks = (formData.subtasks || []).length > 0;
+
   const totalTimeSpent = [
     ...(formData.timeLogs || []),
     ...(formData.subtasks || []).flatMap(s => s.timeLogs || [])
   ].reduce((acc, log) => acc + log.minutes, 0);
 
   // Subtask Helpers
-  const addSubtask = () => { 
-    if(newSubtask.trim()){ 
+  const addSubtask = () => {
+    if(newSubtask.trim()){
       const updatedSubtasks = [...(formData.subtasks || []), {id: crypto.randomUUID(), title: newSubtask, completed: false, timeLogs: []}];
-      setFormData({...formData, subtasks: updatedSubtasks}); 
-      setNewSubtask(''); 
+      setFormData({...formData, subtasks: updatedSubtasks});
+      setNewSubtask('');
     }
   };
   const toggleSubtask = (id) => setFormData({...formData, subtasks: formData.subtasks.map(s => s.id === id ? {...s, completed: !s.completed} : s)});
@@ -104,7 +110,7 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
   const saveEditSubtask = () => {
     setFormData({
       ...formData,
-      subtasks: formData.subtasks.map(s => 
+      subtasks: formData.subtasks.map(s =>
         s.id === editingSubtaskId ? { ...s, title: editingSubtaskText } : s
       )
     });
@@ -118,7 +124,7 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
     if (loggingSubtask && !loggingSubtask.isMainTask) { // It's a subtask
       setFormData({
         ...formData,
-        subtasks: formData.subtasks.map(s => 
+        subtasks: formData.subtasks.map(s =>
           s.id === loggingSubtask.id ? { ...s, timeLogs: [...(s.timeLogs || []), newLog] } : s
         )
       });
@@ -127,13 +133,13 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
     }
     setLoggingSubtask(undefined);
   };
-  
+
   const handleDeleteLog = (logToDelete) => {
     if (window.confirm('Are you sure you want to delete this time log?')) {
       if (logToDelete.subtaskId) {
         setFormData({
           ...formData,
-          subtasks: formData.subtasks.map(s => 
+          subtasks: formData.subtasks.map(s =>
             s.id === logToDelete.subtaskId ? { ...s, timeLogs: s.timeLogs.filter(l => l.id !== logToDelete.id) } : s
           )
         });
@@ -152,156 +158,193 @@ const TaskForm = ({ initialData, onSubmit, onCancel }) => {
 
   return (
     <>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-          <h3 className="text-lg font-bold">{initialData ? 'Edit Task' : 'New Task'}</h3>
-          <button onClick={onCancel}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+          <h3 className="text-[15px] font-semibold text-slate-800 flex items-center gap-1.5">
+            {initialData ? <Edit2 className="text-indigo-600" size={16} /> : <ClipboardList className="text-indigo-600" size={16} />}
+            {initialData ? 'Edit Task' : 'New Task'}
+          </h3>
+          <button type="button" onClick={onCancel} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"><X size={16}/></button>
         </div>
-        
-        <div className="flex border-b border-slate-100 bg-white shrink-0">
+
+        <div className="flex gap-1 border-b border-slate-100 bg-white shrink-0 px-2 pt-2">
           {['details', 'subtasks', 'time'].map(tab => (
-            <button 
-              key={tab} 
+            <button
+              key={tab}
               type="button"
-              onClick={() => setModalTab(tab)} 
-              className={`flex-1 py-3 text-sm font-medium border-b-2 capitalize transition-colors ${modalTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setModalTab(tab)}
+              className={`flex-1 py-2 text-xs font-semibold rounded-t-lg capitalize transition-colors border-b-2 ${modalTab === tab ? 'border-indigo-600 text-indigo-600 bg-indigo-50/60' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
             >
               {tab === 'time' ? `Time (${formatDuration(totalTimeSpent)})` : tab === 'subtasks' ? `Subtasks (${formData.subtasks?.length || 0})` : tab}
             </button>
           ))}
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1">
-          <Form id="task-form" onSubmit={handleSubmit}>
-            {modalTab === 'details' && (
-              <div className="space-y-4 animate-in fade-in">
-                {/* Details Form Groups */}
-                <FormGroup>
-                  <Label htmlFor="title">Task Title</Label>
-                  <Input id="title" type="text" placeholder="Task Title" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                </FormGroup>
-                <FormGroup>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" rows="3" placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                </FormGroup>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormGroup>
-                    <Label htmlFor="dueDate">Due Date</Label>
-                    <Input id="dueDate" type="date" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
-                  </FormGroup>
-                  <FormGroup>
-                    <Label htmlFor="category">Category</Label>
-                    <Select id="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                      <option>General</option><option>Work</option><option>Personal</option><option>Shopping</option><option>Health</option>
-                    </Select>
-                  </FormGroup>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormGroup>
-                    <Label>Priority</Label>
-                    <div className="flex gap-2">
-                      {['low', 'medium', 'high'].map(p => (
-                        <button key={p} type="button" onClick={() => setFormData({...formData, priority: p})} className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg border transition-all ${formData.priority === p ? (p === 'high' ? 'bg-red-50 border-red-500 text-red-600' : p === 'medium' ? 'bg-amber-50 border-amber-500 text-amber-600' : 'bg-emerald-50 border-emerald-500 text-emerald-600') : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}>{p}</button>
-                      ))}
-                    </div>
-                  </FormGroup>
-                  <FormGroup>
-                    <Label htmlFor="status">Status</Label>
-                    <Select id="status" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                      <option value="todo">To Do</option><option value="in-progress">In Progress</option><option value="done">Done</option>
-                    </Select>
-                  </FormGroup>
-                </div>
-                <FormGroup>
-                  <Label htmlFor="progress">Progress: {formData.progress || 0}%</Label>
-                  <input id="progress" type="range" min="0" max="100" value={formData.progress || 0} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
-                </FormGroup>
+        <form id="task-form" onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-4">
+          {modalTab === 'details' && (
+            <div className="space-y-4 animate-in fade-in">
+              <div>
+                <label className={labelClass} htmlFor="title">Task Title</label>
+                <input id="title" type="text" placeholder="Task Title" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={fieldClass} />
               </div>
-            )}
+              <div>
+                <label className={labelClass} htmlFor="description">Description</label>
+                <textarea id="description" rows="3" placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className={fieldClass} />
+              </div>
 
-            {modalTab === 'subtasks' && (
-              <div className="space-y-4 animate-in fade-in">
+              <div>
+                <label className={labelClass}>Category</label>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-0.5 custom-scrollbar">
+                  {categories.map(cat => {
+                    const isSelected = formData.category === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, category: cat.id })}
+                        style={isSelected ? { borderColor: cat.color } : {}}
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${
+                          isSelected
+                            ? `${cat.bg || 'bg-indigo-50 text-indigo-700'}`
+                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass} htmlFor="dueDate">Due Date</label>
+                  <input id="dueDate" type="date" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="status">Status</label>
+                  <select id="status" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={fieldClass}>
+                    <option value="todo">To Do</option><option value="in-progress">In Progress</option><option value="done">Done</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Priority</label>
                 <div className="flex gap-2">
-                  <input type="text" name="newSubtask" placeholder="Add subtask..." value={newSubtask} onChange={e => setNewSubtask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubtask())} className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                  <Button type="button" onClick={addSubtask}>Add</Button>
-                </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {(formData.subtasks || []).map(s => (
-                    <div key={s.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded group">
-                      <button type="button" onClick={() => toggleSubtask(s.id)}><CheckSquare size={16} className={s.completed ? 'text-indigo-600' : 'text-slate-300'}/></button>
-                      {editingSubtaskId === s.id ? (
-                        <input type="text" value={editingSubtaskText} onChange={e => setEditingSubtaskText(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), saveEditSubtask())} className="flex-1 text-sm p-1 border border-indigo-300 rounded" autoFocus />
-                      ) : (
-                        <span className={`flex-1 text-sm ${s.completed && 'line-through text-slate-400'}`}>{s.title}</span>
-                      )}
-                      {s.timeLogs?.length > 0 && (
-                        <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{formatDuration(s.timeLogs.reduce((acc, log) => acc + log.minutes, 0))}</span>
-                      )}
-                      <div className="flex items-center">
-                        {editingSubtaskId === s.id ? (
-                          <button type="button" onClick={saveEditSubtask} className="p-1 text-emerald-600 hover:text-emerald-800"><Check size={16}/></button>
-                        ) : (
-                          <>
-                            <button type="button" onClick={() => setLoggingSubtask(s)} className="p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-indigo-600"><Clock size={14}/></button>
-                            <button type="button" onClick={() => startEditSubtask(s)} className="p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-indigo-600"><Edit2 size={14}/></button>
-                          </>
-                        )}
-                        <button type="button" onClick={() => removeSubtask(s.id)}><X size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600"/></button>
-                      </div>
-                    </div>
+                  {['low', 'medium', 'high'].map(p => (
+                    <button key={p} type="button" onClick={() => setFormData({...formData, priority: p})} className={`flex-1 py-1.5 text-[11px] font-bold uppercase rounded-lg border transition-all ${formData.priority === p ? (p === 'high' ? 'bg-red-50 border-red-500 text-red-600' : p === 'medium' ? 'bg-amber-50 border-amber-500 text-amber-600' : 'bg-emerald-50 border-emerald-500 text-emerald-600') : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}>{p}</button>
                   ))}
                 </div>
-                {(!formData.subtasks || formData.subtasks.length === 0) && <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg">No subtasks yet</div>}
               </div>
-            )}
 
-            {modalTab === 'time' && (
-              <div className="space-y-4 animate-in fade-in">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-bold">Time Logs</h4>
-                  <Button type="button" onClick={() => setLoggingSubtask({ isMainTask: true })}><Plus size={16}/> Log Time</Button>
-                </div>
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {(formData.timeLogs || []).map(log => (
-                    <div key={log.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                      <div>
-                        <span className="font-medium">{formatDuration(log.minutes)}</span>
-                        <span className="text-xs text-slate-500 ml-2">{log.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {/* Removed Edit button */}
-                        <button onClick={() => handleDeleteLog(log)}><Trash2 size={14} className="text-slate-400 hover:text-red-600"/></button>
-                      </div>
-                    </div>
-                  ))}
-                  {(formData.subtasks || []).map(s => (
-                    (s.timeLogs || []).map(log => (
-                      <div key={log.id} className="flex items-center justify-between p-2 pl-6 bg-slate-50 rounded">
-                        <div>
-                          <span className="font-medium">{formatDuration(log.minutes)}</span>
-                          <span className="text-xs text-slate-500 ml-2">{log.date} on <span className="font-semibold">{s.title}</span></span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {/* Removed Edit button */}
-                          <button onClick={() => handleDeleteLog({...log, subtaskId: s.id})}><Trash2 size={14} className="text-slate-400 hover:text-red-600"/></button>
-                        </div>
-                      </div>
-                    ))
-                  ))}
-                  {totalTimeSpent === 0 && <div className="text-center py-6 text-slate-400 text-sm">No time logged yet.</div>}
-                </div>
+              <div>
+                <label className={labelClass}>
+                  Progress: {hasSubtasks ? Math.round((formData.subtasks.filter(s => s.completed).length / formData.subtasks.length) * 100) : (formData.progress || 0)}%
+                </label>
+                <input
+                  id="progress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  disabled={hasSubtasks}
+                  value={hasSubtasks ? Math.round((formData.subtasks.filter(s => s.completed).length / formData.subtasks.length) * 100) : (formData.progress || 0)}
+                  onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })}
+                  className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-indigo-600 [&::-moz-range-thumb]:cursor-pointer"
+                />
+                {hasSubtasks && (
+                  <p className="text-[11px] font-medium text-slate-400 mt-1">Auto-calculated from subtask completion — switch to the Subtasks tab to change it.</p>
+                )}
               </div>
-            )}
-          </Form>
-        </div>
-        
-        <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
-          <Button type="button" onClick={onCancel} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
-          <Button type="submit" form="task-form">Save Task</Button>
+            </div>
+          )}
+
+          {modalTab === 'subtasks' && (
+            <div className="space-y-3 animate-in fade-in">
+              <div className="flex gap-2">
+                <input type="text" name="newSubtask" placeholder="Add subtask..." value={newSubtask} onChange={e => setNewSubtask(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSubtask())} className={fieldClass} />
+                <button type="button" onClick={addSubtask} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors shrink-0">Add</button>
+              </div>
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {(formData.subtasks || []).map(s => (
+                  <div key={s.id} className="flex items-center gap-1.5 p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors group">
+                    <button type="button" onClick={() => toggleSubtask(s.id)} className="p-1 rounded-md hover:bg-white transition-colors shrink-0"><CheckSquare size={16} className={s.completed ? 'text-indigo-600' : 'text-slate-300'}/></button>
+                    {editingSubtaskId === s.id ? (
+                      <input type="text" value={editingSubtaskText} onChange={e => setEditingSubtaskText(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), saveEditSubtask())} className="flex-1 text-sm px-2 py-1 bg-white border border-indigo-300 rounded-md focus:ring-2 focus:ring-indigo-500/40 outline-none" autoFocus />
+                    ) : (
+                      <span className={`flex-1 text-sm truncate ${s.completed && 'line-through text-slate-400'}`}>{s.title}</span>
+                    )}
+                    {s.timeLogs?.length > 0 && (
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">{formatDuration(s.timeLogs.reduce((acc, log) => acc + log.minutes, 0))}</span>
+                    )}
+                    <div className="flex items-center shrink-0">
+                      {editingSubtaskId === s.id ? (
+                        <button type="button" onClick={saveEditSubtask} className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"><Check size={15}/></button>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => setLoggingSubtask(s)} className="p-1.5 rounded-md text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-white hover:text-indigo-600 transition-colors"><Clock size={14}/></button>
+                          <button type="button" onClick={() => startEditSubtask(s)} className="p-1.5 rounded-md text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-white hover:text-indigo-600 transition-colors"><Edit2 size={14}/></button>
+                        </>
+                      )}
+                      <button type="button" onClick={() => removeSubtask(s.id)} className="p-1.5 rounded-md text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-white hover:text-red-600 transition-colors"><X size={14}/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {(!formData.subtasks || formData.subtasks.length === 0) && (
+                <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg">
+                  <ListChecks size={20} className="mx-auto mb-2 text-slate-300" />
+                  No subtasks yet
+                </div>
+              )}
+            </div>
+          )}
+
+          {modalTab === 'time' && (
+            <div className="space-y-3 animate-in fade-in">
+              <div className="flex justify-between items-center">
+                <h4 className="font-semibold text-sm text-slate-800">Time Logs</h4>
+                <button type="button" onClick={() => setLoggingSubtask({ isMainTask: true })} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors"><Plus size={14}/> Log Time</button>
+              </div>
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {(formData.timeLogs || []).map(log => (
+                  <div key={log.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors">
+                    <div>
+                      <span className="text-sm font-semibold">{formatDuration(log.minutes)}</span>
+                      <span className="text-xs text-slate-500 ml-2">{log.date}</span>
+                    </div>
+                    <button onClick={() => handleDeleteLog(log)} className="p-1.5 rounded-md text-slate-400 hover:bg-white hover:text-red-600 transition-colors"><Trash2 size={14}/></button>
+                  </div>
+                ))}
+                {(formData.subtasks || []).map(s => (
+                  (s.timeLogs || []).map(log => (
+                    <div key={log.id} className="flex items-center justify-between p-2 pl-6 bg-slate-50 rounded-lg hover:bg-slate-100/70 transition-colors">
+                      <div>
+                        <span className="text-sm font-semibold">{formatDuration(log.minutes)}</span>
+                        <span className="text-xs text-slate-500 ml-2">{log.date} on <span className="font-semibold">{s.title}</span></span>
+                      </div>
+                      <button onClick={() => handleDeleteLog({...log, subtaskId: s.id})} className="p-1.5 rounded-md text-slate-400 hover:bg-white hover:text-red-600 transition-colors"><Trash2 size={14}/></button>
+                    </div>
+                  ))
+                ))}
+                {totalTimeSpent === 0 && (
+                  <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg">
+                    <Clock size={20} className="mx-auto mb-2 text-slate-300" />
+                    No time logged yet
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </form>
+
+        <div className="px-5 py-2.5 border-t border-slate-100 flex justify-end gap-2 bg-white shrink-0">
+          <button type="button" onClick={onCancel} className="px-3.5 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold text-sm rounded-lg transition-colors">Cancel</button>
+          <button type="submit" form="task-form" className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors">Save Task</button>
         </div>
       </div>
       {(loggingSubtask !== undefined) && (
-        <TimeLogModal 
+        <TimeLogModal
           subtask={loggingSubtask}
           onLog={handleLogTime}
           onCancel={handleCancelTimeLog}

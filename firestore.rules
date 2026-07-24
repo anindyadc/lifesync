@@ -52,5 +52,22 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
+    // 4. Specific rule for TaskFlow settings (custom categories), same unique-path reason
+    match /artifacts/default-app-id/users/{userId}/settings/taskConfig {
+      allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
+    }
+
+    // 5. Specific rule for TaskFlow's Quick List — its own top-level collection
+    // ("quickTasks") would otherwise make the generic rule #2 check for
+    // 'quickTasks' in allowedApps instead of 'taskflow', so it needs an explicit block.
+    match /artifacts/default-app-id/users/{userId}/quickTasks/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
+    }
+
+    // 6. Specific rule for WalletWatch's Misc Expense draft, same unique-path reason as walletConfig
+    match /artifacts/default-app-id/users/{userId}/settings/miscExpenseDraft {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
   }
 }

@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { formatDuration } from '../../../lib/utils';
+import { getTaskMinutes } from './useTasks';
 
 export const useTaskExport = (tasks, chartElementId) => {
   const [exporting, setExporting] = useState(false);
@@ -18,7 +19,7 @@ export const useTaskExport = (tasks, chartElementId) => {
       csvEscape(t.priority),
       csvEscape(t.category),
       t.dueDate?.toDate ? t.dueDate.toDate().toLocaleDateString('en-CA') : t.dueDate,
-      t.timeSpent
+      getTaskMinutes(t)
     ].join(','));
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -74,7 +75,7 @@ export const useTaskExport = (tasks, chartElementId) => {
 
       autoTable(doc, {
         head: [['Title', 'Status', 'Priority', 'Category', 'Time']],
-        body: data.map(t => [t.title, t.status, t.priority, t.category, formatDuration(t.timeSpent)]),
+        body: data.map(t => [t.title, t.status, t.priority, t.category, formatDuration(getTaskMinutes(t))]),
         startY: yPos,
         styles: { fontSize: 9 },
         headStyles: { fillColor: [79, 70, 229] }

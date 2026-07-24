@@ -38,7 +38,9 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
 
   const handleDateInputChange = (e) => {
     const { name, value } = e.target;
-    onDateChange({ ...dateRange, [name]: new Date(value) });
+    // safeGetDate, not `new Date(value)` — a raw 'YYYY-MM-DD' string parses as UTC and
+    // would silently shift the boundary day for users east of UTC.
+    onDateChange({ ...dateRange, [name]: safeGetDate(value) });
   };
 
   return (

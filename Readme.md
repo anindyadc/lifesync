@@ -6,7 +6,7 @@ This guide details the complete process for setting up, securing, and deploying 
 
 LifeSync is a multi-module React application designed to help you organize different aspects of your life. It uses Firebase for a secure backend and includes several apps:
 
-*   **Taskflow:** A powerful task manager where you can create tasks, add detailed subtasks, and track completion progress. Progress can be automatically calculated from subtasks or set manually for greater control. Time logs can be added and deleted for both tasks and subtasks, but not directly edited. If changes are needed, users should delete and re-add the time entry. The time report now includes 'From' and 'To' date selectors, allowing users to filter reported time logs. This filter is applied to both the displayed data and the CSV/PDF export options.
+*   **Taskflow:** A powerful task manager where you can create tasks, add detailed subtasks, and track completion progress. Progress can be automatically calculated from subtasks or set manually for greater control. Time logs can be added and deleted for both tasks and subtasks, but not directly edited. If changes are needed, users should delete and re-add the time entry. Categories are user-editable (with their own colors/icons) via a Manage Categories screen, and "My Tasks" supports search, priority/category filters, sorting, and bulk mark-done/delete. The dashboard shows a KPI summary (with a month-over-month completion-rate trend) alongside Priority and Category breakdown charts and a detailed report table. The time report includes 'From' and 'To' date selectors, allowing users to filter reported time logs; this filter is applied to both the displayed data and the CSV/PDF export options, which now always match what's shown on screen.
 *   **WalletWatch:** An expense tracker with an advanced, collapsible transaction history and a monthly dashboard view. Users can view transactions chronologically and group them by month, event, or individually, with search, a date range, multi-select filters (category, tags, trips, payment accounts/modes), and sort by date or amount — plus its own CSV/PDF export scoped to whatever's currently filtered. Each history group shows a Spent/Lent/Official breakdown rather than a single mixed total. The dashboard shows a KPI summary (spend, pending reimbursement, average daily spend, transaction count) alongside spending-trend, category, payment-mode/account, and top trips/events charts, and lets users click into any breakdown to instantly view the underlying transaction details. The interface also includes smart autocomplete for tags, event groups, and payment accounts.
 *   **IncidentLogger:** A tool for logging incidents. Users can now edit existing incident details and permanently delete reported incidents.
 *   **ChangeManager:** A utility for managing changes, now with full functionality to add, edit, delete, and archive change log entries. The previous network connection issues related to Firebase environment variables have also been resolved.
@@ -272,6 +272,22 @@ To secure your app online, we will store the database credentials in GitHub's se
 | VITE\_FIREBASE\_MESSAGING\_SENDER\_ID | Your Sender ID |
 | VITE\_FIREBASE\_APP\_ID | Your App ID |
 | VITE\_INVESTMENT\_SECRET\_KEY | Random secret used to encrypt Investment amounts |
+
+4. **(Optional) TaskFlow Telegram Reminders:**  
+   A daily digest of pending planned tasks (due today or overdue) can be sent to Telegram via a scheduled GitHub Actions workflow (`.github/workflows/task-reminders.yml`) — no paid Firebase plan or extra hosting needed, since it never touches Cloud Functions and Firestore access itself stays on the free Spark plan.  
+   * **Get a Telegram bot token and chat ID** (skip if you already have both): message [@BotFather](https://t.me/BotFather) on Telegram, run `/newbot` and follow the prompts to get a bot token; then message your new bot once and visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser to find your numeric `chat.id`.  
+   * **Get a Firebase service account key:** Firebase Console \> Project Settings (gear icon) \> **Service Accounts** tab \> **Generate new private key** — downloads a JSON file. This grants full Firestore access, so treat it like a password.  
+   * **Get your Firebase Auth UID:** Firebase Console \> **Build** \> **Authentication** \> **Users** \> copy the UID next to your account (this is who the reminder checks tasks for).  
+   * **Add these as GitHub repository secrets** (same Settings \> Secrets and variables \> Actions screen as above):
+
+| Secret Name | Description |
+| :---- | :---- |
+| FIREBASE\_SERVICE\_ACCOUNT | The entire downloaded service-account JSON file, pasted as-is |
+| TARGET\_UID | Your Firebase Auth UID |
+| TELEGRAM\_BOT\_TOKEN | Your bot token from @BotFather |
+| TELEGRAM\_CHAT\_ID | Your numeric Telegram chat ID |
+
+   * Once all four secrets are set, go to the **Actions** tab \> **TaskFlow Telegram Reminders** \> **Run workflow** to send a test digest immediately, without waiting for the daily 08:00 IST schedule.
 
 ## **Phase 5: GitHub Pages Deployment**
 

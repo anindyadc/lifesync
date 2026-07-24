@@ -64,5 +64,10 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
     }
 
+    // 6. Specific rule for WalletWatch's Misc Expense draft, same unique-path reason as walletConfig
+    match /artifacts/default-app-id/users/{userId}/settings/miscExpenseDraft {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
   }
 }

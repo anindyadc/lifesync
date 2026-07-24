@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Settings, Plus, X, Loader2, FileText, Download } from 'lucide-react';
+import { Settings, Plus, X, Loader2, FileText, Download, Wallet } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import Dashboard from './components/DashboardStats';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import ConfirmModal from './components/ConfirmModal';
+import MiscExpenseModal from './components/MiscExpenseModal';
 import { useExpenses } from './hooks/useExpenses';
 import { useExport } from './hooks/useExport';
+import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -17,10 +19,12 @@ const WalletWatchApp = ({ user }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const { expenses, allExpenses, categories, loading, addCategory, removeCategory } = useExpenses(user, 'default-app-id', selectedMonth);
   const { exportToCSV, exportToPDF, exporting } = useExport(expenses, categories, 'walletwatch-dashboard-charts');
+  const { draftItems, addDraftItem, removeDraftItem, clearDraft } = useMiscExpenseDraft(user);
 
   const [view, setView] = useState('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isMiscOpen, setIsMiscOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -196,6 +200,18 @@ const WalletWatchApp = ({ user }) => {
             <Settings size={20}/>
           </button>
           <button
+            onClick={() => setIsMiscOpen(true)}
+            className="relative flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 text-sm font-bold hover:bg-slate-100 transition-all active:scale-95"
+            title="Misc Expenses — jot down small spends across the day, save later as one transaction"
+          >
+            <Wallet size={16} /> Misc
+            {draftItems.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-indigo-600 text-white text-[10px] font-bold rounded-full">
+                {draftItems.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => { setEditingId(null); setRelatedTxn(null); setIsAddOpen(true); }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all active:scale-95"
           >
@@ -225,6 +241,28 @@ const WalletWatchApp = ({ user }) => {
           />
         )}
       </div>
+
+      {isMiscOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] flex items-end sm:items-center justify-center"
+          onClick={() => setIsMiscOpen(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MiscExpenseModal
+              draftItems={draftItems}
+              categories={categories}
+              onAddItem={addDraftItem}
+              onRemoveItem={removeDraftItem}
+              onSaveAsTransaction={(payload) => handleSave(payload, false)}
+              onDiscardAll={clearDraft}
+              onCancel={() => setIsMiscOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {isAddOpen && (
         <div

@@ -176,12 +176,19 @@ const WalletWatchApp = ({ user }) => {
           </button>
         </div>
         <div className="flex gap-2 justify-end w-full sm:w-auto">
-          <button onClick={exportToCSV} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" title="Export CSV">
-            <FileText size={20}/>
-          </button>
-          <button onClick={exportToPDF} disabled={exporting} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50" title="Export PDF">
-            {exporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20}/>}
-          </button>
+          {/* Scoped to the Dashboard tab's selected month — History has its own
+              export buttons (in TransactionList) scoped to its filtered results,
+              since the two views can show very different data. */}
+          {view === 'dashboard' && (
+            <>
+              <button onClick={exportToCSV} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" title="Export CSV">
+                <FileText size={20}/>
+              </button>
+              <button onClick={exportToPDF} disabled={exporting} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 disabled:opacity-50" title="Export PDF">
+                {exporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20}/>}
+              </button>
+            </>
+          )}
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2.5 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"

@@ -4,14 +4,9 @@ import {
   TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X
 } from 'lucide-react';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
-import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE } from '../constants';
+import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart } from './OverviewCharts';
-
-// "Personal" spend excludes pending lent amounts (not yet actually spent) AND
-// Official-trip expenses (employer-reimbursed, reported separately — see
-// OfficialTripsSummary below).
-const isSettledSpend = (e) => Number(e.amount) < 0 && e.reimbursementStatus !== 'pending' && !e.isOfficial;
 
 const monthKey = (d) => `${d.getFullYear()}-${d.getMonth()}`;
 
@@ -694,8 +689,7 @@ export const PaymentAccountBreakdown = ({ expenses, categories }) => {
   const data = useMemo(() => {
     const map = {};
     expenses.filter(e => e.amount < 0 && !e.isOfficial).forEach(e => {
-      const modeLabel = PAYMENT_MODES.find(m => m.id === e.paymentMode)?.label || e.paymentMode || 'Other';
-      const key = e.paymentAccount && e.paymentAccount.trim() ? e.paymentAccount.trim() : modeLabel;
+      const key = getAccountKey(e);
       if (!map[key]) map[key] = { total: 0, items: [] };
       map[key].total += Math.abs(Number(e.amount) || 0);
       map[key].items.push(e);

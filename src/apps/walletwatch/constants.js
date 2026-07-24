@@ -3,7 +3,7 @@
  * Centralized configuration for categories and payment modes.
  */
 
-import { Smartphone, Banknote, CreditCard } from 'lucide-react';
+import { Smartphone, Banknote, CreditCard, Utensils, Plane, ShoppingBag, Receipt, HeartPulse, Film, MoreHorizontal, Wallet } from 'lucide-react';
 
 // Validated categorical palette (CVD-checked via the dataviz skill's validate_palette.js —
 // all 8 slots pass the lightness/chroma/CVD-separation checks). Fixed order: assignment is
@@ -37,6 +37,21 @@ export const DEFAULT_CATEGORIES = [
   { id: 'other', label: 'Other', ...CATEGORICAL_PALETTE[7] },
 ];
 
+// Icons for the fixed default category ids, used by TransactionList's row avatar so
+// entries are scannable at a glance instead of every row showing the same CreditCard
+// glyph. Custom user-added categories (arbitrary ids) fall back to DEFAULT_CATEGORY_ICON.
+export const CATEGORY_ICONS = {
+  food: Utensils,
+  travel: Plane,
+  shopping: ShoppingBag,
+  utilities: Receipt,
+  health: HeartPulse,
+  entertainment: Film,
+  reimbursement: Banknote,
+  other: MoreHorizontal,
+};
+export const DEFAULT_CATEGORY_ICON = Wallet;
+
 export const PAYMENT_MODES = [
   { id: 'upi', label: 'UPI', icon: Smartphone, ...CATEGORICAL_PALETTE[0] },
   { id: 'cash', label: 'Cash', icon: Banknote, ...CATEGORICAL_PALETTE[1] },
@@ -47,3 +62,18 @@ export const PAYMENT_MODES = [
 // at the time a new one is added) — deterministic, not a content hash.
 export const getCategoryColor = (existingCount) =>
   CATEGORICAL_PALETTE[existingCount % CATEGORICAL_PALETTE.length];
+
+// "Personal" spend excludes pending lent amounts (not yet actually spent) AND
+// Official-trip expenses (employer-reimbursed, reported separately). Shared by
+// DashboardStats' KPIs/charts and TransactionList's group subtotals so "spent"
+// means the same thing everywhere in the app instead of a raw signed-amount sum.
+export const isSettledSpend = (e) => Number(e.amount) < 0 && e.reimbursementStatus !== 'pending' && !e.isOfficial;
+
+// Account identity for grouping/filtering: the free-text account if set (e.g. "GPay-300"),
+// otherwise the Payment Mode's label (e.g. plain "Cash") — shared by the Dashboard's
+// PaymentAccountBreakdown and TransactionList's account filter/badge so both agree on
+// what "an account" is.
+export const getAccountKey = (e) => {
+  const modeLabel = PAYMENT_MODES.find(m => m.id === e.paymentMode)?.label || e.paymentMode || 'Other';
+  return e.paymentAccount && e.paymentAccount.trim() ? e.paymentAccount.trim() : modeLabel;
+};

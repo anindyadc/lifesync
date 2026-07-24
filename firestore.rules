@@ -57,5 +57,12 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
     }
 
+    // 5. Specific rule for TaskFlow's Quick List — its own top-level collection
+    // ("quickTasks") would otherwise make the generic rule #2 check for
+    // 'quickTasks' in allowedApps instead of 'taskflow', so it needs an explicit block.
+    match /artifacts/default-app-id/users/{userId}/quickTasks/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('taskflow');
+    }
+
   }
 }

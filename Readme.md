@@ -273,6 +273,22 @@ To secure your app online, we will store the database credentials in GitHub's se
 | VITE\_FIREBASE\_APP\_ID | Your App ID |
 | VITE\_INVESTMENT\_SECRET\_KEY | Random secret used to encrypt Investment amounts |
 
+4. **(Optional) TaskFlow Telegram Reminders:**  
+   A daily digest of pending planned tasks (due today or overdue) can be sent to Telegram via a scheduled GitHub Actions workflow (`.github/workflows/task-reminders.yml`) — no paid Firebase plan or extra hosting needed, since it never touches Cloud Functions and Firestore access itself stays on the free Spark plan.  
+   * **Get a Telegram bot token and chat ID** (skip if you already have both): message [@BotFather](https://t.me/BotFather) on Telegram, run `/newbot` and follow the prompts to get a bot token; then message your new bot once and visit `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser to find your numeric `chat.id`.  
+   * **Get a Firebase service account key:** Firebase Console \> Project Settings (gear icon) \> **Service Accounts** tab \> **Generate new private key** — downloads a JSON file. This grants full Firestore access, so treat it like a password.  
+   * **Get your Firebase Auth UID:** Firebase Console \> **Build** \> **Authentication** \> **Users** \> copy the UID next to your account (this is who the reminder checks tasks for).  
+   * **Add these as GitHub repository secrets** (same Settings \> Secrets and variables \> Actions screen as above):
+
+| Secret Name | Description |
+| :---- | :---- |
+| FIREBASE\_SERVICE\_ACCOUNT | The entire downloaded service-account JSON file, pasted as-is |
+| TARGET\_UID | Your Firebase Auth UID |
+| TELEGRAM\_BOT\_TOKEN | Your bot token from @BotFather |
+| TELEGRAM\_CHAT\_ID | Your numeric Telegram chat ID |
+
+   * Once all four secrets are set, go to the **Actions** tab \> **TaskFlow Telegram Reminders** \> **Run workflow** to send a test digest immediately, without waiting for the daily 08:00 IST schedule.
+
 ## **Phase 5: GitHub Pages Deployment**
 
 We will use a GitHub Action to build the app, inject the secret keys, and deploy it.

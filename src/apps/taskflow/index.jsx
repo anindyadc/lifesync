@@ -6,6 +6,7 @@ import { safeGetDate } from '../../lib/utils';
 
 // Custom Hooks
 import { useTasks } from './hooks/useTasks';
+import { useQuickTasks } from './hooks/useQuickTasks';
 import { useTaskExport } from './hooks/useTaskExport';
 
 // Local Components
@@ -16,6 +17,7 @@ import TaskReportTable from './components/TaskReportTable';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import TimeReport from './components/TimeReport';
+import QuickList from './components/QuickList';
 
 // Pure, reusable so the Dashboard's current month and its month-over-month delta can
 // both be computed the same way without duplicating the filtering logic.
@@ -66,6 +68,7 @@ const getCompletionRate = (monthTasks) =>
 const TaskFlowApp = ({ user }) => {
   // 1. Initialize Hooks
   const { tasks, categories, loading, addTask, updateTask, deleteTask, addCategory, removeCategory } = useTasks(user);
+  const { quickTasks, addQuickTask, toggleQuickTask, deleteQuickTask } = useQuickTasks(user);
   const { exportToCSV, exportToPDF, exporting } = useTaskExport(tasks, 'taskflow-dashboard-charts');
 
   // 2. Local State
@@ -215,21 +218,25 @@ const TaskFlowApp = ({ user }) => {
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center bg-slate-100 p-2 rounded-xl gap-2">
         <div className="flex space-x-1">
-          {['dashboard', 'tasks', 'report'].map(tab => (
+          {['dashboard', 'tasks', 'quicklist', 'report'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              {tab === 'tasks' ? 'My Tasks' : tab}
+              {tab === 'tasks' ? 'My Tasks' : tab === 'quicklist' ? 'Quick List' : tab}
             </button>
           ))}
         </div>
         <div className="flex gap-2 pr-2">
-          <button onClick={() => exportToCSV(activeTab === 'report' ? filteredTasks : tasks)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
-          <button onClick={() => exportToPDF(activeTab, activeTab === 'report' ? filteredTasks : tasks)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
-            {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
-          </button>
+          {activeTab !== 'quicklist' && (
+            <>
+              <button onClick={() => exportToCSV(activeTab === 'report' ? filteredTasks : tasks)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
+              <button onClick={() => exportToPDF(activeTab, activeTab === 'report' ? filteredTasks : tasks)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
+                {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
+              </button>
+            </>
+          )}
           <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Manage Categories"><Settings size={16}/></button>
           <button onClick={handleCreateNew} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"><Plus size={16}/> New Task</button>
         </div>
@@ -276,6 +283,17 @@ const TaskFlowApp = ({ user }) => {
               onBulkDelete={handleBulkDelete}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
+            />
+          </div>
+        )}
+
+        {activeTab === 'quicklist' && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <QuickList
+              quickTasks={quickTasks}
+              onAdd={addQuickTask}
+              onToggle={toggleQuickTask}
+              onDelete={deleteQuickTask}
             />
           </div>
         )}

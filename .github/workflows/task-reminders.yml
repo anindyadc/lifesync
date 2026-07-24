@@ -1,0 +1,32 @@
+name: TaskFlow Telegram Reminders
+
+on:
+  schedule:
+    # 08:00 IST daily (IST = UTC+5:30)
+    - cron: '30 2 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: scripts/task-reminders
+        run: npm ci
+
+      - name: Send reminders
+        working-directory: scripts/task-reminders
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TARGET_UID: ${{ secrets.TARGET_UID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node send-reminders.js

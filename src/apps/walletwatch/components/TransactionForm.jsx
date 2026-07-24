@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle2, Loader2, X } from 'lucide-react';
 import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
@@ -38,6 +38,43 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
   const [showDetails, setShowDetails] = useState(!!initialData || isSettling);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+
+  // Batch mode — for combining several small same-day spends (tea, auto, snacks...)
+  // into one transaction instead of logging each as its own row.
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const batchIdCounter = useRef(3);
+  const [batchItems, setBatchItems] = useState([
+    { id: 1, label: '', amount: '' },
+    { id: 2, label: '', amount: '' }
+  ]);
+  const [descriptionEdited, setDescriptionEdited] = useState(false);
+
+  const batchTotal = batchItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const batchDescription = React.useMemo(() => (
+    batchItems
+      .filter(item => Number(item.amount) > 0)
+      .map(item => (item.label.trim() ? `${item.label.trim()} (₹${Number(item.amount)})` : `₹${Number(item.amount)}`))
+      .join(', ')
+  ), [batchItems]);
+
+  // Keep the Description field synced to the itemized breakdown as rows change, unless
+  // the user has typed their own override — adjusted during render (same pattern as the
+  // group→Official default below) rather than in an effect.
+  const [lastAutoDescription, setLastAutoDescription] = useState('');
+  if (isBatchMode && !descriptionEdited && batchDescription !== lastAutoDescription) {
+    setLastAutoDescription(batchDescription);
+    setFormData(prev => ({ ...prev, description: batchDescription }));
+  }
+
+  const addBatchItem = () => {
+    setBatchItems(prev => [...prev, { id: batchIdCounter.current++, label: '', amount: '' }]);
+  };
+  const removeBatchItem = (id) => {
+    setBatchItems(prev => (prev.length > 1 ? prev.filter(item => item.id !== id) : prev));
+  };
+  const updateBatchItem = (id, field, value) => {
+    setBatchItems(prev => prev.map(item => (item.id === id ? { ...item, [field]: value } : item)));
+  };
 
   const hasAdvancedData = !!(formData.group || formData.tags || formData.isReimbursable || formData.isOfficial || formData.paymentMode !== 'upi');
 
@@ -150,9 +187,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     e.preventDefault();
     if (!formData.category || saving) return;
 
-    const amountNum = Number(formData.amount);
-    if (!formData.amount || isNaN(amountNum) || amountNum <= 0) {
-      setAmountError('Enter an amount greater than 0');
+    const amountNum = isBatchMode ? batchTotal : Number(formData.amount);
+    if (!amountNum || isNaN(amountNum) || amountNum <= 0) {
+      setAmountError(isBatchMode ? 'Add at least one expense with an amount' : 'Enter an amount greater than 0');
       return;
     }
     setAmountError('');
@@ -162,6 +199,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
       await onSubmit({
         ...formData,
         amount: amountNum,
+        description: isBatchMode ? (formData.description || batchDescription) : formData.description,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         reimbursementStatus: formData.isReimbursable ? 'pending' : 'none'
       }, keepOpen);
@@ -176,6 +214,14 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
           isReimbursable: false,
           date: toISODate(new Date()),
         }));
+        if (isBatchMode) {
+          setBatchItems([
+            { id: batchIdCounter.current++, label: '', amount: '' },
+            { id: batchIdCounter.current++, label: '', amount: '' }
+          ]);
+          setDescriptionEdited(false);
+          setLastAutoDescription('');
+        }
         setSavedCount(c => c + 1);
       }
     } finally {
@@ -206,41 +252,129 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
 
       <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-4 space-y-4">
-          {/* Amount — focal field: bigger type, same compact height as other inputs */}
-          <div>
-            <label className={labelClass}>Amount</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                value={formData.amount}
-                onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); setAmountError(''); }}
-                placeholder="0.00"
-                className="w-full pl-7 pr-3 py-2 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                required
-                autoFocus={!initialData}
-              />
-            </div>
-            {amountError && <p className="text-[11px] font-semibold text-red-500 mt-1">{amountError}</p>}
-          </div>
+          {/* Batch-mode toggle — combine several small same-day spends into one entry.
+              Only offered for fresh, non-settling entries (editing/refunds always target
+              a single existing record). */}
+          {!initialData && !isSettling && (
+            <button
+              type="button"
+              onClick={() => setIsBatchMode(v => !v)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors ${
+                isBatchMode
+                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                  : 'bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100'
+              }`}
+            >
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
+                <Layers size={13} />
+                {isBatchMode ? 'Combining multiple expenses' : 'Combine multiple small expenses'}
+              </span>
+              <ChevronDown size={14} className={`transition-transform ${isBatchMode ? 'rotate-180' : ''} ${isBatchMode ? 'text-white' : 'text-indigo-400'}`} />
+            </button>
+          )}
 
-          {/* Description */}
-          <div>
-            <label className={labelClass}>Description</label>
-            <div className="relative">
-              <Type className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              <input
-                type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="What was this for?"
-                className={`${fieldClass} pl-8`}
-              />
+          {isBatchMode ? (
+            <div className="space-y-2">
+              <label className={labelClass}>Expenses to combine</label>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
+                {batchItems.map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={item.label}
+                      onChange={(e) => updateBatchItem(item.id, 'label', e.target.value)}
+                      placeholder={`Item ${idx + 1} (e.g. Tea)`}
+                      className={`${fieldClass} flex-1 py-1.5 text-sm`}
+                    />
+                    <div className="relative w-28 shrink-0">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">₹</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={item.amount}
+                        onChange={(e) => updateBatchItem(item.id, 'amount', e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-6 pr-2 py-1.5 text-sm font-semibold bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeBatchItem(item.id)}
+                      disabled={batchItems.length <= 1}
+                      aria-label="Remove item"
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400 shrink-0"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addBatchItem}
+                className="w-full py-1.5 border border-dashed border-slate-300 text-slate-500 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/40 rounded-lg text-xs font-semibold transition-colors"
+              >
+                + Add another expense
+              </button>
+
+              <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 rounded-lg">
+                <span className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Total</span>
+                <span className="text-lg font-bold text-indigo-900">₹{batchTotal.toFixed(2)}</span>
+              </div>
+              {amountError && <p className="text-[11px] font-semibold text-red-500">{amountError}</p>}
+
+              <div>
+                <label className={labelClass}>Description (auto-generated, editable)</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setDescriptionEdited(true); }}
+                  rows={2}
+                  className={`${fieldClass} resize-none`}
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Amount — focal field: bigger type, same compact height as other inputs */}
+              <div>
+                <label className={labelClass}>Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0.01"
+                    value={formData.amount}
+                    onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); setAmountError(''); }}
+                    placeholder="0.00"
+                    className="w-full pl-7 pr-3 py-2 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    required
+                    autoFocus={!initialData}
+                  />
+                </div>
+                {amountError && <p className="text-[11px] font-semibold text-red-500 mt-1">{amountError}</p>}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={labelClass}>Description</label>
+                <div className="relative">
+                  <Type className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="What was this for?"
+                    className={`${fieldClass} pl-8`}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Category — compact, evenly-sized pills with a subtle selected state */}
           <div>

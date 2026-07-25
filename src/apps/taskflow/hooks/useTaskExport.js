@@ -4,6 +4,13 @@ import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { formatDuration } from '../../../lib/utils';
 import { getTaskMinutes } from './useTasks';
+import { getTaskType } from '../constants';
+
+const scopeLabel = (t) => {
+  const type = getTaskType(t);
+  if (type !== 'official') return 'Personal';
+  return t.office ? `Official — ${t.office}` : 'Official';
+};
 
 export const useTaskExport = (tasks, chartElementId) => {
   const [exporting, setExporting] = useState(false);
@@ -12,12 +19,13 @@ export const useTaskExport = (tasks, chartElementId) => {
 
   const exportToCSV = (tasksToExport) => {
     const data = tasksToExport || tasks;
-    const headers = ['Title', 'Status', 'Priority', 'Category', 'Due Date', 'Time Spent (mins)'];
+    const headers = ['Title', 'Status', 'Priority', 'Category', 'Scope', 'Due Date', 'Time Spent (mins)'];
     const rows = data.map(t => [
       csvEscape(t.title),
       csvEscape(t.status),
       csvEscape(t.priority),
       csvEscape(t.category),
+      csvEscape(scopeLabel(t)),
       t.dueDate?.toDate ? t.dueDate.toDate().toLocaleDateString('en-CA') : t.dueDate,
       getTaskMinutes(t)
     ].join(','));
@@ -74,8 +82,8 @@ export const useTaskExport = (tasks, chartElementId) => {
       yPos += 5;
 
       autoTable(doc, {
-        head: [['Title', 'Status', 'Priority', 'Category', 'Time']],
-        body: data.map(t => [t.title, t.status, t.priority, t.category, formatDuration(getTaskMinutes(t))]),
+        head: [['Title', 'Status', 'Priority', 'Category', 'Scope', 'Time']],
+        body: data.map(t => [t.title, t.status, t.priority, t.category, scopeLabel(t), formatDuration(getTaskMinutes(t))]),
         startY: yPos,
         styles: { fontSize: 9 },
         headStyles: { fillColor: [79, 70, 229] }

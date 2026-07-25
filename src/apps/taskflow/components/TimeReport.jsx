@@ -1,11 +1,20 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatDuration, safeGetDate, toISODate } from '../../../lib/utils';
-import { Clock } from 'lucide-react';
+import { Clock, Building2 } from 'lucide-react';
+import { TASK_TYPES, getTaskType } from '../constants';
 
-const TimeReport = ({ tasks, dateRange, onDateChange }) => {
+const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
+  const [filterType, setFilterType] = useState('');
+  const [filterOffice, setFilterOffice] = useState('');
+
+  const scopedTasks = useMemo(() => tasks.filter(t => {
+    if (filterType && getTaskType(t) !== filterType) return false;
+    if (filterOffice && t.office !== filterOffice) return false;
+    return true;
+  }), [tasks, filterType, filterOffice]);
 
   const tasksInReport = useMemo(() => {
-    return tasks.map(task => {
+    return scopedTasks.map(task => {
       const taskTimeLogs = task.timeLogs?.filter(log => {
         const logDate = safeGetDate(log.date);
         return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
@@ -27,14 +36,41 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
         subtasks: subtasksWithTime,
       };
     }).filter(task => task.timeLogs.length > 0 || task.subtasks.length > 0);
-  }, [tasks, dateRange]);
+  }, [scopedTasks, dateRange]);
 
-
-  const grandTotalMinutes = tasksInReport.reduce((total, task) => {
+  const taskTotalMinutes = (task) => {
     const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
     const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
-    return total + taskTime + subtaskTime;
-  }, 0);
+    return taskTime + subtaskTime;
+  };
+
+  const grandTotalMinutes = tasksInReport.reduce((total, task) => total + taskTotalMinutes(task), 0);
+
+  // Time-spent breakdowns for the "which office/project did my time actually go to"
+  // question — grouped from the same date-range-trimmed tasksInReport used below, so the
+  // totals always match the per-task list and the grand total exactly.
+  const byOffice = useMemo(() => {
+    const buckets = {};
+    tasksInReport.forEach(task => {
+      const taskType = getTaskType(task);
+      const key = taskType === 'official' ? (task.office || 'Unspecified office') : 'Personal';
+      const office = offices.find(o => o.id === task.office);
+      const label = taskType === 'official' ? (office?.label || task.office || 'Unspecified office') : 'Personal';
+      buckets[key] = buckets[key] || { label, minutes: 0 };
+      buckets[key].minutes += taskTotalMinutes(task);
+    });
+    return Object.values(buckets).sort((a, b) => b.minutes - a.minutes);
+  }, [tasksInReport, offices]);
+
+  const byCategory = useMemo(() => {
+    const buckets = {};
+    tasksInReport.forEach(task => {
+      const key = task.category || 'Uncategorized';
+      buckets[key] = buckets[key] || { label: key, minutes: 0 };
+      buckets[key].minutes += taskTotalMinutes(task);
+    });
+    return Object.values(buckets).sort((a, b) => b.minutes - a.minutes);
+  }, [tasksInReport]);
 
   const handleDateInputChange = (e) => {
     const { name, value } = e.target;
@@ -72,6 +108,60 @@ const TimeReport = ({ tasks, dateRange, onDateChange }) => {
           />
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mr-1">Scope:</span>
+        <select
+          value={filterType}
+          onChange={(e) => { setFilterType(e.target.value); if (e.target.value !== 'official') setFilterOffice(''); }}
+          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer"
+        >
+          <option value="">All Types</option>
+          {TASK_TYPES.map(t => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+        {filterType === 'official' && offices.length > 0 && (
+          <select
+            value={filterOffice}
+            onChange={(e) => setFilterOffice(e.target.value)}
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer max-w-[150px] truncate"
+          >
+            <option value="">All Offices</option>
+            {offices.map(o => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {tasksInReport.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div className="p-4 bg-slate-50/80 rounded-lg border border-slate-100">
+            <h4 className="font-semibold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Building2 size={14}/> Time by Office</h4>
+            <div className="space-y-1.5">
+              {byOffice.map(b => (
+                <div key={b.label} className="flex justify-between text-xs">
+                  <span className="text-slate-600">{b.label}</span>
+                  <span className="font-semibold text-slate-800">{formatDuration(b.minutes)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-4 bg-slate-50/80 rounded-lg border border-slate-100">
+            <h4 className="font-semibold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Clock size={14}/> Time by Category / Project</h4>
+            <div className="space-y-1.5">
+              {byCategory.map(b => (
+                <div key={b.label} className="flex justify-between text-xs">
+                  <span className="text-slate-600">{b.label}</span>
+                  <span className="font-semibold text-slate-800">{formatDuration(b.minutes)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {tasksInReport.map(task => {
           const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;

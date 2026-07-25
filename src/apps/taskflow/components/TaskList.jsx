@@ -1,26 +1,240 @@
 import React, { useState, useMemo } from 'react';
-import { Edit2, Trash2, Tag, Calendar, Timer, Check, ChevronDown, ChevronRight, AlertTriangle, Search, ArrowUpDown, XCircle, CheckSquare, ListChecks } from 'lucide-react';
+import { Edit2, Trash2, Calendar, Timer, Check, ChevronDown, ChevronRight, AlertTriangle, Search, ArrowUpDown, XCircle, CheckSquare, ListChecks, LayoutGrid, List } from 'lucide-react';
 import { formatDuration, safeGetDate } from '../../../lib/utils';
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../constants';
+import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, TASK_TYPES, getTaskType } from '../constants';
 
 const PRIORITY_RANK = { high: 3, medium: 2, low: 1 };
 
-const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, onToggleSubtask, onBulkComplete, onBulkDelete, filterStatus, setFilterStatus }) => {
+const VIEW_MODE_KEY = 'taskflow-tasklist-view-mode';
+
+const getPriorityColor = (p) => {
+  switch (p) {
+    case 'high': return 'text-red-600 bg-red-50 border-red-200';
+    case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
+    case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    default: return 'text-slate-600 bg-slate-50';
+  }
+};
+
+// Single source of truth for the per-task derived values (progress, time spent, overdue,
+// category/type/office lookups) so TaskCard and TaskRow render from identical data instead
+// of each recomputing it slightly differently.
+const getTaskDerived = (task, categories, offices) => {
+  const subCompleted = task.subtasks?.filter(s => s.completed).length || 0;
+  const subTotal = task.subtasks?.length || 0;
+  const progress = subTotal > 0 ? (subCompleted / subTotal) * 100 : (task.progress ?? 0);
+
+  const taskTimeSpent = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
+  const subtaskTimeSpent = (task.subtasks || []).reduce((acc, s) => acc + (s.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0), 0);
+  const timeSpent = taskTimeSpent + subtaskTimeSpent;
+
+  const dueDateObj = task.dueDate ? safeGetDate(task.dueDate) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isOverdue = task.status !== 'done' && dueDateObj && dueDateObj < today;
+
+  const category = categories.find(c => c.id === task.category);
+  const CategoryIcon = CATEGORY_ICONS[task.category] || DEFAULT_CATEGORY_ICON;
+
+  const taskType = getTaskType(task);
+  const typeInfo = TASK_TYPES.find(t => t.id === taskType);
+  const TypeIcon = typeInfo?.icon;
+  const office = offices.find(o => o.id === task.office);
+
+  return { subCompleted, subTotal, progress, timeSpent, isOverdue, category, CategoryIcon, taskType, TypeIcon, office };
+};
+
+const TaskBadges = ({ task, derived }) => (
+  <>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium capitalize border ${getPriorityColor(task.priority)}`}>
+      {task.priority}
+    </span>
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${derived.category?.bg || 'text-slate-500 bg-slate-50 border-slate-200'}`}>
+      <derived.CategoryIcon size={12}/> {derived.category?.label || task.category}
+    </span>
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${derived.taskType === 'official' ? (derived.office?.bg || 'text-indigo-600 bg-indigo-50 border-indigo-200') : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
+      {derived.TypeIcon && <derived.TypeIcon size={12}/>} {derived.taskType === 'official' ? (derived.office?.label || task.office || 'Official') : 'Personal'}
+    </span>
+    {task.dueDate && (
+      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${derived.isOverdue ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
+        <Calendar size={12}/> {task.dueDate}
+      </span>
+    )}
+    {derived.isOverdue && (
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border text-red-600 bg-red-50 border-red-200 font-semibold">
+        <AlertTriangle size={12}/> Overdue
+      </span>
+    )}
+    {derived.timeSpent > 0 && (
+      <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded flex items-center gap-1 font-medium border border-emerald-100">
+        <Timer size={10}/> {formatDuration(derived.timeSpent)}
+      </span>
+    )}
+  </>
+);
+
+const SubtaskChecklist = ({ task, onToggleSubtask, dense }) => (
+  <div className={`space-y-1 ${dense ? '' : 'pt-2 border-t border-slate-100'} animate-in fade-in`}>
+    {task.subtasks.map(s => (
+      <button
+        key={s.id}
+        type="button"
+        onClick={() => onToggleSubtask(s.id)}
+        className="flex items-center gap-2.5 w-full text-left py-1 px-1.5 -mx-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+      >
+        <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${s.completed ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+          <Check size={11} className={`text-white transition-opacity ${s.completed ? 'opacity-100' : 'opacity-0'}`} />
+        </span>
+        <span className={`text-sm ${s.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{s.title}</span>
+      </button>
+    ))}
+  </div>
+);
+
+const TaskCard = ({ task, derived, isSelected, isExpanded, onToggleExpand, onToggleSelect, onStatusChange, onEdit, onDelete, onToggleSubtask }) => (
+  <div className={`bg-white rounded-xl border p-4 flex flex-col gap-3 transition-all hover:shadow-md ${isSelected ? 'border-indigo-300 ring-1 ring-indigo-200 bg-indigo-50/30' : 'border-slate-200'}`}>
+    <div className="flex items-start gap-2.5">
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={onToggleSelect}
+        aria-label={`Select ${task.title}`}
+        className="mt-1.5 w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0"
+      />
+      <button
+        onClick={onStatusChange}
+        className={`mt-1 w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
+      >
+        <Check size={14} className={task.status === 'done' ? 'opacity-100' : 'opacity-0'} />
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <h4 className={`font-semibold text-slate-800 truncate ${task.status === 'done' ? 'line-through text-slate-400' : ''}`}>{task.title}</h4>
+        {task.description && <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">{task.description}</p>}
+      </div>
+
+      <div className="flex gap-0.5 shrink-0 -mr-1 -mt-1">
+        <button onClick={onEdit} aria-label="Edit task" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Edit2 size={15}/></button>
+        <button onClick={onDelete} aria-label="Delete task" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={15}/></button>
+      </div>
+    </div>
+
+    <div>
+      <div className="flex justify-between text-xs text-slate-500 mb-1">
+        <span>Progress</span><span>{Math.round(derived.progress)}%</span>
+      </div>
+      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${derived.progress}%` }}/>
+      </div>
+    </div>
+
+    <div className="flex flex-wrap gap-1.5">
+      <TaskBadges task={task} derived={derived} />
+    </div>
+
+    {derived.subTotal > 0 && (
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-indigo-600 -mt-0.5 self-start"
+      >
+        {isExpanded ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}
+        {derived.subCompleted}/{derived.subTotal} subtasks
+      </button>
+    )}
+
+    {isExpanded && <SubtaskChecklist task={task} onToggleSubtask={onToggleSubtask} />}
+  </div>
+);
+
+// Grid-based row (sm+) so every section — title, progress, badges, actions — is given a
+// share of the row's actual width instead of the title column stacking everything inside
+// a fixed max-w block that left the rest of a wide window empty. Below sm it collapses to
+// a single stacked column (grid-cols-1), same as the old flex-col mobile layout.
+const TaskRow = ({ task, derived, isSelected, isExpanded, onToggleExpand, onToggleSelect, onStatusChange, onEdit, onDelete, onToggleSubtask }) => (
+  <div>
+    <div className={`p-4 hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1.6fr)_minmax(150px,240px)_minmax(0,1.3fr)_auto] sm:items-center gap-x-4 gap-y-3">
+        <div className="flex gap-3 min-w-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            aria-label={`Select ${task.title}`}
+            className="mt-1.5 w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0"
+          />
+          <button
+            onClick={onStatusChange}
+            className={`mt-1 w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
+          >
+            <Check size={14} className={task.status === 'done' ? 'opacity-100' : 'opacity-0'} />
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <h4 className={`font-semibold text-slate-800 truncate ${task.status === 'done' ? 'line-through text-slate-400' : ''}`}>{task.title}</h4>
+            {task.description && <p className="text-sm text-slate-500 line-clamp-1">{task.description}</p>}
+          </div>
+        </div>
+
+        <div className="w-full pl-14 sm:pl-0">
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Progress</span><span>{Math.round(derived.progress)}%</span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${derived.progress}%` }}/>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pl-14 sm:pl-0">
+          <TaskBadges task={task} derived={derived} />
+        </div>
+
+        <div className="flex gap-1 items-center justify-end pl-14 sm:pl-0 shrink-0">
+          {derived.subTotal > 0 && (
+            <button onClick={onToggleExpand} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+              {isExpanded ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+            </button>
+          )}
+          <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+            <button onClick={onEdit} aria-label="Edit task" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Edit2 size={16}/></button>
+            <button onClick={onDelete} aria-label="Delete task" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {isExpanded && (
+      <div className="pl-12 pr-6 pb-4 animate-in fade-in">
+        <SubtaskChecklist task={task} onToggleSubtask={onToggleSubtask} dense />
+      </div>
+    )}
+  </div>
+);
+
+const TaskList = ({ tasks, categories = [], offices = [], onEdit, onDelete, onStatusChange, onToggleSubtask, onBulkComplete, onBulkDelete, filterStatus, setFilterStatus }) => {
   const [expandedTask, setExpandedTask] = useState(null);
   const [search, setSearch] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterOffice, setFilterOffice] = useState('');
   const [sortBy, setSortBy] = useState('created-desc');
   const [selectedIds, setSelectedIds] = useState([]);
-
-  const getPriorityColor = (p) => {
-    switch(p) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-      default: return 'text-slate-600 bg-slate-50';
+  // Persisted across visits (not just this session) since it's a standing display
+  // preference, not per-task state — falls back to 'card' if localStorage is unavailable.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'card';
+    } catch {
+      return 'card';
     }
+  });
+
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore (private browsing, etc.) */ }
   };
+
   const toggleExpand = (id) => setExpandedTask(expandedTask === id ? null : id);
 
   const filteredTasks = useMemo(() => {
@@ -29,13 +243,15 @@ const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, on
       if (filterStatus !== 'all' && t.status !== filterStatus) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       if (filterCategory && t.category !== filterCategory) return false;
+      if (filterType && getTaskType(t) !== filterType) return false;
+      if (filterOffice && t.office !== filterOffice) return false;
       if (query) {
-        const haystack = [t.title, t.description, t.category].filter(Boolean).join(' ').toLowerCase();
+        const haystack = [t.title, t.description, t.category, t.office].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       return true;
     });
-  }, [tasks, filterStatus, filterPriority, filterCategory, search]);
+  }, [tasks, filterStatus, filterPriority, filterCategory, filterType, filterOffice, search]);
 
   const sortedTasks = useMemo(() => {
     if (sortBy === 'created-desc') return filteredTasks; // already newest-first from useTasks
@@ -52,11 +268,13 @@ const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, on
     return arr;
   }, [filteredTasks, sortBy]);
 
-  const hasActiveFilters = !!(search.trim() || filterPriority || filterCategory || filterStatus !== 'all');
+  const hasActiveFilters = !!(search.trim() || filterPriority || filterCategory || filterType || filterOffice || filterStatus !== 'all');
   const clearAllFilters = () => {
     setSearch('');
     setFilterPriority('');
     setFilterCategory('');
+    setFilterType('');
+    setFilterOffice('');
     setFilterStatus('all');
   };
 
@@ -84,20 +302,42 @@ const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, on
             <span className="font-bold text-slate-800">Task List</span>
             <span className="text-[11px] font-semibold text-slate-400">Showing {sortedTasks.length} of {tasks.length}</span>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, description, category..."
-              className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/40 transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <XCircle size={14} />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title, description, category..."
+                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/40 transition-all"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <XCircle size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5 shrink-0">
+              <button
+                onClick={() => changeViewMode('card')}
+                aria-label="Card view"
+                title="Card view"
+                aria-pressed={viewMode === 'card'}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <LayoutGrid size={15}/>
               </button>
-            )}
+              <button
+                onClick={() => changeViewMode('list')}
+                aria-label="List view"
+                title="List view"
+                aria-pressed={viewMode === 'list'}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <List size={15}/>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -134,6 +374,30 @@ const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, on
               <option value="">All Categories</option>
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          )}
+
+          <select
+            value={filterType}
+            onChange={(e) => { setFilterType(e.target.value); if (e.target.value !== 'official') setFilterOffice(''); }}
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer"
+          >
+            <option value="">All Types</option>
+            {TASK_TYPES.map(t => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+
+          {filterType === 'official' && offices.length > 0 && (
+            <select
+              value={filterOffice}
+              onChange={(e) => setFilterOffice(e.target.value)}
+              className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer max-w-[130px] truncate"
+            >
+              <option value="">All Offices</option>
+              {offices.map(o => (
+                <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </select>
           )}
@@ -179,125 +443,59 @@ const TaskList = ({ tasks, categories = [], onEdit, onDelete, onStatusChange, on
         )}
       </div>
 
-      <div className="divide-y divide-slate-100">
-        {sortedTasks.map(task => {
-          const subCompleted = task.subtasks?.filter(s => s.completed).length || 0;
-          const subTotal = task.subtasks?.length || 0;
-          const progress = subTotal > 0 ? (subCompleted / subTotal) * 100 : (task.progress ?? 0);
+      <div className={viewMode === 'card' ? 'p-4 bg-slate-50/60' : ''}>
+        {viewMode === 'card' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {sortedTasks.map(task => {
+              const derived = getTaskDerived(task, categories, offices);
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  derived={derived}
+                  isSelected={selectedIds.includes(task.id)}
+                  isExpanded={expandedTask === task.id}
+                  onToggleExpand={() => toggleExpand(task.id)}
+                  onToggleSelect={() => toggleSelected(task.id)}
+                  onStatusChange={() => onStatusChange(task.id, task.status)}
+                  onEdit={() => onEdit(task)}
+                  onDelete={() => onDelete(task.id)}
+                  onToggleSubtask={(subId) => onToggleSubtask(task.id, subId)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {sortedTasks.map(task => {
+              const derived = getTaskDerived(task, categories, offices);
+              return (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  derived={derived}
+                  isSelected={selectedIds.includes(task.id)}
+                  isExpanded={expandedTask === task.id}
+                  onToggleExpand={() => toggleExpand(task.id)}
+                  onToggleSelect={() => toggleSelected(task.id)}
+                  onStatusChange={() => onStatusChange(task.id, task.status)}
+                  onEdit={() => onEdit(task)}
+                  onDelete={() => onDelete(task.id)}
+                  onToggleSubtask={(subId) => onToggleSubtask(task.id, subId)}
+                />
+              );
+            })}
+          </div>
+        )}
 
-          const taskTimeSpent = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
-          const subtaskTimeSpent = (task.subtasks || []).reduce((acc, s) => acc + (s.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0), 0);
-          const timeSpent = taskTimeSpent + subtaskTimeSpent;
-
-          const dueDateObj = task.dueDate ? safeGetDate(task.dueDate) : null;
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const isOverdue = task.status !== 'done' && dueDateObj && dueDateObj < today;
-
-          const category = categories.find(c => c.id === task.category);
-          const CategoryIcon = CATEGORY_ICONS[task.category] || DEFAULT_CATEGORY_ICON;
-          const isSelected = selectedIds.includes(task.id);
-
-          return (
-            <div key={task.id}>
-              <div className={`p-4 flex flex-col sm:flex-row justify-between items-start hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-indigo-50/50' : ''}`}>
-                <div className="flex gap-3 flex-1 min-w-0">
-                   <input
-                     type="checkbox"
-                     checked={isSelected}
-                     onChange={() => toggleSelected(task.id)}
-                     aria-label={`Select ${task.title}`}
-                     className="mt-1.5 w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0"
-                   />
-                   <button
-                     onClick={() => onStatusChange(task.id, task.status)}
-                     className={`mt-1 w-5 h-5 flex-shrink-0 rounded border flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
-                   >
-                     <Check size={14} className={task.status === 'done' ? 'opacity-100' : 'opacity-0'} />
-                   </button>
-
-                   <div className="flex-1 min-w-0">
-                      <h4 className={`font-semibold text-slate-800 truncate ${task.status === 'done' ? 'line-through text-slate-400' : ''}`}>{task.title}</h4>
-                      {task.description && <p className="text-sm text-slate-500 line-clamp-1">{task.description}</p>}
-
-                      <div className="mt-2 w-full max-w-xs">
-                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                          <span>Progress</span><span>{Math.round(progress)}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                          <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}/>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium capitalize border ${getPriorityColor(task.priority)}`}>
-                          {task.priority}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${category?.bg || 'text-slate-500 bg-slate-50 border-slate-200'}`}>
-                          <CategoryIcon size={12}/> {category?.label || task.category}
-                        </span>
-                        {task.dueDate && (
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${isOverdue ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
-                            <Calendar size={12}/> {task.dueDate}
-                          </span>
-                        )}
-                        {isOverdue && (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border text-red-600 bg-red-50 border-red-200 font-semibold">
-                            <AlertTriangle size={12}/> Overdue
-                          </span>
-                        )}
-                        {timeSpent > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded flex items-center gap-1 font-medium border border-emerald-100">
-                            <Timer size={10}/> {formatDuration(timeSpent)}
-                          </span>
-                        )}
-                      </div>
-                   </div>
-                </div>
-
-                <div className="flex gap-1 items-center mt-4 sm:mt-0 sm:pl-4">
-                  {subTotal > 0 && (
-                    <button onClick={() => toggleExpand(task.id)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
-                      {expandedTask === task.id ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
-                    </button>
-                  )}
-                  <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(task)} aria-label="Edit task" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Edit2 size={16}/></button>
-                    <button onClick={() => onDelete(task.id)} aria-label="Delete task" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
-                  </div>
-                </div>
-              </div>
-
-              {expandedTask === task.id && (
-                <div className="pl-12 pr-6 pb-4 animate-in fade-in">
-                  <div className="space-y-1">
-                    {task.subtasks.map(s => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => onToggleSubtask(task.id, s.id)}
-                        className="flex items-center gap-3 w-full text-left py-1 px-1.5 -mx-1.5 rounded-lg hover:bg-slate-50 transition-colors"
-                      >
-                        <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${s.completed ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
-                          <Check size={11} className={`text-white transition-opacity ${s.completed ? 'opacity-100' : 'opacity-0'}`} />
-                        </span>
-                        <span className={`text-sm ${s.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{s.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
         {sortedTasks.length === 0 && tasks.length > 0 && (
-          <div className="text-center py-10 text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl m-4">
+          <div className={`text-center py-10 text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl ${viewMode === 'list' ? 'm-4' : ''}`}>
             <Search size={24} className="mx-auto mb-2 text-slate-300" />
             No tasks match your filters.
           </div>
         )}
         {tasks.length === 0 && (
-          <div className="text-center py-10 text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl m-4">
+          <div className={`text-center py-10 text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl ${viewMode === 'list' ? 'm-4' : ''}`}>
             <ListChecks size={24} className="mx-auto mb-2 text-slate-300" />
             No tasks yet — tap "New Task" above to add one.
           </div>

@@ -3,7 +3,7 @@
  * Centralized configuration for task categories.
  */
 
-import { ListChecks, Briefcase, User, ShoppingBag, HeartPulse, Tag } from 'lucide-react';
+import { ListChecks, Briefcase, User, ShoppingBag, HeartPulse, Tag, Building2, Home } from 'lucide-react';
 
 // Same validated categorical palette used by WalletWatch (CVD-checked) — assignment is
 // by creation-order slot index (see getCategoryColor below), never re-derived from
@@ -48,6 +48,26 @@ export const CATEGORY_ICONS = {
 export const DEFAULT_CATEGORY_ICON = Tag;
 
 // Assigns the next validated slot by creation order (existingCount = categories.length
-// at the time a new one is added) — deterministic, not a content hash.
+// at the time a new one is added) — deterministic, not a content hash. Also reused for
+// offices below, since it's just a palette-by-index assignment, not category-specific.
 export const getCategoryColor = (existingCount) =>
   CATEGORICAL_PALETTE[existingCount % CATEGORICAL_PALETTE.length];
+
+// Task Type is a fixed second dimension (unlike Category, not user-editable) separating
+// personal tasks from official/work tasks tied to a specific office. Missing on tasks
+// created before this feature existed — getTaskType's fallback keeps them "personal"
+// without needing a migration, same reasoning as DEFAULT_CATEGORIES' `id` choice.
+export const TASK_TYPES = [
+  { id: 'personal', label: 'Personal', icon: Home },
+  { id: 'official', label: 'Official', icon: Building2 },
+];
+export const getTaskType = (task) => task?.taskType || 'personal';
+
+// Offices are user-editable (like categories), since which offices someone works out of
+// can change; only meaningful when a task's type is 'official'. `id` equals the label,
+// same reasoning as DEFAULT_CATEGORIES so existing task docs keep matching without a
+// migration if seeded values are later renamed instead of recreated.
+export const DEFAULT_OFFICES = [
+  { id: 'Office A', label: 'Office A', ...CATEGORICAL_PALETTE[5] },
+  { id: 'Office B', label: 'Office B', ...CATEGORICAL_PALETTE[6] },
+];

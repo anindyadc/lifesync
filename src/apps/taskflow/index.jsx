@@ -3,6 +3,7 @@ import {
   Plus, Download, FileText, Loader2, X, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
 import { safeGetDate } from '../../lib/utils';
+import { getTaskType } from './constants';
 
 // Custom Hooks
 import { useTasks } from './hooks/useTasks';
@@ -65,9 +66,27 @@ const getTasksForMonth = (tasks, date) => {
 const getCompletionRate = (monthTasks) =>
   monthTasks.length > 0 ? Math.round((monthTasks.filter(t => t.status === 'done').length / monthTasks.length) * 100) : 0;
 
+// Dashboard scope: 'all' | 'personal' | `office:${officeId}` (any official task, or one
+// scoped to a specific office) — lets the Dashboard be viewed as a whole or split out by
+// Personal/Official-per-office without duplicating the KPI/chart/report-table wiring.
+const filterByScope = (tasks, scope) => {
+  if (scope === 'all') return tasks;
+  if (scope === 'personal') return tasks.filter(t => getTaskType(t) === 'personal');
+  if (scope === 'official') return tasks.filter(t => getTaskType(t) === 'official');
+  if (scope.startsWith('office:')) {
+    const officeId = scope.slice('office:'.length);
+    return tasks.filter(t => getTaskType(t) === 'official' && t.office === officeId);
+  }
+  return tasks;
+};
+
 const TaskFlowApp = ({ user }) => {
   // 1. Initialize Hooks
-  const { tasks, categories, loading, addTask, updateTask, deleteTask, addCategory, removeCategory } = useTasks(user);
+  const {
+    tasks, categories, offices, loading,
+    addTask, updateTask, deleteTask,
+    addCategory, removeCategory, addOffice, removeOffice
+  } = useTasks(user);
   const { quickTasks, addQuickTask, toggleQuickTask, deleteQuickTask } = useQuickTasks(user);
   const { exportToCSV, exportToPDF, exporting } = useTaskExport(tasks, 'taskflow-dashboard-charts');
 
@@ -75,10 +94,13 @@ const TaskFlowApp = ({ user }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('categories');
   const [newCatName, setNewCatName] = useState('');
+  const [newOfficeName, setNewOfficeName] = useState('');
   const [editingTask, setEditingTask] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [dashboardDate, setDashboardDate] = useState(new Date());
+  const [dashboardScope, setDashboardScope] = useState('all');
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
@@ -116,14 +138,15 @@ const TaskFlowApp = ({ user }) => {
 
   const memoizedEditingTask = useMemo(() => editingTask, [editingTask]);
 
-  // 3. Derived Stats for Dashboard (Current Month)
-  const currentMonthTasks = useMemo(() => getTasksForMonth(tasks, dashboardDate), [tasks, dashboardDate]);
+  // 3. Derived Stats for Dashboard (Current Month, within the selected scope)
+  const dashboardScopedTasks = useMemo(() => filterByScope(tasks, dashboardScope), [tasks, dashboardScope]);
+  const currentMonthTasks = useMemo(() => getTasksForMonth(dashboardScopedTasks, dashboardDate), [dashboardScopedTasks, dashboardDate]);
 
   const previousCompletionRate = useMemo(() => {
     const prevDate = new Date(dashboardDate.getFullYear(), dashboardDate.getMonth() - 1, 1);
-    const prevMonthTasks = getTasksForMonth(tasks, prevDate);
+    const prevMonthTasks = getTasksForMonth(dashboardScopedTasks, prevDate);
     return prevMonthTasks.length > 0 ? getCompletionRate(prevMonthTasks) : null;
-  }, [tasks, dashboardDate]);
+  }, [dashboardScopedTasks, dashboardDate]);
 
   const totalTimeSpent = useMemo(() => {
     return currentMonthTasks.reduce((total, task) => {
@@ -208,6 +231,13 @@ const TaskFlowApp = ({ user }) => {
     }
   };
 
+  const handleAddOffice = () => {
+    if (newOfficeName.trim()) {
+      addOffice(newOfficeName);
+      setNewOfficeName('');
+    }
+  };
+
   // 5. Render
   if (loading) {
     return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-indigo-600"/></div>;
@@ -237,7 +267,7 @@ const TaskFlowApp = ({ user }) => {
               </button>
             </>
           )}
-          <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Manage Categories"><Settings size={16}/></button>
+          <button onClick={() => setIsSettingsOpen(true)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Manage Categories & Offices"><Settings size={16}/></button>
           <button onClick={handleCreateNew} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-indigo-700"><Plus size={16}/> New Task</button>
         </div>
       </div>
@@ -246,7 +276,7 @@ const TaskFlowApp = ({ user }) => {
       <div id={`taskflow-${activeTab}`}>
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+            <div className="flex flex-wrap justify-between items-center bg-slate-50 p-4 rounded-xl gap-3">
               <h3 className="font-bold text-lg text-slate-700">
                 Dashboard for: {dashboardDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
               </h3>
@@ -254,6 +284,23 @@ const TaskFlowApp = ({ user }) => {
                 <button onClick={() => handleMonthChange(-1)} className="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-100"><ChevronLeft size={16}/></button>
                 <button onClick={() => handleMonthChange(1)} className="p-2 rounded-lg bg-white shadow-sm hover:bg-slate-100"><ChevronRight size={16}/></button>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 px-4 -mt-3 pb-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mr-1">View:</span>
+              {[
+                { id: 'all', label: 'All Tasks' },
+                { id: 'personal', label: 'Personal' },
+                { id: 'official', label: 'Official (All Offices)' },
+                ...offices.map(o => ({ id: `office:${o.id}`, label: o.label })),
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setDashboardScope(opt.id)}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors ${dashboardScope === opt.id ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
             <div className="space-y-6 bg-slate-50 p-2 rounded-xl">
               <DashboardStats stats={stats} previousCompletionRate={previousCompletionRate} />
@@ -263,7 +310,7 @@ const TaskFlowApp = ({ user }) => {
                   <CategoryChart tasks={currentMonthTasks} categories={categories} />
                 </div>
                 <div className="lg:col-span-2">
-                  <TaskReportTable tasks={currentMonthTasks} />
+                  <TaskReportTable tasks={currentMonthTasks} offices={offices} />
                 </div>
               </div>
             </div>
@@ -275,6 +322,7 @@ const TaskFlowApp = ({ user }) => {
             <TaskList
               tasks={tasks}
               categories={categories}
+              offices={offices}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}
@@ -302,6 +350,7 @@ const TaskFlowApp = ({ user }) => {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             <TimeReport
               tasks={filteredTasks}
+              offices={offices}
               dateRange={dateRange}
               onDateChange={handleDateChange}
             />
@@ -315,64 +364,93 @@ const TaskFlowApp = ({ user }) => {
           <TaskForm
             initialData={memoizedEditingTask}
             categories={categories}
+            offices={offices}
             onSubmit={handleSave}
             onCancel={() => setIsModalOpen(false)}
           />
         </div>
       )}
 
-      {/* Manage Categories */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
-            <div className="flex justify-between items-center mb-1">
-              <h3 className="text-lg font-bold text-slate-800">Manage Categories</h3>
-              <button onClick={() => setIsSettingsOpen(false)} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
-                <X size={20}/>
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 font-medium mb-5">{categories.length} categories &middot; tap &times; to remove</p>
+      {/* Manage Categories & Offices */}
+      {isSettingsOpen && (() => {
+        const isCat = settingsTab === 'categories';
+        const list = isCat ? categories : offices;
+        const newName = isCat ? newCatName : newOfficeName;
+        const setNewName = isCat ? setNewCatName : setNewOfficeName;
+        const handleAdd = isCat ? handleAddCategory : handleAddOffice;
+        const handleRemove = isCat ? removeCategory : removeOffice;
 
-            <div className="flex gap-2 mb-5">
-              <input
-                type="text"
-                value={newCatName}
-                onChange={e => setNewCatName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
-                placeholder="New category..."
-                className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
-              />
-              <button onClick={handleAddCategory} aria-label="Add category" className="shrink-0 p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-90 transition-all">
-                <Plus size={18}/>
-              </button>
-            </div>
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-800">Manage Categories &amp; Offices</h3>
+                <button onClick={() => setIsSettingsOpen(false)} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                  <X size={20}/>
+                </button>
+              </div>
 
-            <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-1 custom-scrollbar">
-              {categories.map(c => (
-                <div key={c.id} className="group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                  <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{c.label}</span>
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+                {['categories', 'offices'].map(t => (
                   <button
-                    onClick={() => removeCategory(c.id)}
-                    aria-label={`Remove ${c.label}`}
-                    title={`Remove ${c.label}`}
-                    className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                    key={t}
+                    onClick={() => setSettingsTab(t)}
+                    className={`flex-1 py-1.5 text-xs font-bold capitalize rounded-lg transition-colors ${settingsTab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
-                    <X size={12}/>
+                    {t}
                   </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <button
-              onClick={() => setIsSettingsOpen(false)}
-              className="mt-6 w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-colors"
-            >
-              Done
-            </button>
+              <p className="text-xs text-slate-400 font-medium mb-3">
+                {list.length} {settingsTab} &middot; tap &times; to remove
+                {!isCat && <span className="block mt-0.5">Offices apply to Official-type tasks.</span>}
+              </p>
+
+              <div className="flex gap-2 mb-5">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                  placeholder={isCat ? 'New category...' : 'New office...'}
+                  className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
+                />
+                <button onClick={handleAdd} aria-label={isCat ? 'Add category' : 'Add office'} className="shrink-0 p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-90 transition-all">
+                  <Plus size={18}/>
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-1 custom-scrollbar">
+                {list.map(item => (
+                  <div key={item.id} className="group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{item.label}</span>
+                    <button
+                      onClick={() => handleRemove(item.id)}
+                      aria-label={`Remove ${item.label}`}
+                      title={`Remove ${item.label}`}
+                      className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                    >
+                      <X size={12}/>
+                    </button>
+                  </div>
+                ))}
+                {list.length === 0 && (
+                  <p className="text-xs text-slate-400 italic py-2">No {settingsTab} yet.</p>
+                )}
+              </div>
+
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="mt-6 w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

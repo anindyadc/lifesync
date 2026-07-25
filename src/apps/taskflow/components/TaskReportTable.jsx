@@ -1,7 +1,8 @@
 import React from 'react';
 import { formatDuration } from '../../../lib/utils';
+import { getTaskType } from '../constants';
 
-const TaskReportTable = ({ tasks }) => {
+const TaskReportTable = ({ tasks, offices = [] }) => {
   const getStatusColor = (s) => { 
     switch(s) { 
       case 'done': return 'bg-indigo-100 text-indigo-700'; 
@@ -20,6 +21,7 @@ const TaskReportTable = ({ tasks }) => {
           <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-100">
             <tr>
               <th className="px-6 py-3">Task</th>
+              <th className="px-6 py-3">Scope</th>
               <th className="px-6 py-3">Status</th>
               <th className="px-6 py-3">Progress</th>
               <th className="px-6 py-3">Time</th>
@@ -36,10 +38,19 @@ const TaskReportTable = ({ tasks }) => {
                 return acc + (subtask.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0);
               }, 0);
               const totalTime = taskTime + subtaskTime;
-              
+
+              const taskType = getTaskType(task);
+              const office = offices.find(o => o.id === task.office);
+              const scopeLabel = taskType === 'official' ? (office?.label || task.office || 'Official') : 'Personal';
+
               return (
                 <tr key={task.id} className="hover:bg-slate-50">
                   <td className="px-6 py-3 font-medium text-slate-800">{task.title}</td>
+                  <td className="px-6 py-3 text-xs">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full ${taskType === 'official' ? (office?.bg || 'bg-indigo-100 text-indigo-700') : 'bg-slate-100 text-slate-600'}`}>
+                      {scopeLabel}
+                    </span>
+                  </td>
                   <td className="px-6 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs capitalize ${getStatusColor(task.status)}`}>
                       {task.status.replace('-', ' ')}
@@ -57,7 +68,7 @@ const TaskReportTable = ({ tasks }) => {
                 </tr>
               );
             })}
-            {tasks.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400">No tasks yet</td></tr>}
+            {tasks.length === 0 && <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">No tasks yet</td></tr>}
           </tbody>
         </table>
       </div>

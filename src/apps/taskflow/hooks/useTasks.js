@@ -4,7 +4,7 @@ import {
   onSnapshot, serverTimestamp, setDoc
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { DEFAULT_CATEGORIES, getCategoryColor } from '../constants';
+import { DEFAULT_CATEGORIES, DEFAULT_OFFICES, getCategoryColor } from '../constants';
 
 const APP_ID = 'default-app-id';
 
@@ -22,6 +22,7 @@ export const getTaskMinutes = (task) => {
 export const useTasks = (user) => {
   const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [offices, setOffices] = useState(DEFAULT_OFFICES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,11 +48,9 @@ export const useTasks = (user) => {
 
     const catRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'taskConfig');
     const unsubCat = onSnapshot(catRef, (docSnap) => {
-      if (docSnap.exists() && docSnap.data().categories) {
-        setCategories(docSnap.data().categories);
-      } else {
-        setCategories(DEFAULT_CATEGORIES);
-      }
+      const data = docSnap.exists() ? docSnap.data() : null;
+      setCategories(data?.categories || DEFAULT_CATEGORIES);
+      setOffices(data?.offices || DEFAULT_OFFICES);
     }, (error) => {
       console.error("Firestore Categories Error:", error);
     });
@@ -98,5 +97,29 @@ export const useTasks = (user) => {
     await setDoc(catRef, { categories: updated }, { merge: true });
   };
 
-  return { tasks, categories, loading, addTask, updateTask, deleteTask, addCategory, removeCategory };
+  const addOffice = async (label) => {
+    const trimmed = (label || '').trim();
+    if (!trimmed || !user) return;
+    if (offices.some(o => o.id === trimmed)) return;
+
+    const { color, bg } = getCategoryColor(offices.length);
+    const updated = [...offices, { id: trimmed, label: trimmed, color, bg }];
+
+    const catRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'taskConfig');
+    await setDoc(catRef, { offices: updated }, { merge: true });
+  };
+
+  const removeOffice = async (id) => {
+    if (!user) return;
+    const updated = offices.filter(o => o.id !== id);
+
+    const catRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'taskConfig');
+    await setDoc(catRef, { offices: updated }, { merge: true });
+  };
+
+  return {
+    tasks, categories, offices, loading,
+    addTask, updateTask, deleteTask,
+    addCategory, removeCategory, addOffice, removeOffice
+  };
 };

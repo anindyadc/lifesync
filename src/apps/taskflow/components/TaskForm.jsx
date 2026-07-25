@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckSquare, Plus, Edit2, Check, Clock, Trash2, ClipboardList, ListChecks } from 'lucide-react';
 import { formatDuration, toISODate } from '../../../lib/utils';
+import { TASK_TYPES } from '../constants';
 
 const labelClass = "block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1";
 const fieldClass = "w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none font-medium text-sm transition-all";
@@ -58,11 +59,12 @@ const TimeLogModal = ({ onLog, onCancel, subtask }) => {
   );
 };
 
-const TaskForm = ({ initialData, onSubmit, onCancel, categories = [] }) => {
+const TaskForm = ({ initialData, onSubmit, onCancel, categories = [], offices = [] }) => {
   const [formData, setFormData] = useState(() => {
     const baseData = {
       title: '', description: '', priority: 'medium', status: 'todo',
-      dueDate: '', category: categories[0]?.id || 'General', subtasks: [], timeLogs: [], progress: 0
+      dueDate: '', category: categories[0]?.id || 'General', taskType: 'personal', office: '',
+      subtasks: [], timeLogs: [], progress: 0
     };
     if (initialData) {
       return { ...baseData, ...initialData };
@@ -215,6 +217,55 @@ const TaskForm = ({ initialData, onSubmit, onCancel, categories = [] }) => {
                   })}
                 </div>
               </div>
+
+              <div>
+                <label className={labelClass}>Type</label>
+                <div className="flex gap-2">
+                  {TASK_TYPES.map(t => {
+                    const Icon = t.icon;
+                    const isSelected = formData.taskType === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, taskType: t.id, office: t.id === 'official' ? formData.office : '' })}
+                        className={`flex-1 py-1.5 flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg border transition-all ${isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                      >
+                        <Icon size={13} /> {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {formData.taskType === 'official' && (
+                <div>
+                  <label className={labelClass}>Office</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-0.5 custom-scrollbar">
+                    {offices.map(o => {
+                      const isSelected = formData.office === o.id;
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, office: o.id })}
+                          style={isSelected ? { borderColor: o.color } : {}}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${
+                            isSelected
+                              ? `${o.bg || 'bg-indigo-50 text-indigo-700'}`
+                              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                    {offices.length === 0 && (
+                      <p className="text-xs text-slate-400 italic">No offices configured — add one via Manage Categories &amp; Offices.</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

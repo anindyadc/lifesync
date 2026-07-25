@@ -96,10 +96,12 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
 
   const handleGroupClick = (group) => {
     setFormData({ ...formData, group });
+    setShowGroupSuggestions(false);
   };
 
   const handleAccountClick = (account) => {
     setFormData({ ...formData, paymentAccount: account });
+    setShowAccountSuggestions(false);
   };
 
   useEffect(() => {

@@ -6,7 +6,7 @@ import {
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
-import { MonthlyTrendChart, WeeklyBarChart } from './OverviewCharts';
+import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
 
 const monthKey = (d) => `${d.getFullYear()}-${d.getMonth()}`;
 
@@ -37,35 +37,35 @@ const MonthNavigator = ({ selectedMonth, setSelectedMonth }) => {
 // Receives its data + selected month from WalletWatchApp (src/apps/walletwatch/index.jsx),
 // which is also what the header CSV/PDF export buttons and History view read from —
 // a single source of truth, so "export" always matches whatever month is on screen here.
+//
+// Layout is a "bento" grid rather than a fixed main-column/sidebar split: the top row
+// pairs the two time-based visuals (compact calendar heatmap + 6-month trend), and every
+// breakdown card below flows into a responsive 1/2/3-col grid. Each breakdown card already
+// returns null when it has nothing to show for the month (e.g. no official trips) — since
+// a null child renders no DOM node, the grid never reserves empty space for it, so no
+// separate "does the sidebar have anything to show" check is needed here.
 const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth }) => {
-  // The sidebar cards below all return null when they have nothing to show (e.g. a
-  // month with no personal spend and no official trips) — without this check the
-  // 3-col grid still reserves the right column, leaving a big empty gap next to the
-  // charts. Collapse to a single full-width column instead when that's the case.
-  const hasSidebarContent = useMemo(() => (
-    expenses.some(e => Number(e.amount) < 0 && !e.isOfficial) ||
-    allExpenses.some(e => e.isOfficial && Number(e.amount) < 0)
-  ), [expenses, allExpenses]);
-
   return (
     <div>
       <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
       <SummaryCards expenses={expenses} allExpenses={allExpenses} selectedMonth={selectedMonth} />
 
-      <div className={hasSidebarContent ? 'grid grid-cols-1 lg:grid-cols-3 gap-6' : 'space-y-6'}>
-        <div className={hasSidebarContent ? 'lg:col-span-2 space-y-6' : 'space-y-6'}>
-          <MonthlyTrendChart allExpenses={allExpenses} />
-          <WeeklyBarChart expenses={allExpenses} />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+        <div className="lg:col-span-2">
+          <DailyCalendar expenses={expenses} categories={categories} selectedMonth={selectedMonth} />
         </div>
-        {hasSidebarContent && (
-          <div className="lg:col-span-1 space-y-6">
-            <CategoryBreakdown categories={categories} expenses={expenses} />
-            <PaymentModeBreakdown expenses={expenses} />
-            <PaymentAccountBreakdown expenses={expenses} categories={categories} />
-            <GroupSubtotals categories={categories} expenses={expenses} />
-            <OfficialTripsSummary categories={categories} allExpenses={allExpenses} />
-          </div>
-        )}
+        <div className="lg:col-span-3">
+          <MonthlyTrendChart allExpenses={allExpenses} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <CategoryBreakdown categories={categories} expenses={expenses} />
+        <WeeklyBarChart expenses={allExpenses} />
+        <PaymentModeBreakdown expenses={expenses} />
+        <PaymentAccountBreakdown expenses={expenses} categories={categories} />
+        <GroupSubtotals categories={categories} expenses={expenses} />
+        <OfficialTripsSummary categories={categories} allExpenses={allExpenses} />
       </div>
     </div>
   );

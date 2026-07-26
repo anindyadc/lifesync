@@ -100,6 +100,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
   const [expandedTransactionGroups, setExpandedTransactionGroups] = useState({});
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterScope, setFilterScope] = useState(''); // '' | 'personal' | 'official'
   const [filterTags, setFilterTags] = useState([]);
   const [filterGroups, setFilterGroups] = useState([]);
   const [filterAccounts, setFilterAccounts] = useState([]);
@@ -163,6 +164,8 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
 
     return expenses.filter(exp => {
       if (filterCategory && exp.category !== filterCategory) return false;
+      if (filterScope === 'personal' && exp.isOfficial) return false;
+      if (filterScope === 'official' && !exp.isOfficial) return false;
       if (filterTags.length > 0 && !(exp.tags || []).some(t => filterTags.includes(t))) return false;
       if (filterGroups.length > 0 && !filterGroups.includes(exp.group)) return false;
       if (filterAccounts.length > 0 && !filterAccounts.includes(getAccountKey(exp))) return false;
@@ -188,7 +191,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
 
       return true;
     });
-  }, [expenses, categories, filterCategory, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, search]);
+  }, [expenses, categories, filterCategory, filterScope, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, search]);
 
   const sortedExpenses = useMemo(() => {
     const arr = [...filteredExpenses];
@@ -202,13 +205,14 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
   }, [filteredExpenses, sortBy]);
 
   const hasActiveFilters = !!(
-    search.trim() || filterCategory || filterTags.length || filterGroups.length ||
+    search.trim() || filterCategory || filterScope || filterTags.length || filterGroups.length ||
     filterAccounts.length || filterPaymentModes.length || dateFrom || dateTo
   );
 
   const clearAllFilters = () => {
     setSearch('');
     setFilterCategory('');
+    setFilterScope('');
     setFilterTags([]);
     setFilterGroups([]);
     setFilterAccounts([]);
@@ -540,6 +544,21 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             ))}
           </select>
 
+          <div className="flex items-center gap-1">
+            {[['', 'All'], ['personal', 'Personal'], ['official', 'Official']].map(([value, label]) => (
+              <button
+                key={value || 'all'}
+                type="button"
+                onClick={() => setFilterScope(value)}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                  filterScope === value ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <MultiSelectFilter label="Tags" icon={Tag} options={availableTags} selected={filterTags} onToggle={toggleInArray(setFilterTags)} />
           <MultiSelectFilter label="Trips" icon={MapPin} options={availableGroups} selected={filterGroups} onToggle={toggleInArray(setFilterGroups)} />
           <MultiSelectFilter label="Accounts" icon={CreditCard} options={availableAccounts} selected={filterAccounts} onToggle={toggleInArray(setFilterAccounts)} />
@@ -664,7 +683,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             <Filter size={28} className="text-slate-300" />
           </div>
           <h4 className="text-base font-bold text-slate-800">No transactions match your filters</h4>
-          <p className="text-sm text-slate-500 mt-2">Try changing or clearing the search, category, tag, account, or date filters above.</p>
+          <p className="text-sm text-slate-500 mt-2">Try changing or clearing the search, category, scope, tag, account, or date filters above.</p>
         </div>
       ) : (
         <>

@@ -4,6 +4,7 @@ import {
   updateDoc, doc, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { safeGetDate } from '../../../lib/utils';
 
 const APP_ID = 'default-app-id';
 
@@ -33,7 +34,7 @@ export const useChanges = (user) => {
   }, [user]);
 
   const addChange = async (data) => {
-    const tsDate = new Date(data.date);
+    const tsDate = safeGetDate(data.date) || new Date();
     // Add current time to date for sorting precision
     const now = new Date();
     tsDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
@@ -47,9 +48,24 @@ export const useChanges = (user) => {
   };
 
   const updateChange = async (id, data) => {
-    const tsDate = new Date(data.date);
-    const now = new Date();
-    tsDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    const newDate = safeGetDate(data.date) || new Date();
+    const existing = changes.find(c => c.id === id);
+    const existingDate = existing?.date?.toDate ? existing.date.toDate() : null;
+
+    // If the calendar day hasn't changed, keep the original time-of-day so
+    // editing an unrelated field doesn't bump this entry's position in the
+    // date-sorted list/timeline. Only re-stamp "now" when the day actually moved.
+    let tsDate;
+    if (existingDate &&
+        existingDate.getFullYear() === newDate.getFullYear() &&
+        existingDate.getMonth() === newDate.getMonth() &&
+        existingDate.getDate() === newDate.getDate()) {
+      tsDate = existingDate;
+    } else {
+      const now = new Date();
+      tsDate = newDate;
+      tsDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    }
 
     await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'changelogs', id), {
       ...data,

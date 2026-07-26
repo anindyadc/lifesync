@@ -69,5 +69,13 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
 
+    // 7. Specific rule for ChangeManager's changelog entries. The collection
+    // is named 'changelogs' but the app's allowedApps key is 'changemanager',
+    // so the generic rule #2 would wrongly check for 'changelogs' in
+    // allowedApps instead of 'changemanager' (same reason as quickTasks above).
+    match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
+    }
+
   }
 }

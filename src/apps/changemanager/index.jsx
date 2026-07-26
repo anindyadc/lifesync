@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Server, Plus, Search, FileText, Download, XCircle, Loader2, History,
-  Archive, Eye, EyeOff
+  Archive, Eye, EyeOff, LayoutGrid, List
 } from 'lucide-react';
 
 // Hooks
@@ -11,11 +11,19 @@ import { safeGetDate, toISODate } from '../../lib/utils';
 
 // Components
 import ChangeCard from './components/ChangeCard';
+import ChangeRow from './components/ChangeRow';
 import TimelineItem from './components/TimelineItem';
 import ChangeForm from './components/ChangeForm';
 import ChangeStats from './components/ChangeStats';
+import ChangeTypeChart from './components/ChangeTypeChart';
+import ChangeStatusChart from './components/ChangeStatusChart';
+import ActivityHeatmap from './components/ActivityHeatmap';
 import ServerFilter from './components/ServerFilter';
 import ConfirmModal from '../../components/ConfirmModal';
+
+// Same fixed set as ChangeForm's Change Type <select> options.
+const CHANGE_TYPES = ['Update', 'Patch', 'Config Change', 'Reboot', 'Deployment', 'Hardware'];
+const VIEW_MODE_KEY = 'changemanager-changelist-view-mode';
 
 const ChangeManagerApp = ({ user }) => {
   // 1. Logic & Data Fetching
@@ -24,11 +32,26 @@ const ChangeManagerApp = ({ user }) => {
   // 2. Local UI State
   const [view, setView] = useState('list'); // 'list' | 'add' | 'timeline'
   const [filterServer, setFilterServer] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [dateRange, setDateRange] = useState({ from: null, to: null });
   const [editingChange, setEditingChange] = useState(null);
   const [deletingChangeId, setDeletingChangeId] = useState(null);
   const [archivingChange, setArchivingChange] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
+  // Persisted across visits, same convention as TaskFlow's My Tasks / WalletWatch's History toggle.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'card';
+    } catch {
+      return 'card';
+    }
+  });
+
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore (private browsing, etc.) */ }
+  };
 
   // 3. Derived State (Filtering)
   const activeChanges = useMemo(() => changes.filter(c => c.status !== 'archived'), [changes]);
@@ -49,6 +72,14 @@ const ChangeManagerApp = ({ user }) => {
       );
     }
 
+    if (filterStatus) {
+      result = result.filter(c => c.status === filterStatus);
+    }
+
+    if (filterType) {
+      result = result.filter(c => c.type === filterType);
+    }
+
     if (dateRange.from || dateRange.to) {
       result = result.filter(c => {
         const changeDate = safeGetDate(c.date);
@@ -60,7 +91,7 @@ const ChangeManagerApp = ({ user }) => {
     }
 
     return result;
-  }, [changes, activeChanges, filterServer, showArchived, dateRange]);
+  }, [changes, activeChanges, filterServer, filterStatus, filterType, showArchived, dateRange]);
 
   // Initialize Export Hook with filtered data
   const { exportPDF, exportCSV } = useChangeExport(filteredChanges, filterServer);
@@ -135,6 +166,25 @@ const ChangeManagerApp = ({ user }) => {
     setView('timeline');
   };
 
+  const toggleFailedFilter = () => {
+    setFilterStatus(prev => prev === 'failed' ? '' : 'failed');
+  };
+
+  const hasStatusTypeFilters = !!(filterStatus || filterType);
+  const clearStatusTypeFilters = () => {
+    setFilterStatus('');
+    setFilterType('');
+  };
+
+  const handleHeatmapDayClick = (date) => {
+    const from = new Date(date);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(date);
+    to.setHours(23, 59, 59, 999);
+    setDateRange({ from, to });
+    setView('list');
+  };
+
   // 5. Render
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-indigo-600"/></div>;
 
@@ -183,6 +233,27 @@ const ChangeManagerApp = ({ user }) => {
             )}
           </div>
 
+          <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5 shrink-0">
+            <button
+              onClick={() => changeViewMode('card')}
+              aria-label="Card view"
+              title="Card view"
+              aria-pressed={viewMode === 'card'}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <LayoutGrid size={15}/>
+            </button>
+            <button
+              onClick={() => changeViewMode('list')}
+              aria-label="List view"
+              title="List view"
+              aria-pressed={viewMode === 'list'}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <List size={15}/>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2">
             <input
               type="date"
@@ -215,37 +286,106 @@ const ChangeManagerApp = ({ user }) => {
         </div>
       </div>
 
+      {/* Status & Type Filters */}
+      <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex gap-1.5">
+          {['', 'success', 'pending', 'failed'].map(s => (
+            <button
+              key={s || 'all'}
+              onClick={() => setFilterStatus(s)}
+              className={`text-xs px-2 py-1 rounded-lg capitalize font-semibold transition-colors ${filterStatus === s ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              {s || 'All'}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer"
+        >
+          <option value="">All Types</option>
+          {CHANGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        {hasStatusTypeFilters && (
+          <button
+            onClick={clearStatusTypeFilters}
+            className="flex items-center gap-1 px-2 py-1.5 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors"
+            title="Clear status/type filters"
+          >
+            <XCircle size={14} /> Clear
+          </button>
+        )}
+      </div>
+
       {/* VIEW: LIST (Dashboard) */}
       {view === 'list' && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in">
-          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredChanges.length > 0 ? (
-              filteredChanges.map(change => (
-                <ChangeCard
-                  key={change.id}
-                  change={change}
-                  onClick={() => handleServerClick(change.serverName)}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  onArchive={handleArchiveClick}
-                  onUnarchive={handleUnarchive}
-                />
-              ))
-            ) : (
-              <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
-                No changes found matching your criteria.
-              </div>
-            )}
+        <div className="space-y-6 animate-in fade-in">
+          {/* Bento row: heatmap paired with the two donut charts so the row's
+              width is actually used instead of leaving the calendar's narrow
+              grid stranded in an otherwise-empty full-width card. */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="lg:col-span-2">
+              <ActivityHeatmap changes={activeChanges} onDayClick={handleHeatmapDayClick} />
+            </div>
+            <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <ChangeStatusChart changes={activeChanges} />
+              <ChangeTypeChart changes={activeChanges} />
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <ServerFilter servers={uniqueServers} onSelect={handleServerClick} />
-            <ChangeStats
-              totalChanges={activeChanges.length}
-              uniqueServersCount={uniqueServers.length}
-              failedCount={activeChanges.filter(c => c.status === 'failed').length}
-              archivedCount={archivedChanges.length}
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              {filteredChanges.length > 0 ? (
+                viewMode === 'card' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredChanges.map(change => (
+                      <ChangeCard
+                        key={change.id}
+                        change={change}
+                        onClick={() => handleServerClick(change.serverName)}
+                        onEdit={handleEdit}
+                        onDelete={handleDeleteClick}
+                        onArchive={handleArchiveClick}
+                        onUnarchive={handleUnarchive}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+                    {filteredChanges.map(change => (
+                      <ChangeRow
+                        key={change.id}
+                        change={change}
+                        onClick={() => handleServerClick(change.serverName)}
+                        onEdit={handleEdit}
+                        onDelete={handleDeleteClick}
+                        onArchive={handleArchiveClick}
+                        onUnarchive={handleUnarchive}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                  No changes found matching your criteria.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <ServerFilter servers={uniqueServers} onSelect={handleServerClick} />
+              <ChangeStats
+                totalChanges={activeChanges.length}
+                uniqueServersCount={uniqueServers.length}
+                failedCount={activeChanges.filter(c => c.status === 'failed').length}
+                archivedCount={archivedChanges.length}
+                onFailedClick={toggleFailedFilter}
+                isFailedFilterActive={filterStatus === 'failed'}
+              />
+            </div>
           </div>
         </div>
       )}

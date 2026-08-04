@@ -77,5 +77,29 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
     }
 
+    // 8. Specific rules for WalletWatch's Fixed Expenses (recurring bills) —
+    // top-level collections whose path segments ('fixedExpenseTemplates',
+    // 'fixedExpenseInstances') don't match the 'walletwatch' allowedApps key,
+    // same reason as quickTasks/changelogs above.
+    match /artifacts/default-app-id/users/{userId}/fixedExpenseTemplates/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+    match /artifacts/default-app-id/users/{userId}/fixedExpenseInstances/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 9. Specific rule for WalletWatch's Credit Card billing config, same unique-path
+    // reason as walletConfig/miscExpenseDraft/taskConfig.
+    match /artifacts/default-app-id/users/{userId}/settings/creditCardConfig {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 10. Specific rule for WalletWatch's Credit Card cycle settlements — top-level
+    // collection whose path segment ('cardCycleSettlements') doesn't match the
+    // 'walletwatch' allowedApps key, same reason as fixedExpenseTemplates/Instances above.
+    match /artifacts/default-app-id/users/{userId}/cardCycleSettlements/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
   }
 }

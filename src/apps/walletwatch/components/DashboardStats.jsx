@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   Wallet, Clock, Calendar, Receipt, PieChart, Layers, ChevronLeft, ChevronRight,
-  TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X
+  TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X, Repeat, AlertTriangle
 } from 'lucide-react';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
+import { monthKeyOf } from '../hooks/useFixedExpenses';
 
 const monthKey = (d) => `${d.getFullYear()}-${d.getMonth()}`;
 
@@ -44,7 +45,7 @@ const MonthNavigator = ({ selectedMonth, setSelectedMonth }) => {
 // returns null when it has nothing to show for the month (e.g. no official trips) — since
 // a null child renders no DOM node, the grid never reserves empty space for it, so no
 // separate "does the sidebar have anything to show" check is needed here.
-const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth }) => {
+const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth, fixedInstances = [] }) => {
   return (
     <div>
       <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
@@ -66,6 +67,50 @@ const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelect
         <PaymentAccountBreakdown expenses={expenses} categories={categories} />
         <GroupSubtotals categories={categories} expenses={expenses} />
         <OfficialTripsSummary categories={categories} allExpenses={allExpenses} />
+        <FixedBillsDueCard instances={fixedInstances} selectedMonth={selectedMonth} />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * FixedBillsDueCard — pending/overdue fixed-expense instances for the month being
+ * viewed. Scoped to selectedMonth (not "today") so browsing a past month still shows
+ * what was outstanding then; overdue is still judged against "today" since a pending
+ * bill from a past month is overdue regardless of which month you're looking at.
+ * Returns null when there's nothing pending, same convention as the other cards.
+ */
+export const FixedBillsDueCard = ({ instances, selectedMonth }) => {
+  const monthKey = monthKeyOf(selectedMonth);
+  const pending = useMemo(
+    () => instances.filter(i => i.monthKey === monthKey && i.status === 'pending'),
+    [instances, monthKey]
+  );
+
+  if (pending.length === 0) return null;
+
+  const total = pending.reduce((s, i) => s + Math.abs(Number(i.amount) || 0), 0);
+  const today = new Date();
+
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
+      <div className="flex items-center gap-2 mb-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <Repeat size={16} className="text-indigo-500" /> Fixed Bills Due
+      </div>
+      <p className="text-xl font-black text-slate-900 mb-4">{formatCurrency(total)}</p>
+      <div className="space-y-2.5">
+        {pending.map(i => {
+          const dueEnd = safeGetDate(i.dueEnd);
+          const overdue = dueEnd && today > dueEnd;
+          return (
+            <div key={i.id} className="flex items-center justify-between text-[11px] font-bold">
+              <span className={overdue ? 'text-red-600 flex items-center gap-1' : 'text-slate-600'}>
+                {overdue && <AlertTriangle size={11} />} {i.label}
+              </span>
+              <span className="text-slate-900">{formatCurrency(Math.abs(i.amount))}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

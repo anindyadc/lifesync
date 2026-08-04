@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { safeGetDate } from '../../../lib/utils';
 import { DEFAULT_CATEGORIES, getCategoryColor } from '../constants';
 
 export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null) => {
@@ -14,9 +15,11 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
     // Listen to Expenses
     const qExp = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
     const unsubExp = onSnapshot(qExp, (snapshot) => {
+      // safeGetDate (not a raw `.date.toDate()`) so one doc with a missing/malformed
+      // date can't throw mid-sort and take down the entire transaction list.
       const sortedExpenses = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a, b) => b.date.toDate() - a.date.toDate());
+        .sort((a, b) => (safeGetDate(b.date) || 0) - (safeGetDate(a.date) || 0));
       setAllExpenses(sortedExpenses);
       setLoading(false);
     }, (error) => {
@@ -42,8 +45,9 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
   const expenses = useMemo(() => {
     if (!selectedMonth) return allExpenses;
     return allExpenses.filter(exp => {
-      const expDate = exp.date.toDate();
-      return expDate.getMonth() === selectedMonth.getMonth() &&
+      const expDate = safeGetDate(exp.date);
+      return expDate &&
+             expDate.getMonth() === selectedMonth.getMonth() &&
              expDate.getFullYear() === selectedMonth.getFullYear();
     });
   }, [selectedMonth, allExpenses]);

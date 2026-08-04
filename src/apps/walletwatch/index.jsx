@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, X, Loader2, FileText, Download, Wallet } from 'lucide-react';
+import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import Dashboard from './components/DashboardStats';
@@ -7,9 +7,13 @@ import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import ConfirmModal from './components/ConfirmModal';
 import MiscExpenseModal from './components/MiscExpenseModal';
+import FixedExpenses from './components/FixedExpenses';
+import CreditCardBilling from './components/CreditCardBilling';
 import { useExpenses } from './hooks/useExpenses';
 import { useExport } from './hooks/useExport';
 import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
+import { useFixedExpenses } from './hooks/useFixedExpenses';
+import { useCreditCards } from './hooks/useCreditCards';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -20,6 +24,8 @@ const WalletWatchApp = ({ user }) => {
   const { expenses, allExpenses, categories, loading, addCategory, removeCategory } = useExpenses(user, 'default-app-id', selectedMonth);
   const { exportToCSV, exportToPDF, exporting } = useExport(expenses, categories, 'walletwatch-dashboard-charts');
   const { draftItems, addDraftItem, removeDraftItem, clearDraft } = useMiscExpenseDraft(user);
+  const fixedExpenses = useFixedExpenses(user);
+  const creditCards = useCreditCards(user, allExpenses);
 
   const [view, setView] = useState('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -28,6 +34,7 @@ const WalletWatchApp = ({ user }) => {
   const [newCatName, setNewCatName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [deleteCategoryId, setDeleteCategoryId] = useState(null);
   const [relatedTxn, setRelatedTxn] = useState(null);
 
   const APP_ID = 'default-app-id';
@@ -102,14 +109,31 @@ const WalletWatchApp = ({ user }) => {
     }
   };
 
+  const categoryUsageCount = deleteCategoryId ? allExpenses.filter(e => e.category === deleteCategoryId).length : 0;
+  const confirmDeleteCategory = async () => {
+    if (!deleteCategoryId) return;
+    await removeCategory(deleteCategoryId);
+    setDeleteCategoryId(null);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 font-sans pb-10">
-      <ConfirmModal 
-        isOpen={!!deleteId} 
-        title="Delete Record" 
-        message="Permanently remove this transaction? This will update your charts." 
-        onConfirm={confirmDelete} 
-        onCancel={() => setDeleteId(null)} 
+      <ConfirmModal
+        isOpen={!!deleteId}
+        title="Delete Record"
+        message="Permanently remove this transaction? This will update your charts."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
+
+      <ConfirmModal
+        isOpen={!!deleteCategoryId}
+        title="Delete Category"
+        message={categoryUsageCount > 0
+          ? `${categoryUsageCount} existing transaction${categoryUsageCount !== 1 ? 's' : ''} still use this category — they'll show its raw ID instead of a label until re-categorized. Remove it anyway?`
+          : 'Permanently remove this category from your list?'}
+        onConfirm={confirmDeleteCategory}
+        onCancel={() => setDeleteCategoryId(null)}
       />
 
       {isSettingsOpen && (
@@ -143,7 +167,7 @@ const WalletWatchApp = ({ user }) => {
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
                   <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{c.label}</span>
                   <button
-                    onClick={() => removeCategory(c.id)}
+                    onClick={() => setDeleteCategoryId(c.id)}
                     aria-label={`Remove ${c.label}`}
                     title={`Remove ${c.label}`}
                     className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
@@ -177,6 +201,18 @@ const WalletWatchApp = ({ user }) => {
             className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             History
+          </button>
+          <button
+            onClick={() => setView('fixed')}
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'fixed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Repeat size={14} /> Fixed
+          </button>
+          <button
+            onClick={() => setView('cards')}
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <CreditCard size={14} /> Cards
           </button>
         </div>
         <div className="flex gap-2 justify-end w-full sm:w-auto">
@@ -228,6 +264,7 @@ const WalletWatchApp = ({ user }) => {
             allExpenses={allExpenses}
             selectedMonth={selectedMonth}
             setSelectedMonth={setSelectedMonth}
+            fixedInstances={fixedExpenses.instances}
           />
         )}
 
@@ -238,6 +275,36 @@ const WalletWatchApp = ({ user }) => {
             onEdit={(exp) => { setEditingId(exp.id); setRelatedTxn(null); setIsAddOpen(true); }}
             onSettle={(exp) => { setRelatedTxn(exp); setIsAddOpen(true); }}
             onDelete={setDeleteId}
+          />
+        )}
+
+        {view === 'fixed' && (
+          <FixedExpenses
+            templates={fixedExpenses.templates}
+            instances={fixedExpenses.instances}
+            categories={categories}
+            allExpenses={allExpenses}
+            loading={fixedExpenses.loading}
+            addTemplate={fixedExpenses.addTemplate}
+            updateTemplate={fixedExpenses.updateTemplate}
+            toggleTemplateActive={fixedExpenses.toggleTemplateActive}
+            deleteTemplate={fixedExpenses.deleteTemplate}
+            markPaid={fixedExpenses.markPaid}
+            skipInstance={fixedExpenses.skipInstance}
+          />
+        )}
+
+        {view === 'cards' && (
+          <CreditCardBilling
+            cards={creditCards.cards}
+            allExpenses={allExpenses}
+            loading={creditCards.loading}
+            addCard={creditCards.addCard}
+            updateCard={creditCards.updateCard}
+            removeCard={creditCards.removeCard}
+            cyclesForCard={creditCards.cyclesForCard}
+            settleCycle={creditCards.settleCycle}
+            deleteSettlement={creditCards.deleteSettlement}
           />
         )}
       </div>

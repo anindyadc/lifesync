@@ -7,7 +7,7 @@ This guide details the complete process for setting up, securing, and deploying 
 LifeSync is a multi-module React application designed to help you organize different aspects of your life. It uses Firebase for a secure backend and includes several apps:
 
 *   **TaskFlow:** A task manager with two task types: **planned tasks** (subtasks, per-task/subtask time logs, priority, due dates, and progress that's manual or auto-computed from subtask completion) and a lightweight **Quick List** for same-day/tomorrow checklists. Tasks can be tagged **Personal** or **Official**, with a user-editable list of offices, so you can view everything together or scoped to one office — with matching dashboard, filter, and report breakdowns. Categories and Offices are both user-editable with their own colors/icons. "My Tasks" supports search, priority/category/type/office filters, sorting, bulk mark-done/delete, and a Card or List view toggle. The dashboard shows a KPI summary (with a month-over-month completion-rate trend) alongside Priority and Category breakdown charts and a detailed report table; the report tab adds date-range filtering and Time-by-Office / Time-by-Category breakdowns, all reflected in CSV/PDF export. An optional daily Telegram reminder for tasks due today or overdue can be enabled via GitHub Actions — see Phase 4, step 4.
-*   **WalletWatch:** An expense tracker with a collapsible transaction history and a monthly dashboard view. Group transactions by month, event, or individually, with search, a date range, multi-select filters (category, tags, trips, payment accounts/modes), sorting, a Card or List view toggle, and CSV/PDF export scoped to whatever's currently filtered. Each history group shows a Spent/Lent/Official breakdown rather than a single mixed total. A separate **Misc Expenses** entry lets you jot down small same-day spends (tea, auto, snacks) across multiple visits during the day and combine them into one transaction whenever you're ready. The dashboard shows a KPI summary (spend, pending reimbursement, average daily spend, transaction count) alongside spending-trend, category, payment-mode/account, and top trips/events charts. The interface also includes smart autocomplete for tags, event groups, and payment accounts.
+*   **WalletWatch:** An expense tracker with a collapsible transaction history and a monthly dashboard view. Group transactions by month, event, or individually, with search, a date range, multi-select filters (category, tags, trips, payment accounts/modes), sorting, a Card or List view toggle, and CSV/PDF export scoped to whatever's currently filtered. Each history group shows a Spent/Lent/Official breakdown rather than a single mixed total. A separate **Misc Expenses** entry lets you jot down small same-day spends (tea, auto, snacks) across multiple visits during the day and combine them into one transaction whenever you're ready. A **Fixed** tab tracks recurring bills (rent, EMIs, subscriptions) that automatically come due each month within a configurable date window — an unpaid bill never counts as spend until you mark it paid. A **Cards** tab tallies each credit card's spend against its actual statement cycle (not just the calendar month) and lets you settle it against the bank payment, flagging any short/over mismatch. The dashboard shows a KPI summary (spend, pending reimbursement, average daily spend, transaction count) alongside spending-trend, category, payment-mode/account, and top trips/events charts. The interface also includes smart autocomplete for tags, event groups, and payment accounts.
 *   **IncidentLogger:** A tool for logging incidents, with priority/status tracking, a dedicated resolve flow, edit/delete, search/filter, and CSV/PDF export.
 *   **ChangeManager:** An infrastructure change log with list, per-server timeline, and archive views; search/filter by server or application, CSV/PDF export, and archive/unarchive (hard delete is also available).
 *   **Investment:** Tracks holdings with a list and maturity calendar view; amounts are AES-encrypted client-side before being stored in Firestore (see the `VITE_INVESTMENT_SECRET_KEY` note in Phase 3, step 7).
@@ -136,6 +136,31 @@ service cloud.firestore {
 
     // 6. WalletWatch's Misc Expense draft — same unique-path reason as walletConfig
     match /artifacts/default-app-id/users/{userId}/settings/miscExpenseDraft {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 7. ChangeManager's changelog entries — path segment 'changelogs' doesn't match
+    // its allowedApps key 'changemanager', same reason as quickTasks above.
+    match /artifacts/default-app-id/users/{userId}/changelogs/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('changemanager');
+    }
+
+    // 8. WalletWatch's Fixed Expenses (recurring bills) — top-level collections whose
+    // path segments don't match 'walletwatch', same reason as quickTasks above.
+    match /artifacts/default-app-id/users/{userId}/fixedExpenseTemplates/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+    match /artifacts/default-app-id/users/{userId}/fixedExpenseInstances/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 9. WalletWatch's Credit Card billing config — same unique-path reason as walletConfig
+    match /artifacts/default-app-id/users/{userId}/settings/creditCardConfig {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 10. WalletWatch's Credit Card cycle settlements — same reason as fixedExpenseTemplates above
+    match /artifacts/default-app-id/users/{userId}/cardCycleSettlements/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
     }
   }

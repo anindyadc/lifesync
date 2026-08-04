@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const getFirebaseConfig = () => {
@@ -44,7 +44,23 @@ const app = initializeApp(firebaseConfig);
 
 // Export services for use in App.jsx and other modules
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Offline persistence: cached reads keep working with no network, and writes queue
+// locally then flush once back online — every mini-app's onSnapshot listeners get this
+// for free since they all share this one `db` instance. Falls back to the default
+// in-memory Firestore if the browser doesn't support IndexedDB (e.g. some
+// private-browsing modes), rather than crashing the whole app at startup.
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (error) {
+  console.warn('Firestore offline persistence unavailable, falling back to in-memory cache:', error);
+  firestoreDb = getFirestore(app);
+}
+export const db = firestoreDb;
+
 export const storage = getStorage(app);
 
 /** * appId: Unique identifier for this specific deployment instance.

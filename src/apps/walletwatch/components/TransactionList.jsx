@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   CreditCard, Trash2, Pencil, RefreshCcw, Folder, ChevronDown, Tag, Filter, XCircle,
   Link2, MapPin, Search, ArrowUpDown, Calendar, Wallet, Download, FileText, Loader2,
-  LayoutGrid, List
+  LayoutGrid, List, Repeat
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
 import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey } from '../constants';
@@ -757,6 +757,11 @@ const TransactionCard = ({ exp, categories, onEdit, onDelete, onSettle, relatedE
         {exp.isOfficial && (
           <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Official</span>
         )}
+        {exp.isFixedExpense && (
+          <span className="flex items-center gap-0.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">
+            <Repeat size={9} /> Fixed
+          </span>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
@@ -841,6 +846,11 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedEx
           )}
           {exp.isOfficial && (
             <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Official</span>
+          )}
+          {exp.isFixedExpense && (
+            <span className="flex items-center gap-0.5 text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">
+              <Repeat size={8} /> Fixed
+            </span>
           )}
         </div>
 

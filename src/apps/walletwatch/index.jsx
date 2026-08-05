@@ -265,6 +265,7 @@ const WalletWatchApp = ({ user }) => {
             selectedMonth={selectedMonth}
             setSelectedMonth={setSelectedMonth}
             fixedInstances={fixedExpenses.instances}
+            cards={creditCards.cards}
           />
         )}
 

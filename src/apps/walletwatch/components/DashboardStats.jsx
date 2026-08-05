@@ -8,6 +8,7 @@ import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettle
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
 import { monthKeyOf } from '../hooks/useFixedExpenses';
+import { getCycleForDate } from '../lib/cardCycles';
 
 const monthKey = (d) => `${d.getFullYear()}-${d.getMonth()}`;
 
@@ -45,7 +46,7 @@ const MonthNavigator = ({ selectedMonth, setSelectedMonth }) => {
 // returns null when it has nothing to show for the month (e.g. no official trips) — since
 // a null child renders no DOM node, the grid never reserves empty space for it, so no
 // separate "does the sidebar have anything to show" check is needed here.
-const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth, fixedInstances = [] }) => {
+const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth, fixedInstances = [], cards = [] }) => {
   return (
     <div>
       <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
@@ -65,6 +66,7 @@ const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelect
         <WeeklyBarChart expenses={allExpenses} />
         <PaymentModeBreakdown expenses={expenses} />
         <PaymentAccountBreakdown expenses={expenses} categories={categories} />
+        <AccountPeriodTally allExpenses={allExpenses} categories={categories} cards={cards} />
         <GroupSubtotals categories={categories} expenses={expenses} />
         <OfficialTripsSummary categories={categories} allExpenses={allExpenses} />
         <FixedBillsDueCard instances={fixedInstances} selectedMonth={selectedMonth} />
@@ -813,6 +815,188 @@ export const PaymentAccountBreakdown = ({ expenses, categories }) => {
                     {selectedAccount.name}
                   </h3>
                   <p className="text-sm font-bold text-slate-600 mt-1">{formatCurrency(selectedAccount.total)} across {selectedAccount.items.length} transactions</p>
+                </div>
+                <button onClick={() => setSelectedAccount(null)} aria-label="Close" className="p-2 bg-white/50 hover:bg-white rounded-full transition-colors text-slate-500 shadow-sm shrink-0">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={handleExportCsv} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-white rounded-xl text-xs font-bold text-slate-600 hover:text-indigo-600 shadow-sm border border-slate-100 min-h-[40px]">
+                  <FileText size={14} /> CSV
+                </button>
+                <button onClick={handleExportPdf} disabled={exportingPdf} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-white rounded-xl text-xs font-bold text-slate-600 hover:text-indigo-600 shadow-sm border border-slate-100 disabled:opacity-50 min-h-[40px]">
+                  {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {selectedAccount.items.map(exp => (
+                <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
+                  <div className="min-w-0 pr-3">
+                    <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                      {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+const formatTallyRange = (start, end) => {
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const s = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
+  const e = end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${s} – ${e}`;
+};
+
+/**
+ * AccountPeriodTally — per-account spend right now, with a Month/Cycle toggle. Always
+ * anchored to "today" (not the Dashboard's navigated selectedMonth) since the point is
+ * "where do I stand this period," same convention as the Cards tab's current-cycle-first
+ * list and FixedBillsDueCard. In Cycle mode, an account matching a card configured in the
+ * Cards tab (`cards`, by name — same identity as CreditCardBilling) uses that card's
+ * actual billing-cycle window; every other account (Cash, unconfigured UPI, etc.) falls
+ * back to the current calendar month, since it has no cycle to speak of. A standalone
+ * panel deliberately kept separate from PaymentAccountBreakdown above, which stays a pure
+ * calendar-month report tied to the month navigator.
+ */
+export const AccountPeriodTally = ({ allExpenses, categories, cards = [] }) => {
+  const [mode, setMode] = useState('month');
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const data = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const cardByName = new Map(cards.map(c => [c.name, c]));
+
+    const rangeFor = (accountName) => {
+      const card = mode === 'cycle' ? cardByName.get(accountName) : null;
+      if (card) {
+        const cycle = getCycleForDate(now, card.cycleStartDay || 1);
+        return { start: cycle.cycleStart, end: cycle.cycleEnd, isCycle: true };
+      }
+      return { start: monthStart, end: monthEnd, isCycle: false };
+    };
+
+    const byAccount = {};
+    allExpenses.filter(e => Number(e.amount) < 0 && !e.isOfficial).forEach(e => {
+      const key = getAccountKey(e);
+      (byAccount[key] ||= []).push(e);
+    });
+
+    const rows = Object.entries(byAccount)
+      .map(([name, items]) => {
+        const range = rangeFor(name);
+        const matched = items.filter(e => {
+          const d = safeGetDate(e.date);
+          return d && d >= range.start && d <= range.end;
+        });
+        const total = matched.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+        return { name, total, items: matched, range };
+      })
+      .filter(r => r.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .map((r, i) => ({ ...r, color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length].color }));
+
+    const grandTotal = rows.reduce((acc, r) => acc + r.total, 0);
+    return { rows, grandTotal };
+  }, [allExpenses, cards, mode]);
+
+  const handleExportCsv = () => {
+    downloadExpensesCSV(selectedAccount.items, categories, `account-${selectedAccount.name.replace(/[^a-z0-9]+/gi, '-')}.csv`);
+  };
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      await downloadExpensesPDF(selectedAccount.items, categories, {
+        title: `Account Report: ${selectedAccount.name}`,
+        filename: `account-${selectedAccount.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`,
+      });
+    } catch (err) {
+      console.error('Account PDF export failed:', err);
+      alert('Failed to export PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  if (data.rows.length === 0) return null;
+
+  return (
+    <>
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm font-sans">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
+            <Layers size={16} className="text-indigo-500" /> Account Tally
+          </div>
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+            <button
+              onClick={() => setMode('month')}
+              className={`px-2 py-1 text-[10px] font-bold transition-colors ${mode === 'month' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setMode('cycle')}
+              className={`px-2 py-1 text-[10px] font-bold transition-colors ${mode === 'cycle' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              Cycle
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-400 font-medium mb-4">
+          {mode === 'cycle' ? "This month for most accounts, actual billing cycle for cards configured in the Cards tab" : 'Current calendar month'}
+        </p>
+        <div className="space-y-3">
+          {data.rows.map((r, i) => (
+            <div
+              key={i}
+              className="space-y-1.5 cursor-pointer group min-h-[32px]"
+              onClick={() => setSelectedAccount(r)}
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                  <span className="text-slate-600 group-hover:text-indigo-600 transition-colors truncate">{r.name}</span>
+                  {r.range.isCycle && <span className="text-[9px] text-indigo-400 font-semibold shrink-0">cycle</span>}
+                </div>
+                <span className="text-slate-900 shrink-0 ml-2">{formatCurrency(r.total)}</span>
+              </div>
+              <div className="w-full bg-slate-50 h-1 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${data.grandTotal > 0 ? (r.total / data.grandTotal) * 100 : 0}%`, backgroundColor: r.color }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedAccount && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-slate-100" style={{ backgroundColor: '#f8fafc' }}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: selectedAccount.color }}></div>
+                    {selectedAccount.name}
+                  </h3>
+                  <p className="text-sm font-bold text-slate-600 mt-1">{formatCurrency(selectedAccount.total)} across {selectedAccount.items.length} transactions</p>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mt-1">
+                    {formatTallyRange(selectedAccount.range.start, selectedAccount.range.end)}{selectedAccount.range.isCycle ? ' · billing cycle' : ' · this month'}
+                  </p>
                 </div>
                 <button onClick={() => setSelectedAccount(null)} aria-label="Close" className="p-2 bg-white/50 hover:bg-white rounded-full transition-colors text-slate-500 shadow-sm shrink-0">
                   <X size={20} />

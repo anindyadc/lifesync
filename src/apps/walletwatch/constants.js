@@ -3,7 +3,7 @@
  * Centralized configuration for categories and payment modes.
  */
 
-import { Smartphone, Banknote, CreditCard, Utensils, Plane, ShoppingBag, Receipt, HeartPulse, Film, MoreHorizontal, Wallet } from 'lucide-react';
+import { Smartphone, Banknote, CreditCard, Landmark, Utensils, Plane, ShoppingBag, Receipt, HeartPulse, Film, MoreHorizontal, Wallet } from 'lucide-react';
 
 // Validated categorical palette (CVD-checked via the dataviz skill's validate_palette.js —
 // all 8 slots pass the lightness/chroma/CVD-separation checks). Fixed order: assignment is
@@ -56,6 +56,9 @@ export const PAYMENT_MODES = [
   { id: 'upi', label: 'UPI', icon: Smartphone, ...CATEGORICAL_PALETTE[0] },
   { id: 'cash', label: 'Cash', icon: Banknote, ...CATEGORICAL_PALETTE[1] },
   { id: 'card', label: 'Card', icon: CreditCard, ...CATEGORICAL_PALETTE[2] },
+  // Added for cases like a credit card bill paid via NEFT/IMPS/net-banking/auto-debit
+  // rather than a UPI push — see CreditCardBilling's SettleForm "Paid From" select.
+  { id: 'bank', label: 'Bank Transfer', icon: Landmark, ...CATEGORICAL_PALETTE[3] },
 ];
 
 // Assigns the next validated slot by creation order (existingCount = categories.length

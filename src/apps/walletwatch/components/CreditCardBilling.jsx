@@ -21,6 +21,8 @@ const STATUS_META = {
   over: { label: 'Over-paid', className: 'bg-blue-100 text-blue-600', icon: AlertTriangle },
   unsettled: { label: 'Not settled', className: 'bg-amber-100 text-amber-600', icon: Clock },
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-600', icon: AlertTriangle },
+  ok: { label: 'On Budget', className: 'bg-emerald-100 text-emerald-600', icon: CheckCircle2 },
+  overspent: { label: 'Overspent', className: 'bg-red-100 text-red-600', icon: AlertTriangle },
 };
 
 const StatusChip = ({ status, delta }) => {
@@ -41,6 +43,8 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
   const [showAllCycles, setShowAllCycles] = useState(false);
 
   const activeCard = selectedCard || cards[0]?.name || null;
+  const activeCardObj = cards.find(c => c.name === activeCard) || null;
+  const isPrepaidActive = activeCardObj?.cardType === 'prepaid';
 
   const cycles = useMemo(() => (activeCard ? cyclesForCard(activeCard) : []), [activeCard, cyclesForCard]);
   const visibleCycles = showAllCycles ? cycles : cycles.slice(0, 3);
@@ -64,8 +68,18 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
   };
 
   const handleExportCsv = () => {
-    const headers = ['Card', 'Cycle Start', 'Cycle End', 'Spend', 'Status', 'Paid Amount', 'Paid Date', 'Paid Via'];
-    const rows = cycles.map(c => [
+    const headers = isPrepaidActive
+      ? ['Card', 'Cycle Start', 'Cycle End', 'Opening Balance', 'Spend', 'Refill Amount', 'Closing Balance']
+      : ['Card', 'Cycle Start', 'Cycle End', 'Spend', 'Status', 'Paid Amount', 'Paid Date', 'Paid Via'];
+    const rows = cycles.map(c => (isPrepaidActive ? [
+      activeCard,
+      toISODate(c.cycleStart),
+      toISODate(c.cycleEnd),
+      c.openingBalance,
+      c.cardSpend,
+      c.refillAmount,
+      c.balance,
+    ] : [
       activeCard,
       toISODate(c.cycleStart),
       toISODate(c.cycleEnd),
@@ -74,7 +88,7 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
       c.settlement ? c.settlement.paidAmount : '',
       c.settlement ? toISODate(c.settlement.paidDate.toDate ? c.settlement.paidDate.toDate() : c.settlement.paidDate) : '',
       c.settlement ? (PAYMENT_MODES.find(m => m.id === c.settlement.paymentMode)?.label || c.settlement.paymentMode) : '',
-    ].map(csvEscape).join(','));
+    ]).map(csvEscape).join(','));
     downloadCsvContent([headers.join(','), ...rows].join('\n'), `${activeCard.replace(/[^a-zA-Z0-9]+/g, '-')}-billing-cycles.csv`);
   };
 
@@ -110,6 +124,9 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
               }`}
             >
               <CreditCard size={15} /> {c.name}
+              {c.cardType === 'prepaid' && (
+                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${activeCard === c.name ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-500'}`}>Prepaid</span>
+              )}
             </button>
           ))}
         </div>
@@ -149,6 +166,7 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
       ) : (
         <div className="space-y-3">
           {visibleCycles.map((cycle, idx) => {
+            const isPrepaid = cycle.cardType === 'prepaid';
             const delta = cycle.settlement ? Number(cycle.settlement.paidAmount) - cycle.cardSpend : 0;
             return (
               <div key={cycle.cycleKey} className={`bg-white rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${idx === 0 ? 'border-indigo-200 shadow-sm' : 'border-slate-200'}`}>
@@ -157,7 +175,11 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
                     <Calendar size={11} /> {formatCycleRange(cycle.cycleStart, cycle.cycleEnd)} {idx === 0 && <span className="text-indigo-500">&middot; Current cycle</span>}
                   </p>
                   <p className="text-lg font-black text-slate-900 mt-0.5">{formatCurrency(cycle.cardSpend)}</p>
-                  {cycle.settlement && (
+                  {isPrepaid ? (
+                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      Opening {formatCurrency(cycle.openingBalance)} + Refill {formatCurrency(cycle.refillAmount)} &rarr; Balance {formatCurrency(cycle.balance)}
+                    </p>
+                  ) : cycle.settlement && (
                     <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                       Paid {formatCurrency(cycle.settlement.paidAmount)} via {PAYMENT_MODES.find(m => m.id === cycle.settlement.paymentMode)?.label || cycle.settlement.paymentMode}
                       {cycle.settlement.paymentAccount ? ` (${cycle.settlement.paymentAccount})` : ''}
@@ -165,19 +187,25 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusChip status={cycle.status} delta={cycle.settlement ? delta : 0} />
-                  {cycle.settlement ? (
-                    <>
-                      <button onClick={() => setSettleContext({ cycle })} aria-label="Edit settlement" title="Edit" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600"><Pencil size={15} /></button>
-                      <button onClick={() => setUnsettleId(cycle.settlement.id)} aria-label="Un-settle" title="Un-settle" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-600"><Trash2 size={15} /></button>
-                    </>
+                  {isPrepaid ? (
+                    <StatusChip status={cycle.status} />
                   ) : (
-                    <button
-                      onClick={() => setSettleContext({ cycle })}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
-                    >
-                      <CheckCircle2 size={13} /> Settle
-                    </button>
+                    <>
+                      <StatusChip status={cycle.status} delta={cycle.settlement ? delta : 0} />
+                      {cycle.settlement ? (
+                        <>
+                          <button onClick={() => setSettleContext({ cycle })} aria-label="Edit settlement" title="Edit" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600"><Pencil size={15} /></button>
+                          <button onClick={() => setUnsettleId(cycle.settlement.id)} aria-label="Un-settle" title="Un-settle" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-600"><Trash2 size={15} /></button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setSettleContext({ cycle })}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
+                        >
+                          <CheckCircle2 size={13} /> Settle
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -235,14 +263,22 @@ const fieldClass = "w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded
 const ManageCardsModal = ({ cards, suggestedNames, addCard, updateCard, removeCard, onClose }) => {
   const [newName, setNewName] = useState('');
   const [newDay, setNewDay] = useState(1);
+  const [newType, setNewType] = useState('credit');
+  const [newRefill, setNewRefill] = useState('');
+  const [newStartingBalance, setNewStartingBalance] = useState('');
+  const [newStartingDate, setNewStartingDate] = useState(() => toISODate(new Date()));
   const [removeCandidate, setRemoveCandidate] = useState(null);
 
   const handleAdd = (name) => {
     const trimmed = (name ?? newName).trim();
     if (!trimmed) return;
-    addCard(trimmed, newDay);
+    addCard(trimmed, newDay, newType, newRefill, newStartingBalance, newStartingDate);
     setNewName('');
     setNewDay(1);
+    setNewType('credit');
+    setNewRefill('');
+    setNewStartingBalance('');
+    setNewStartingDate(toISODate(new Date()));
   };
 
   const confirmRemove = async () => {
@@ -269,21 +305,62 @@ const ManageCardsModal = ({ cards, suggestedNames, addCard, updateCard, removeCa
         </div>
         <p className="text-xs text-slate-400 font-medium mb-4 shrink-0">Name must match the Account text used on card-mode transactions.</p>
 
-        <div className="flex gap-2 mb-4 shrink-0">
-          <input
-            type="text" value={newName} onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            placeholder="Card name, e.g. HDFC Credit Card"
-            className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
-          />
-          <input
-            type="number" min="1" max="31" value={newDay} onChange={e => setNewDay(e.target.value)}
-            title="Billing cycle start day"
-            className="w-16 shrink-0 px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-center"
-          />
-          <button onClick={() => handleAdd()} aria-label="Add card" className="shrink-0 p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-90 transition-all">
-            <Plus size={18} />
-          </button>
+        <div className="space-y-2 mb-4 shrink-0">
+          <div className="flex gap-2">
+            <input
+              type="text" value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              placeholder="Card name, e.g. HDFC Credit Card"
+              className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
+            />
+            <div className="flex rounded-xl border border-slate-200 overflow-hidden shrink-0">
+              <button type="button" onClick={() => setNewType('credit')} className={`px-2.5 py-2 text-[11px] font-bold transition-colors ${newType === 'credit' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Credit</button>
+              <button type="button" onClick={() => setNewType('prepaid')} className={`px-2.5 py-2 text-[11px] font-bold transition-colors ${newType === 'prepaid' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Prepaid</button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl">
+              <span className="text-[10px] text-slate-400 font-semibold shrink-0">Cycle day</span>
+              <input
+                type="number" min="1" max="31" value={newDay} onChange={e => setNewDay(e.target.value)}
+                title="Billing cycle start day"
+                className="w-full bg-transparent outline-none text-sm font-medium text-center"
+              />
+            </div>
+            {newType === 'prepaid' && (
+              <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-semibold shrink-0">Refill ₹</span>
+                <input
+                  type="number" min="0" value={newRefill} onChange={e => setNewRefill(e.target.value)}
+                  title="Fixed monthly refill amount"
+                  className="w-full bg-transparent outline-none text-sm font-medium text-center"
+                />
+              </div>
+            )}
+            <button onClick={() => handleAdd()} aria-label="Add card" className="shrink-0 p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm active:scale-90 transition-all">
+              <Plus size={18} />
+            </button>
+          </div>
+          {newType === 'prepaid' && (
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-semibold shrink-0">Balance ₹</span>
+                <input
+                  type="number" min="0" value={newStartingBalance} onChange={e => setNewStartingBalance(e.target.value)}
+                  title="What the card currently has on it"
+                  className="w-full bg-transparent outline-none text-sm font-medium text-center"
+                />
+              </div>
+              <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] text-slate-400 font-semibold shrink-0">As of</span>
+                <input
+                  type="date" value={newStartingDate} onChange={e => setNewStartingDate(e.target.value)}
+                  title="Date the starting balance above was accurate"
+                  className="w-full bg-transparent outline-none text-sm font-medium"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {suggestedNames.length > 0 && (
@@ -298,19 +375,58 @@ const ManageCardsModal = ({ cards, suggestedNames, addCard, updateCard, removeCa
 
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2 p-0.5">
           {cards.map(c => (
-            <div key={c.name} className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-xl border border-slate-200 bg-white">
-              <span className="flex-1 min-w-0 text-sm font-bold text-slate-700 truncate">{c.name}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10px] text-slate-400 font-semibold">Day</span>
-                <input
-                  type="number" min="1" max="31" value={c.cycleStartDay}
-                  onChange={e => updateCard(c.name, e.target.value)}
-                  className="w-12 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-center"
-                />
+            <div key={c.name} className="flex flex-col gap-1.5 pl-3 pr-1.5 py-2 rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 min-w-0 text-sm font-bold text-slate-700 truncate">{c.name}</span>
+                <button onClick={() => setRemoveCandidate(c.name)} aria-label={`Remove ${c.name}`} title={`Remove ${c.name}`} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors shrink-0">
+                  <X size={14} />
+                </button>
               </div>
-              <button onClick={() => setRemoveCandidate(c.name)} aria-label={`Remove ${c.name}`} title={`Remove ${c.name}`} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors shrink-0">
-                <X size={14} />
-              </button>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                  <button type="button" onClick={() => updateCard(c.name, { cardType: 'credit' })} className={`px-2 py-1 text-[10px] font-bold transition-colors ${(c.cardType || 'credit') === 'credit' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Credit</button>
+                  <button type="button" onClick={() => updateCard(c.name, { cardType: 'prepaid' })} className={`px-2 py-1 text-[10px] font-bold transition-colors ${c.cardType === 'prepaid' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Prepaid</button>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-slate-400 font-semibold">Day</span>
+                  <input
+                    type="number" min="1" max="31" value={c.cycleStartDay}
+                    onChange={e => updateCard(c.name, { cycleStartDay: e.target.value })}
+                    className="w-12 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-center"
+                  />
+                </div>
+                {c.cardType === 'prepaid' && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-slate-400 font-semibold">Refill ₹</span>
+                    <input
+                      type="number" min="0" value={c.refillAmount || 0}
+                      onChange={e => updateCard(c.name, { refillAmount: e.target.value })}
+                      className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-center"
+                    />
+                  </div>
+                )}
+              </div>
+              {c.cardType === 'prepaid' && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-slate-400 font-semibold">Balance ₹</span>
+                    <input
+                      type="number" min="0" value={c.startingBalance || 0}
+                      onChange={e => updateCard(c.name, { startingBalance: e.target.value })}
+                      title="What the card currently has on it, as of the date below"
+                      className="w-16 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-center"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-slate-400 font-semibold">as of</span>
+                    <input
+                      type="date" value={c.startingBalanceDate || toISODate(new Date())}
+                      onChange={e => updateCard(c.name, { startingBalanceDate: e.target.value })}
+                      className="px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { getAccountKey } from '../constants';
-import { safeGetDate } from '../../../lib/utils';
-import { getCycleForDate, getPreviousCycle } from '../lib/cardCycles';
+import { safeGetDate, toISODate } from '../../../lib/utils';
+import { getCycleForDate, getPreviousCycle, getNextCycle } from '../lib/cardCycles';
 
 const APP_ID = 'default-app-id';
 // Caps how far back cyclesForCard walks so a card used once, years ago, doesn't
 // generate an unbounded list — 12 statement cycles is a full year of history.
 const MAX_CYCLES_BACK = 12;
+// Guards the forward walk (prepaid balance rollover) against a runaway loop if
+// startingBalanceDate is ever badly misconfigured — 50 years of cycles is far more
+// than any real starting date would ever need.
+const MAX_FORWARD_CYCLES = 600;
 
 /**
  * WalletWatch Credit Card billing-cycle tally. Each card's actual statement period
@@ -21,6 +25,15 @@ const MAX_CYCLES_BACK = 12;
  * so the lump-sum bank payment is a liability settlement, not new spend. It's recorded
  * purely in `cardCycleSettlements` and shown only in the Cards tab; History, the
  * Dashboard "Total Spent" KPI, and exports are entirely unaffected.
+ *
+ * A card's `cardType` is 'credit' (default, for legacy configs with no cardType field)
+ * or 'prepaid'. Prepaid cards are refilled a fixed amount by the company each cycle and
+ * never need reconciling against a bank payment, so they skip the settlement flow
+ * entirely. Their balance *rolls over* cycle to cycle (unspent money stays on the card,
+ * matching how a real prepaid card works) rather than resetting — `cyclesForCard` walks
+ * forward from the card's one-time `startingBalance`/`startingBalanceDate` up to the
+ * current cycle, applying `+ refillAmount` then `- cardSpend` per cycle in sequence, so
+ * each cycle's closing balance becomes the next cycle's opening balance.
  */
 export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
   const [cards, setCards] = useState([]);
@@ -58,14 +71,36 @@ export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
     await setDoc(configRef, { cards: updated }, { merge: true });
   };
 
-  const addCard = async (name, cycleStartDay = 1) => {
+  const addCard = async (name, cycleStartDay = 1, cardType = 'credit', refillAmount = 0, startingBalance = 0, startingBalanceDate = null) => {
     const trimmed = (name || '').trim();
     if (!trimmed || cards.some(c => c.name === trimmed)) return;
-    await saveCards([...cards, { name: trimmed, cycleStartDay: Number(cycleStartDay) || 1 }]);
+    const type = cardType === 'prepaid' ? 'prepaid' : 'credit';
+    await saveCards([...cards, {
+      name: trimmed,
+      cycleStartDay: Number(cycleStartDay) || 1,
+      cardType: type,
+      refillAmount: type === 'prepaid' ? (Number(refillAmount) || 0) : 0,
+      startingBalance: type === 'prepaid' ? (Number(startingBalance) || 0) : 0,
+      // Defaults to today so a card added without an explicit "as of" date still gets a
+      // valid anchor for the forward balance walk in cyclesForCard.
+      startingBalanceDate: type === 'prepaid' ? (startingBalanceDate || toISODate(new Date())) : null,
+    }]);
   };
 
-  const updateCard = async (name, cycleStartDay) => {
-    await saveCards(cards.map(c => (c.name === name ? { ...c, cycleStartDay: Number(cycleStartDay) || 1 } : c)));
+  // `updates` is a partial object ({ cycleStartDay } and/or { cardType } and/or
+  // { refillAmount } and/or { startingBalance }/{ startingBalanceDate }) so the Manage
+  // Cards modal can patch one field at a time without needing to know the card's other
+  // current values.
+  const updateCard = async (name, updates) => {
+    await saveCards(cards.map(c => {
+      if (c.name !== name) return c;
+      const merged = { ...c, ...updates };
+      if (updates.cycleStartDay !== undefined) merged.cycleStartDay = Number(updates.cycleStartDay) || 1;
+      if (updates.refillAmount !== undefined) merged.refillAmount = Number(updates.refillAmount) || 0;
+      if (updates.startingBalance !== undefined) merged.startingBalance = Number(updates.startingBalance) || 0;
+      if (updates.cardType !== undefined) merged.cardType = updates.cardType === 'prepaid' ? 'prepaid' : 'credit';
+      return merged;
+    }));
   };
 
   const removeCard = async (name) => {
@@ -77,20 +112,52 @@ export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
   // every render of this hook (e.g. any settlement elsewhere ticking `settlements`),
   // silently defeating the memoization.
   const cyclesForCard = useCallback((cardName) => {
-    const cycleStartDay = cards.find(c => c.name === cardName)?.cycleStartDay || 1;
+    const card = cards.find(c => c.name === cardName);
+    const cycleStartDay = card?.cycleStartDay || 1;
+    const cardType = card?.cardType === 'prepaid' ? 'prepaid' : 'credit';
     const cardExpenses = allExpenses.filter(e => e.paymentMode === 'card' && getAccountKey(e) === cardName && Number(e.amount) < 0);
+
+    const spendInCycle = (cyc) => cardExpenses
+      .filter(e => {
+        const d = safeGetDate(e.date);
+        return d && d >= cyc.cycleStart && d <= cyc.cycleEnd;
+      })
+      .reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+
+    if (cardType === 'prepaid') {
+      const refillAmount = Number(card?.refillAmount) || 0;
+      const startingBalance = Number(card?.startingBalance) || 0;
+      const startingDate = safeGetDate(card?.startingBalanceDate) || new Date();
+      const startCycle = getCycleForDate(startingDate, cycleStartDay);
+      const nowCycle = getCycleForDate(new Date(), cycleStartDay);
+
+      // Walk forward from the cycle the starting balance was recorded in, up through the
+      // current cycle, applying refill-then-spend in sequence so each cycle's closing
+      // balance carries into the next cycle's opening balance (a real prepaid card's
+      // unspent money doesn't reset each period).
+      const forward = [];
+      let openingBalance = startingBalance;
+      let fc = startCycle;
+      let guard = 0;
+      while (guard < MAX_FORWARD_CYCLES) {
+        const cardSpend = spendInCycle(fc);
+        const balance = openingBalance + refillAmount - cardSpend;
+        forward.push({ ...fc, cardType, cardSpend, refillAmount, openingBalance, balance, settlement: null, status: balance < 0 ? 'overspent' : 'ok' });
+        if (fc.cycleKey === nowCycle.cycleKey) break;
+        openingBalance = balance;
+        fc = getNextCycle(fc, cycleStartDay);
+        guard++;
+      }
+
+      // Most-recent-first, capped the same as the credit-card walk-back below.
+      return forward.slice(-MAX_CYCLES_BACK).reverse();
+    }
 
     let cycle = getCycleForDate(new Date(), cycleStartDay);
     const result = [];
 
     for (let i = 0; i < MAX_CYCLES_BACK; i++) {
-      const cardSpend = cardExpenses
-        .filter(e => {
-          const d = safeGetDate(e.date);
-          return d && d >= cycle.cycleStart && d <= cycle.cycleEnd;
-        })
-        .reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
-
+      const cardSpend = spendInCycle(cycle);
       const settlement = settlements.find(s => s.cardName === cardName && s.cycleKey === cycle.cycleKey) || null;
 
       // Always show the current cycle even if empty (so a freshly-configured card isn't
@@ -108,7 +175,7 @@ export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
         status = 'overdue';
       }
 
-      result.push({ ...cycle, cardSpend, settlement, status });
+      result.push({ ...cycle, cardType, cardSpend, settlement, status });
       cycle = getPreviousCycle(cycle, cycleStartDay);
     }
 

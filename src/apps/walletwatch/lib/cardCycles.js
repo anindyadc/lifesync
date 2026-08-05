@@ -38,3 +38,11 @@ export const getPreviousCycle = (cycle, cycleStartDay) => {
   dayBefore.setDate(dayBefore.getDate() - 1);
   return getCycleForDate(dayBefore, cycleStartDay);
 };
+
+// Resolves the cycle immediately after the given one — used to walk forward from a
+// prepaid card's starting-balance date up to the current cycle, accumulating balance.
+export const getNextCycle = (cycle, cycleStartDay) => {
+  const dayAfter = new Date(cycle.cycleEnd);
+  dayAfter.setDate(dayAfter.getDate() + 1);
+  return getCycleForDate(dayAfter, cycleStartDay);
+};

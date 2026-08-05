@@ -49,11 +49,14 @@ const CreditCardBilling = ({ cards, allExpenses, loading, addCard, updateCard, r
   const cycles = useMemo(() => (activeCard ? cyclesForCard(activeCard) : []), [activeCard, cyclesForCard]);
   const visibleCycles = showAllCycles ? cycles : cycles.slice(0, 3);
 
+  // Suggests accounts from both Card- and UPI-mode transactions — a UPI-linked credit
+  // card (e.g. RuPay-on-UPI) is logged with paymentMode 'upi', but still names a credit
+  // line worth tracking here. Cash is excluded since it never represents a credit line.
   const suggestedNames = useMemo(() => {
     const known = new Set(cards.map(c => c.name));
     const names = new Set();
     allExpenses.forEach(e => {
-      if (e.paymentMode === 'card') {
+      if (e.paymentMode === 'card' || e.paymentMode === 'upi') {
         const key = getAccountKey(e);
         if (key && !known.has(key)) names.add(key);
       }
@@ -303,7 +306,7 @@ const ManageCardsModal = ({ cards, suggestedNames, addCard, updateCard, removeCa
             <X size={20} />
           </button>
         </div>
-        <p className="text-xs text-slate-400 font-medium mb-4 shrink-0">Name must match the Account text used on card-mode transactions.</p>
+        <p className="text-xs text-slate-400 font-medium mb-4 shrink-0">Name must match the Account text used on the card's transactions — Card mode or UPI mode both work (e.g. a UPI-linked credit card).</p>
 
         <div className="space-y-2 mb-4 shrink-0">
           <div className="flex gap-2">

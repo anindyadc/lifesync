@@ -115,7 +115,11 @@ export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
     const card = cards.find(c => c.name === cardName);
     const cycleStartDay = card?.cycleStartDay || 1;
     const cardType = card?.cardType === 'prepaid' ? 'prepaid' : 'credit';
-    const cardExpenses = allExpenses.filter(e => e.paymentMode === 'card' && getAccountKey(e) === cardName && Number(e.amount) < 0);
+    // Matched by account identity alone, not paymentMode === 'card' — a UPI-linked
+    // credit card (e.g. RuPay-on-UPI) is logged with paymentMode 'upi' since that's how
+    // the payment was made, but it's still a credit line with a statement to settle just
+    // like a swiped card, as long as its Account text matches this card's configured name.
+    const cardExpenses = allExpenses.filter(e => getAccountKey(e) === cardName && Number(e.amount) < 0);
 
     const spendInCycle = (cyc) => cardExpenses
       .filter(e => {

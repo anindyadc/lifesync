@@ -34,9 +34,15 @@ service cloud.firestore {
     // --- RULES ---
 
     // 1. User Profiles Rule
+    // `create` is restricted to the exact default-role shape the signup flow
+    // writes (AuthScreen.jsx) — without this, ownership alone would let any
+    // authenticated user create their own profile doc with role: 'admin' and
+    // arbitrary allowedApps, a full privilege escalation.
     match /artifacts/default-app-id/public/data/userProfiles/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'user'
+        && request.resource.data.allowedApps == [];
       allow update, delete: if isAdmin();
     }
 
@@ -99,6 +105,13 @@ service cloud.firestore {
     // 'walletwatch' allowedApps key, same reason as fixedExpenseTemplates/Instances above.
     match /artifacts/default-app-id/users/{userId}/cardCycleSettlements/{docId} {
       allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
+    // 11. Specific rule for MediWatch's prescriptions collection — top-level
+    // collection whose path segment ('prescriptions') doesn't match the
+    // 'mediwatch' allowedApps key, same reason as quickTasks/changelogs above.
+    match /artifacts/default-app-id/users/{userId}/prescriptions/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('mediwatch');
     }
 
   }

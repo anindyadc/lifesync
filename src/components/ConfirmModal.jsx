@@ -4,6 +4,7 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
   const [busy, setBusy] = useState(false);
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const cancelRef = useRef(null);
+  const dialogRef = useRef(null);
 
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
@@ -17,7 +18,24 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const focusables = dialogRef.current?.querySelectorAll('button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -36,6 +54,7 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-modal-title"

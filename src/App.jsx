@@ -1,32 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  LayoutGrid,
-  User,
-  LogOut,
   CheckCircle,
   Wallet,
   Loader2,
   Server,
   ShieldAlert,
   Shield,
-  PiggyBank, // New icon for Investments
-  Stethoscope, // New icon for Medical
-  Menu 
-} from 'lucide-react';import { onAuthStateChanged, signOut } from 'firebase/auth';
+  PiggyBank,
+  Stethoscope,
+  Menu,
+  Lock
+} from 'lucide-react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from './lib/firebase';
 
 import AuthScreen from './components/AuthScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 import TaskFlowApp from './apps/taskflow';
 import WalletWatchApp from './apps/walletwatch';
 import ChangeManagerApp from './apps/changemanager';
 import IncidentLoggerApp from './apps/incidentlogger';
 import AdminPanelApp from './apps/admin';
-import InvestmentsApp from './apps/investment'; // New app import
-import MediWatchApp from './apps/mediwatch'; // New mediwatch app import
+import InvestmentsApp from './apps/investment';
+import MediWatchApp from './apps/mediwatch';
 
 import Sidebar from './components/Sidebar';
+
+const AccessDenied = ({ appLabel }) => (
+  <div className="flex flex-col items-center justify-center text-center bg-white p-12 rounded-2xl shadow-sm border border-slate-100 mt-6">
+    <Lock size={32} className="text-slate-300 mb-4" />
+    <h2 className="text-lg font-bold text-slate-800">Access removed</h2>
+    <p className="text-sm text-slate-500 mt-1 max-w-sm">
+      Your account no longer has access to {appLabel}. Ask an admin to re-grant it if this is unexpected.
+    </p>
+  </div>
+);
 
 
 /**
@@ -44,44 +54,50 @@ export default function App() {
   const appId = 'default-app-id';
 
   useEffect(() => {
-    console.log("App.jsx: Setting up auth state listener.");
+    // `latestUid` guards against a slower earlier callback resolving after a
+    // faster later one (e.g. rapid sign-out/sign-in of a different user) and
+    // overwriting fresh state with stale profile data.
+    let cancelled = false;
+    let latestUid = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log("App.jsx: Auth state changed.", { uid: currentUser?.uid });
-      setLoadingProfile(true); 
+      const callUid = currentUser?.uid ?? null;
+      latestUid = callUid;
+      setLoadingProfile(true);
+
       if (currentUser) {
         setUser(currentUser);
         try {
-          console.log("App.jsx: Fetching profile for UID:", currentUser.uid);
           const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'userProfiles', currentUser.uid);
           const snap = await getDoc(profileRef);
-          
+          if (cancelled || latestUid !== callUid) return;
+
           if (snap.exists()) {
-            console.log("App.jsx: Profile document found:", snap.data());
             setUserProfile(snap.data());
           } else {
-            console.warn("App.jsx: Profile document NOT found for user. Creating a default profile.");
-            setUserProfile({ 
-              role: 'user', 
-              allowedApps: [], 
-              displayName: currentUser.displayName 
+            setUserProfile({
+              role: 'user',
+              allowedApps: [],
+              displayName: currentUser.displayName
             });
           }
         } catch (error) {
+          if (cancelled || latestUid !== callUid) return;
           console.error("App.jsx: Critical error fetching user profile:", error);
           setUserProfile({ role: 'user', allowedApps: [] });
         }
       } else {
-        console.log("App.jsx: User is signed out.");
         setUser(null);
         setUserProfile(null);
       }
-      console.log("App.jsx: Setting all loading states to false.");
+
+      if (cancelled || latestUid !== callUid) return;
       setLoadingAuth(false);
       setLoadingProfile(false);
     });
 
     return () => {
-      console.log("App.jsx: Cleaning up auth state listener.");
+      cancelled = true;
       unsubscribe();
     };
   }, []);
@@ -89,6 +105,16 @@ export default function App() {
   const handleSignOut = () => {
     signOut(auth);
   };
+
+  const displayName = useMemo(
+    () => userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'User',
+    [userProfile?.displayName, user?.displayName, user?.email]
+  );
+  const isAdmin = userProfile?.role === 'admin';
+  const isAllowed = useMemo(() => {
+    const allowedApps = userProfile?.allowedApps;
+    return (appKey) => isAdmin || (allowedApps?.includes(appKey) ?? false);
+  }, [userProfile?.allowedApps, isAdmin]);
 
   const isLoading = loadingAuth || loadingProfile;
 
@@ -104,10 +130,6 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  const displayName = userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'User';
-  const isAllowed = (appKey) => userProfile?.allowedApps?.includes(appKey) || userProfile?.role === 'admin';
-  const isAdmin = userProfile?.role === 'admin';
-
   const handleAppSwitch = (app) => {
     setActiveApp(app);
     setSidebarOpen(false); // Close sidebar on app selection
@@ -115,13 +137,13 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeApp) {
-      case 'taskflow': return isAllowed('taskflow') ? <TaskFlowApp user={user} /> : null;
-      case 'walletwatch': return isAllowed('walletwatch') ? <WalletWatchApp user={user} /> : null;
-      case 'changemanager': return isAllowed('changemanager') ? <ChangeManagerApp user={user} /> : null;
-      case 'incidentlogger': return isAllowed('incidentlogger') ? <IncidentLoggerApp user={user} /> : null;
-      case 'investment': return isAllowed('investment') ? <InvestmentsApp user={user} /> : null; // New app case
-      case 'mediwatch': return isAllowed('mediwatch') ? <MediWatchApp user={user} /> : null; // New app case
-      case 'admin': return isAdmin ? <AdminPanelApp /> : null;
+      case 'taskflow': return isAllowed('taskflow') ? <TaskFlowApp user={user} /> : <AccessDenied appLabel="TaskFlow" />;
+      case 'walletwatch': return isAllowed('walletwatch') ? <WalletWatchApp user={user} /> : <AccessDenied appLabel="WalletWatch" />;
+      case 'changemanager': return isAllowed('changemanager') ? <ChangeManagerApp user={user} /> : <AccessDenied appLabel="ChangeLog" />;
+      case 'incidentlogger': return isAllowed('incidentlogger') ? <IncidentLoggerApp user={user} /> : <AccessDenied appLabel="Incidents" />;
+      case 'investment': return isAllowed('investment') ? <InvestmentsApp user={user} /> : <AccessDenied appLabel="Investments" />;
+      case 'mediwatch': return isAllowed('mediwatch') ? <MediWatchApp user={user} /> : <AccessDenied appLabel="MediWatch" />;
+      case 'admin': return isAdmin ? <AdminPanelApp /> : <AccessDenied appLabel="the Admin Hub" />;
       default:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
@@ -226,7 +248,9 @@ export default function App() {
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </header>
-        {renderContent()}
+        <ErrorBoundary key={activeApp}>
+          {renderContent()}
+        </ErrorBoundary>
       </main>
     </div>
   );

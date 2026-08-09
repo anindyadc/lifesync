@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatDuration } from '../../../lib/utils';
 import { getTaskType } from '../constants';
+import { getTaskMinutes } from '../hooks/useTasks';
 
 const TaskReportTable = ({ tasks, offices = [] }) => {
   const getStatusColor = (s) => { 
@@ -33,11 +34,7 @@ const TaskReportTable = ({ tasks, offices = [] }) => {
               const subTotal = task.subtasks?.length || 0;
               const percent = subTotal > 0 ? (subDone/subTotal)*100 : (task.progress ?? 0);
               
-              const taskTime = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
-              const subtaskTime = (task.subtasks || []).reduce((acc, subtask) => {
-                return acc + (subtask.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0);
-              }, 0);
-              const totalTime = taskTime + subtaskTime;
+              const totalTime = getTaskMinutes(task);
 
               const taskType = getTaskType(task);
               const office = offices.find(o => o.id === task.office);

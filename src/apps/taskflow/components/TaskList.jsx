@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Edit2, Trash2, Calendar, Timer, Check, ChevronDown, ChevronRight, AlertTriangle, Search, ArrowUpDown, XCircle, CheckSquare, ListChecks, LayoutGrid, List } from 'lucide-react';
 import { formatDuration, safeGetDate } from '../../../lib/utils';
 import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, TASK_TYPES, getTaskType } from '../constants';
+import { getTaskMinutes } from '../hooks/useTasks';
 
 const PRIORITY_RANK = { high: 3, medium: 2, low: 1 };
 
@@ -24,9 +25,7 @@ const getTaskDerived = (task, categories, offices) => {
   const subTotal = task.subtasks?.length || 0;
   const progress = subTotal > 0 ? (subCompleted / subTotal) * 100 : (task.progress ?? 0);
 
-  const taskTimeSpent = (task.timeLogs || []).reduce((acc, log) => acc + (log.minutes || 0), 0);
-  const subtaskTimeSpent = (task.subtasks || []).reduce((acc, s) => acc + (s.timeLogs || []).reduce((sAcc, log) => sAcc + (log.minutes || 0), 0), 0);
-  const timeSpent = taskTimeSpent + subtaskTimeSpent;
+  const timeSpent = getTaskMinutes(task);
 
   const dueDateObj = task.dueDate ? safeGetDate(task.dueDate) : null;
   const today = new Date();
@@ -283,14 +282,31 @@ const TaskList = ({ tasks, categories = [], offices = [], onEdit, onDelete, onSt
   };
   const clearSelection = () => setSelectedIds([]);
 
-  const handleBulkComplete = () => {
-    onBulkComplete(selectedIds);
-    clearSelection();
+  const allVisibleSelected = sortedTasks.length > 0 && sortedTasks.every(t => selectedIds.includes(t.id));
+  const toggleSelectAllVisible = () => {
+    setSelectedIds(allVisibleSelected ? [] : sortedTasks.map(t => t.id));
   };
-  const handleBulkDelete = () => {
-    if (window.confirm(`Delete ${selectedIds.length} task${selectedIds.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
-      onBulkDelete(selectedIds);
+
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const handleBulkComplete = async () => {
+    if (bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      await onBulkComplete(selectedIds);
       clearSelection();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const handleBulkDelete = async () => {
+    if (bulkBusy) return;
+    if (!window.confirm(`Delete ${selectedIds.length} task${selectedIds.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      await onBulkDelete(selectedIds);
+      clearSelection();
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -299,6 +315,15 @@ const TaskList = ({ tasks, categories = [], offices = [], onEdit, onDelete, onSt
       <div className="p-4 border-b border-slate-100 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-baseline gap-2">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              disabled={sortedTasks.length === 0}
+              aria-label={allVisibleSelected ? 'Deselect all visible tasks' : 'Select all visible tasks'}
+              title={allVisibleSelected ? 'Deselect all visible tasks' : 'Select all visible tasks'}
+              className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 disabled:opacity-40"
+            />
             <span className="font-bold text-slate-800">Task List</span>
             <span className="text-[11px] font-semibold text-slate-400">Showing {sortedTasks.length} of {tasks.length}</span>
           </div>
@@ -431,10 +456,10 @@ const TaskList = ({ tasks, categories = [], offices = [], onEdit, onDelete, onSt
           <div className="flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
             <span className="text-xs font-bold text-indigo-700">{selectedIds.length} selected</span>
             <div className="flex items-center gap-2">
-              <button onClick={handleBulkComplete} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+              <button onClick={handleBulkComplete} disabled={bulkBusy} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50">
                 <CheckSquare size={13} /> Mark Done
               </button>
-              <button onClick={handleBulkDelete} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+              <button onClick={handleBulkDelete} disabled={bulkBusy} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
                 <Trash2 size={13} /> Delete
               </button>
               <button onClick={clearSelection} className="text-xs font-semibold text-indigo-400 hover:text-indigo-600 px-1">Clear</button>

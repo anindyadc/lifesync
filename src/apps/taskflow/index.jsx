@@ -4,9 +4,10 @@ import {
 } from 'lucide-react';
 import { safeGetDate } from '../../lib/utils';
 import { getTaskType } from './constants';
+import ConfirmModal from '../../components/ConfirmModal';
 
 // Custom Hooks
-import { useTasks } from './hooks/useTasks';
+import { useTasks, getTaskMinutes } from './hooks/useTasks';
 import { useQuickTasks } from './hooks/useQuickTasks';
 import { useTaskExport } from './hooks/useTaskExport';
 
@@ -22,6 +23,14 @@ import QuickList from './components/QuickList';
 
 // Pure, reusable so the Dashboard's current month and its month-over-month delta can
 // both be computed the same way without duplicating the filtering logic.
+//
+// Returns each in-scope task with its FULL, unmodified `subtasks` (so progress/counts
+// stay correct even for a subtask with no time logged this month — this used to strip
+// out any subtask without a monthly log, undercounting the Subtasks KPI and the Report
+// table's progress column) plus a separate `monthlySubtasks` — the same subtasks but
+// trimmed to only their monthly time logs — for callers that need a *time* total for
+// the month specifically (pass `{ timeLogs: task.timeLogs, subtasks: task.monthlySubtasks }`
+// into getTaskMinutes rather than the task itself).
 const getTasksForMonth = (tasks, date) => {
   const month = date.getMonth();
   const year = date.getFullYear();
@@ -54,7 +63,8 @@ const getTasksForMonth = (tasks, date) => {
         return {
           ...task,
           timeLogs: monthlyTaskTimeLogs,
-          subtasks: monthlySubtasks,
+          subtasks: task.subtasks || [],
+          monthlySubtasks,
         };
       }
 
@@ -88,7 +98,7 @@ const TaskFlowApp = ({ user }) => {
     addCategory, removeCategory, addOffice, removeOffice
   } = useTasks(user);
   const { quickTasks, addQuickTask, toggleQuickTask, deleteQuickTask } = useQuickTasks(user);
-  const { exportToCSV, exportToPDF, exporting } = useTaskExport(tasks, 'taskflow-dashboard-charts');
+  const { exportToCSV, exportToPDF, exporting } = useTaskExport(tasks);
 
   // 2. Local State
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -121,18 +131,25 @@ const TaskFlowApp = ({ user }) => {
   const filteredTasks = useMemo(() => {
     if (!dateRange.from || !dateRange.to) return tasks;
 
+    const logInRange = (log) => {
+      const logDate = safeGetDate(log.date);
+      return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
+    };
+
     return tasks.filter(task => {
       const taskDate = safeGetDate(task.dueDate);
       const taskInRange = taskDate && taskDate >= dateRange.from && taskDate <= dateRange.to;
 
+      // Time logged directly on the task (not a subtask) used to be invisible here —
+      // a task with no due date in range and no subtask activity, but with its own
+      // logged time in range, silently never reached the Report tab or its export.
+      const taskTimeInRange = task.timeLogs?.some(logInRange);
+
       const subtaskInRange = task.subtasks?.some(subtask =>
-        subtask.timeLogs?.some(log => {
-          const logDate = safeGetDate(log.date);
-          return logDate && logDate >= dateRange.from && logDate <= dateRange.to;
-        })
+        subtask.timeLogs?.some(logInRange)
       );
 
-      return taskInRange || subtaskInRange;
+      return taskInRange || taskTimeInRange || subtaskInRange;
     });
   }, [tasks, dateRange]);
 
@@ -142,6 +159,12 @@ const TaskFlowApp = ({ user }) => {
   const dashboardScopedTasks = useMemo(() => filterByScope(tasks, dashboardScope), [tasks, dashboardScope]);
   const currentMonthTasks = useMemo(() => getTasksForMonth(dashboardScopedTasks, dashboardDate), [dashboardScopedTasks, dashboardDate]);
 
+  // The header export used to always export the full unfiltered `tasks`, so a PDF taken
+  // while viewing "Personal, March" on the Dashboard silently included every task ever
+  // created. My Tasks has no page-level scope known here (its filters live in TaskList's
+  // own state), so it still exports everything shown-or-not, same as before.
+  const tasksForExport = activeTab === 'report' ? filteredTasks : activeTab === 'dashboard' ? currentMonthTasks : tasks;
+
   const previousCompletionRate = useMemo(() => {
     const prevDate = new Date(dashboardDate.getFullYear(), dashboardDate.getMonth() - 1, 1);
     const prevMonthTasks = getTasksForMonth(dashboardScopedTasks, prevDate);
@@ -149,12 +172,11 @@ const TaskFlowApp = ({ user }) => {
   }, [dashboardScopedTasks, dashboardDate]);
 
   const totalTimeSpent = useMemo(() => {
-    return currentMonthTasks.reduce((total, task) => {
-      const taskTime = (task.timeLogs || []).reduce((acc, log) => acc + log.minutes, 0);
-      const subtaskTime = (task.subtasks || []).reduce((acc, subtask) =>
-        acc + (subtask.timeLogs || []).reduce((sAcc, log) => sAcc + log.minutes, 0), 0);
-      return total + taskTime + subtaskTime;
-    }, 0);
+    // `task.subtasks` is now the FULL list (see getTasksForMonth) — the month-scoped
+    // time total has to come from `monthlySubtasks` instead, or this would silently sum
+    // every subtask's all-time logged minutes rather than just this month's.
+    return currentMonthTasks.reduce((total, task) =>
+      total + getTaskMinutes({ timeLogs: task.timeLogs, subtasks: task.monthlySubtasks }), 0);
   }, [currentMonthTasks]);
 
   const stats = useMemo(() => ({
@@ -238,6 +260,20 @@ const TaskFlowApp = ({ user }) => {
     }
   };
 
+  // Removing a category/office used to happen with no confirmation and no warning that
+  // tasks still referencing it would fall back to a raw id/OTHER_SLOT and drop out of
+  // the filter dropdowns — only full-text search could find them again afterward.
+  const [removeTarget, setRemoveTarget] = useState(null); // { isCat, id, label }
+  const removeUsageCount = removeTarget
+    ? tasks.filter(t => removeTarget.isCat ? t.category === removeTarget.id : t.office === removeTarget.id).length
+    : 0;
+  const confirmRemoveTarget = async () => {
+    if (!removeTarget) return;
+    if (removeTarget.isCat) await removeCategory(removeTarget.id);
+    else await removeOffice(removeTarget.id);
+    setRemoveTarget(null);
+  };
+
   // 5. Render
   if (loading) {
     return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-indigo-600"/></div>;
@@ -261,8 +297,8 @@ const TaskFlowApp = ({ user }) => {
         <div className="flex gap-2 pr-2">
           {activeTab !== 'quicklist' && (
             <>
-              <button onClick={() => exportToCSV(activeTab === 'report' ? filteredTasks : tasks)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
-              <button onClick={() => exportToPDF(activeTab, activeTab === 'report' ? filteredTasks : tasks)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
+              <button onClick={() => exportToCSV(tasksForExport)} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600" title="Export CSV"><FileText size={16}/></button>
+              <button onClick={() => exportToPDF(activeTab, tasksForExport)} disabled={exporting} className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-indigo-600 disabled:opacity-50" title="Export PDF">
                 {exporting ? <Loader2 className="animate-spin" size={16}/> : <Download size={16}/>}
               </button>
             </>
@@ -358,6 +394,16 @@ const TaskFlowApp = ({ user }) => {
         )}
       </div>
 
+      <ConfirmModal
+        isOpen={!!removeTarget}
+        title={`Delete ${removeTarget?.isCat ? 'Category' : 'Office'}`}
+        message={removeUsageCount > 0
+          ? `${removeUsageCount} existing task${removeUsageCount !== 1 ? 's' : ''} still use "${removeTarget?.label}" — they'll fall back to a raw id and drop out of the filter dropdowns until re-assigned. Remove it anyway?`
+          : `Permanently remove "${removeTarget?.label}" from your list?`}
+        onConfirm={confirmRemoveTarget}
+        onCancel={() => setRemoveTarget(null)}
+      />
+
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -378,7 +424,6 @@ const TaskFlowApp = ({ user }) => {
         const newName = isCat ? newCatName : newOfficeName;
         const setNewName = isCat ? setNewCatName : setNewOfficeName;
         const handleAdd = isCat ? handleAddCategory : handleAddOffice;
-        const handleRemove = isCat ? removeCategory : removeOffice;
 
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
@@ -427,7 +472,7 @@ const TaskFlowApp = ({ user }) => {
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                     <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{item.label}</span>
                     <button
-                      onClick={() => handleRemove(item.id)}
+                      onClick={() => setRemoveTarget({ isCat, id: item.id, label: item.label })}
                       aria-label={`Remove ${item.label}`}
                       title={`Remove ${item.label}`}
                       className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"

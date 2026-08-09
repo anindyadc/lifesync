@@ -12,7 +12,7 @@ const scopeLabel = (t) => {
   return t.office ? `Official — ${t.office}` : 'Official';
 };
 
-export const useTaskExport = (tasks, chartElementId) => {
+export const useTaskExport = (tasks) => {
   const [exporting, setExporting] = useState(false);
 
   const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -56,9 +56,12 @@ export const useTaskExport = (tasks, chartElementId) => {
 
       let yPos = 40;
 
-      // Capture Dashboard Visuals if visible
-      const chartElement = document.getElementById(chartElementId);
-      
+      // Capture Dashboard Visuals if visible — the wrapper's actual id is
+      // `taskflow-${activeTab}` (index.jsx), not a fixed constant, so it has to be
+      // derived from the tab this export was triggered from rather than passed in once
+      // at hook-construction time (which never matched and silently skipped this section).
+      const chartElement = document.getElementById(`taskflow-${activeTab}`);
+
       if (chartElement && activeTab === 'dashboard') {
         doc.setFontSize(14);
         doc.setTextColor(0);

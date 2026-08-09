@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatDuration, safeGetDate, toISODate } from '../../../lib/utils';
 import { Clock, Building2 } from 'lucide-react';
 import { TASK_TYPES, getTaskType } from '../constants';
+import { getTaskMinutes } from '../hooks/useTasks';
 
 const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
   const [filterType, setFilterType] = useState('');
@@ -38,13 +39,10 @@ const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
     }).filter(task => task.timeLogs.length > 0 || task.subtasks.length > 0);
   }, [scopedTasks, dateRange]);
 
-  const taskTotalMinutes = (task) => {
-    const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
-    const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
-    return taskTime + subtaskTime;
-  };
-
-  const grandTotalMinutes = tasksInReport.reduce((total, task) => total + taskTotalMinutes(task), 0);
+  // tasksInReport's timeLogs/subtasks are already trimmed to the selected date range
+  // (see above), so the shared getTaskMinutes — normally "every log, no date filter" —
+  // works unchanged here too: it just sums whatever logs are present on the task.
+  const grandTotalMinutes = tasksInReport.reduce((total, task) => total + getTaskMinutes(task), 0);
 
   // Time-spent breakdowns for the "which office/project did my time actually go to"
   // question — grouped from the same date-range-trimmed tasksInReport used below, so the
@@ -57,7 +55,7 @@ const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
       const office = offices.find(o => o.id === task.office);
       const label = taskType === 'official' ? (office?.label || task.office || 'Unspecified office') : 'Personal';
       buckets[key] = buckets[key] || { label, minutes: 0 };
-      buckets[key].minutes += taskTotalMinutes(task);
+      buckets[key].minutes += getTaskMinutes(task);
     });
     return Object.values(buckets).sort((a, b) => b.minutes - a.minutes);
   }, [tasksInReport, offices]);
@@ -67,7 +65,7 @@ const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
     tasksInReport.forEach(task => {
       const key = task.category || 'Uncategorized';
       buckets[key] = buckets[key] || { label: key, minutes: 0 };
-      buckets[key].minutes += taskTotalMinutes(task);
+      buckets[key].minutes += getTaskMinutes(task);
     });
     return Object.values(buckets).sort((a, b) => b.minutes - a.minutes);
   }, [tasksInReport]);
@@ -164,9 +162,7 @@ const TimeReport = ({ tasks, offices = [], dateRange, onDateChange }) => {
 
       <div className="space-y-4">
         {tasksInReport.map(task => {
-          const taskTime = task.timeLogs?.reduce((acc, log) => acc + log.minutes, 0) || 0;
-          const subtaskTime = task.subtasks?.reduce((acc, s) => acc + (s.timeLogs?.reduce((sAcc, log) => sAcc + log.minutes, 0) || 0), 0) || 0;
-          const totalTaskTime = taskTime + subtaskTime;
+          const totalTaskTime = getTaskMinutes(task);
 
           return (
             <div key={task.id} className="p-4 bg-slate-50/80 rounded-lg border border-slate-100">

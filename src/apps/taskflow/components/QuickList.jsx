@@ -25,7 +25,7 @@ const Row = ({ item, onToggle, onDelete }) => (
     </span>
     <button
       type="button"
-      onClick={() => onDelete(item.id)}
+      onClick={() => { if (window.confirm(`Delete "${item.title}"?`)) onDelete(item.id); }}
       aria-label="Delete"
       className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
     >

@@ -2,8 +2,12 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate } from '../../../lib/utils';
 
+// Every field quoted/escaped, not just the free-text ones — an unquoted serverName or
+// application containing a comma (e.g. "Web, Prod-01") used to shift every later column.
+const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
 export const useChangeExport = (changes, filterServer) => {
-  
+
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(20);
@@ -37,15 +41,15 @@ export const useChangeExport = (changes, filterServer) => {
   const exportCSV = () => {
     const headers = ['Date', 'Server', 'Application', 'Type', 'Title', 'Description', 'Parameters', 'Status', 'Performed By'];
     const rows = changes.map(c => [
-      formatDate(c.date), 
-      c.serverName, 
-      c.application || '', 
-      c.type, 
-      `"${(c.title || '').replace(/"/g, '""')}"`,
-      `"${(c.description || '').replace(/"/g, '""')}"`,
-      `"${(c.parameters || '').replace(/"/g, '""')}"`, 
-      c.status,
-      c.performedBy || ''
+      csvEscape(formatDate(c.date)),
+      csvEscape(c.serverName),
+      csvEscape(c.application || ''),
+      csvEscape(c.type),
+      csvEscape(c.title || ''),
+      csvEscape(c.description || ''),
+      csvEscape(c.parameters || ''),
+      csvEscape(c.status),
+      csvEscape(c.performedBy || '')
     ].join(','));
     
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');

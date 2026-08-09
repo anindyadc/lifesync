@@ -62,7 +62,11 @@ const ChangeManagerApp = ({ user }) => {
   [activeChanges]);
 
   const filteredChanges = useMemo(() => {
-    const source = showArchived ? changes : activeChanges;
+    // Picking the "Archived" status pill isolates just archived items regardless of the
+    // showArchived eye toggle — previously the only way to see archived changes was that
+    // toggle, which always mixed them (dimmed) into the same list rather than showing
+    // just them.
+    const source = (showArchived || filterStatus === 'archived') ? changes : activeChanges;
     let result = source;
 
     if (filterServer) {
@@ -289,7 +293,7 @@ const ChangeManagerApp = ({ user }) => {
       {/* Status & Type Filters */}
       <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl shadow-sm border border-slate-200">
         <div className="flex gap-1.5">
-          {['', 'success', 'pending', 'failed'].map(s => (
+          {['', 'success', 'pending', 'failed', 'archived'].map(s => (
             <button
               key={s || 'all'}
               onClick={() => setFilterStatus(s)}

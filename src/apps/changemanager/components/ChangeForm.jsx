@@ -1,26 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { XCircle } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Textarea, Select, Button } from '../../../components/Form';
+import { toISODate, safeGetDate } from '../../../lib/utils';
+
+// safeGetDate/toISODate, not `new Date().toISOString().split('T')[0]` — the latter
+// converts a local Date to a UTC string and silently shifts the date by a day for
+// users east of UTC, exactly the bug safeGetDate/toISODate exist to prevent elsewhere.
+const buildFormData = (initialData) => initialData ? {
+  ...initialData,
+  date: toISODate(safeGetDate(initialData.date)) || toISODate(new Date()),
+} : {
+  serverName: '', application: '', type: 'Update', status: 'success',
+  title: '', description: '', parameters: '', date: toISODate(new Date())
+};
 
 const ChangeForm = ({ onSubmit, onCancel, initialData }) => {
-  const [formData, setFormData] = useState({
-    serverName: '', application: '', type: 'Update', status: 'success',
-    title: '', description: '', parameters: '', date: new Date().toISOString().split('T')[0]
-  });
-
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        ...initialData,
-        date: initialData.date?.toDate ? initialData.date.toDate().toISOString().split('T')[0] : initialData.date || new Date().toISOString().split('T')[0],
-      });
-    } else {
-      setFormData({
-        serverName: '', application: '', type: 'Update', status: 'success',
-        title: '', description: '', parameters: '', date: new Date().toISOString().split('T')[0]
-      });
-    }
-  }, [initialData]);
+  const [formData, setFormData] = useState(() => buildFormData(initialData));
+  // Reset the form whenever a *different* record is being edited — adjusted during
+  // render (React's documented pattern for "state depends on a changed prop", same as
+  // WalletWatch's TransactionForm/TransactionList) rather than in an effect, which was
+  // triggering React's "don't setState synchronously in an effect" lint error.
+  const [lastInitialData, setLastInitialData] = useState(initialData);
+  if (initialData !== lastInitialData) {
+    setLastInitialData(initialData);
+    setFormData(buildFormData(initialData));
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();

@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import {
   CreditCard, Trash2, Pencil, RefreshCcw, Folder, ChevronDown, Tag, Filter, XCircle,
   Link2, MapPin, Search, ArrowUpDown, Calendar, Wallet, Download, FileText, Loader2,
-  LayoutGrid, List, Repeat
+  LayoutGrid, List, Repeat, AlertCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
-import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey, getAvailableTags } from '../constants';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const VIEW_MODE_KEY = 'walletwatch-transactionlist-view-mode';
@@ -39,18 +39,25 @@ const getGroupTotals = (items) => ({
  * Compact checkbox-list dropdown for facets with many/variable values (tags, trips,
  * accounts) where a native <select> only allows picking one at a time.
  */
-const MultiSelectFilter = ({ label, icon: Icon, options, selected, onToggle }) => {
+const MultiSelectFilter = ({ label, icon: Icon, options, selected, onToggle, onSetSelected }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handleKeyDown = (e) => { if (e.key === 'Escape') setOpen(false); };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open]);
 
   if (options.length === 0) return null;
+
+  const allSelected = selected.length === options.length;
 
   return (
     <div className="relative" ref={ref}>
@@ -66,7 +73,16 @@ const MultiSelectFilter = ({ label, icon: Icon, options, selected, onToggle }) =
         <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 min-w-[170px] max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg p-1.5 custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute z-20 mt-1 min-w-[170px] max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg p-1.5 custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 mb-1 border-b border-slate-100">
+            <button
+              type="button"
+              onClick={() => onSetSelected(allSelected ? [] : [...options])}
+              className="text-[11px] font-bold text-indigo-600 hover:underline"
+            >
+              {allSelected ? 'Clear all' : 'Select all'}
+            </button>
+          </div>
           {options.map(opt => {
             const isChecked = selected.includes(opt);
             return (
@@ -127,15 +143,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     setter(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
   };
 
-  const availableTags = useMemo(() => {
-    const tagsSet = new Set();
-    expenses.forEach(exp => {
-      if (exp.tags && Array.isArray(exp.tags)) {
-        exp.tags.forEach(t => tagsSet.add(t));
-      }
-    });
-    return Array.from(tagsSet).sort();
-  }, [expenses]);
+  const availableTags = useMemo(() => getAvailableTags(expenses), [expenses]);
 
   // Every expense's `group` field doubles as a trip/event tag (e.g. "Trip: Goa Dec 2025"),
   // so this filter lets a frequent traveler isolate one trip's transactions to review/export.
@@ -157,10 +165,16 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     return map;
   }, [expenses]);
 
+  // A reversed range (From after To) would otherwise just silently filter every
+  // transaction out with no explanation — string comparison is valid here since both
+  // are 'YYYY-MM-DD'. Surfaced in the UI below; the range itself is ignored while invalid
+  // rather than producing a confusing "no results".
+  const dateRangeInvalid = !!(dateFrom && dateTo && dateFrom > dateTo);
+
   const filteredExpenses = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const from = dateFrom ? safeGetDate(dateFrom) : null;
-    const to = dateTo ? safeGetDate(dateTo) : null;
+    const from = (dateFrom && !dateRangeInvalid) ? safeGetDate(dateFrom) : null;
+    const to = (dateTo && !dateRangeInvalid) ? safeGetDate(dateTo) : null;
 
     return expenses.filter(exp => {
       if (filterCategory && exp.category !== filterCategory) return false;
@@ -184,6 +198,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
           exp.group,
           exp.paymentAccount,
           categories.find(c => c.id === exp.category)?.label,
+          PAYMENT_MODES.find(m => m.id === exp.paymentMode)?.label,
           ...(exp.tags || []),
         ].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(query)) return false;
@@ -191,7 +206,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
 
       return true;
     });
-  }, [expenses, categories, filterCategory, filterScope, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, search]);
+  }, [expenses, categories, filterCategory, filterScope, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, dateRangeInvalid, search]);
 
   const sortedExpenses = useMemo(() => {
     const arr = [...filteredExpenses];
@@ -239,13 +254,17 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
       const monthlyGroups = {};
       sortedExpenses.forEach(expense => {
         const date = safeGetDate(expense.date);
-        const monthYear = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        // A missing/malformed date used to crash this whole grouping pass — now it just
+        // falls into its own bucket instead of taking down History for every transaction.
+        const monthYear = date ? date.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown Date';
         if (!monthlyGroups[monthYear]) {
           monthlyGroups[monthYear] = [];
         }
         monthlyGroups[monthYear].push(expense);
       });
-      return { monthlyGroups };
+      const totals = {};
+      Object.entries(monthlyGroups).forEach(([key, items]) => { totals[key] = getGroupTotals(items); });
+      return { monthlyGroups, totals };
     }
 
     if (grouping === 'event') {
@@ -256,7 +275,9 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
           eventGroups[e.group].push(e);
         }
       });
-      return { eventGroups };
+      const totals = {};
+      Object.entries(eventGroups).forEach(([key, items]) => { totals[key] = getGroupTotals(items); });
+      return { eventGroups, totals };
     }
 
     return {};
@@ -344,7 +365,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
               >
                 <h4 className="font-bold text-slate-800">{monthYear}</h4>
                 <div className="flex items-center gap-4">
-                  {renderGroupTotals(getGroupTotals(monthExpenses))}
+                  {renderGroupTotals(groupedData.totals[monthYear])}
                   <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[monthYear] && 'rotate-180'}`} />
                 </div>
               </button>
@@ -400,7 +421,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
                    <h4 className="font-bold text-slate-800">{name}</h4>
                  </div>
                  <div className="flex items-center gap-4">
-                  {renderGroupTotals(getGroupTotals(items))}
+                  {renderGroupTotals(groupedData.totals[name])}
                   <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[name] && 'rotate-180'}`} />
                 </div>
               </button>
@@ -559,9 +580,9 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
             ))}
           </div>
 
-          <MultiSelectFilter label="Tags" icon={Tag} options={availableTags} selected={filterTags} onToggle={toggleInArray(setFilterTags)} />
-          <MultiSelectFilter label="Trips" icon={MapPin} options={availableGroups} selected={filterGroups} onToggle={toggleInArray(setFilterGroups)} />
-          <MultiSelectFilter label="Accounts" icon={CreditCard} options={availableAccounts} selected={filterAccounts} onToggle={toggleInArray(setFilterAccounts)} />
+          <MultiSelectFilter label="Tags" icon={Tag} options={availableTags} selected={filterTags} onToggle={toggleInArray(setFilterTags)} onSetSelected={setFilterTags} />
+          <MultiSelectFilter label="Trips" icon={MapPin} options={availableGroups} selected={filterGroups} onToggle={toggleInArray(setFilterGroups)} onSetSelected={setFilterGroups} />
+          <MultiSelectFilter label="Accounts" icon={CreditCard} options={availableAccounts} selected={filterAccounts} onToggle={toggleInArray(setFilterAccounts)} onSetSelected={setFilterAccounts} />
 
           <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
             {PAYMENT_MODES.map(mode => {
@@ -598,6 +619,11 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
               aria-label="To date"
               className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none"
             />
+            {dateRangeInvalid && (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500" title="From date is after To date — the range is being ignored">
+                <AlertCircle size={12} /> From is after To
+              </span>
+            )}
           </div>
 
           {hasActiveFilters && (
@@ -703,7 +729,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
  * transactions lay out as a responsive multi-column grid instead of one stacked column,
  * mirroring TaskFlow's My Tasks card view.
  */
-const TransactionCard = ({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
+const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -778,7 +804,7 @@ const TransactionCard = ({ exp, categories, onEdit, onDelete, onSettle, relatedE
       </div>
     </div>
   );
-};
+});
 
 /**
  * TransactionRow
@@ -789,7 +815,7 @@ const TransactionCard = ({ exp, categories, onEdit, onDelete, onSettle, relatedE
 // share of the row's actual width, and date/account sit on one line instead of account
 // being pushed into the tag-wrap row below, now that there's room to fit both. Below sm
 // it collapses to a single stacked column (grid-cols-1), same as before.
-const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
+const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -872,6 +898,6 @@ const TransactionRow = ({ exp, categories, onEdit, onDelete, onSettle, relatedEx
       </div>
     </div>
   );
-};
+});
 
 export default TransactionList;

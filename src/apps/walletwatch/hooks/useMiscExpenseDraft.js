@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 const APP_ID = 'default-app-id';
@@ -44,16 +44,26 @@ export const useMiscExpenseDraft = (user) => {
     await setDoc(draftRef, { items }, { merge: true });
   };
 
+  // arrayUnion/arrayRemove (not a read-modify-write of the full `items` array) so two
+  // tabs/devices adding or removing an item near-simultaneously can't lose one to a
+  // last-write-wins overwrite — each op is atomic server-side regardless of what this
+  // client's local `draftItems` snapshot happened to be.
   const addDraftItem = async ({ label, amount }) => {
+    if (!user) return;
     const trimmed = (label || '').trim();
     const amountNum = Number(amount);
     if (!trimmed || !amountNum || amountNum <= 0) return;
     const newItem = { id: generateId(), label: trimmed, amount: amountNum, addedAt: new Date().toISOString() };
-    await saveItems([...draftItems, newItem]);
+    const draftRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'miscExpenseDraft');
+    await setDoc(draftRef, { items: arrayUnion(newItem) }, { merge: true });
   };
 
   const removeDraftItem = async (id) => {
-    await saveItems(draftItems.filter(item => item.id !== id));
+    if (!user) return;
+    const item = draftItems.find(i => i.id === id);
+    if (!item) return;
+    const draftRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'miscExpenseDraft');
+    await setDoc(draftRef, { items: arrayRemove(item) }, { merge: true });
   };
 
   const clearDraft = async () => {

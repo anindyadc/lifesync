@@ -3,7 +3,7 @@ import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle
 import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
 // Modular import for local deployment - ensuring single source of truth
-import { PAYMENT_MODES } from '../constants';
+import { PAYMENT_MODES, getAvailableTags } from '../constants';
 
 /**
  * TransactionForm Component
@@ -33,6 +33,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
   const [showGroupSuggestions, setShowGroupSuggestions] = useState(false);
   const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
   const [amountError, setAmountError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   // Quick-add is the fast path (just Amount/Description/Category); editing an existing
   // entry or recording a refund always shows every field since they may already be set.
   const [showDetails, setShowDetails] = useState(!!initialData || isSettling);
@@ -41,25 +42,19 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
 
   const hasAdvancedData = !!(formData.group || formData.tags || formData.isReimbursable || formData.isOfficial || formData.paymentMode !== 'upi');
 
-  const availableTags = React.useMemo(() => {
-    const tagsSet = new Set();
-    expenses.forEach(exp => {
-      if (exp.tags && Array.isArray(exp.tags)) {
-        exp.tags.forEach(t => tagsSet.add(t));
-      }
-    });
-    return Array.from(tagsSet).sort();
-  }, [expenses]);
+  const availableTags = React.useMemo(() => getAvailableTags(expenses), [expenses]);
 
   const availableGroups = React.useMemo(() => {
     const groupSet = new Set();
     const currentFormDate = safeGetDate(formData.date);
+    if (!currentFormDate) return [];
     const currentFormMonth = currentFormDate.getMonth();
     const currentFormYear = currentFormDate.getFullYear();
 
     expenses.forEach(exp => {
       const expDate = safeGetDate(exp.date);
       if (
+        expDate &&
         expDate.getMonth() === currentFormMonth &&
         expDate.getFullYear() === currentFormYear &&
         exp.group &&
@@ -158,6 +153,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
       return;
     }
     setAmountError('');
+    setSubmitError('');
     setSaving(true);
 
     try {
@@ -180,6 +176,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         }));
         setSavedCount(c => c + 1);
       }
+    } catch (err) {
+      console.error('Transaction save error:', err);
+      setSubmitError(err?.message || 'Could not save this transaction — please try again.');
     } finally {
       setSaving(false);
     }
@@ -465,6 +464,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
 
         {/* Action Buttons — slim pinned footer, always reachable without scrolling */}
         <div className="shrink-0 border-t border-slate-100 px-5 py-2.5 space-y-2 bg-white">
+          {submitError && <p className="text-[11px] font-semibold text-red-500">{submitError}</p>}
           {!initialData && !isSettling ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button

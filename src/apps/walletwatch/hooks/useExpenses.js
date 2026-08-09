@@ -57,7 +57,9 @@ export const useExpenses = (user, appId = 'default-app-id', selectedMonth = null
     if (!trimmed || !user) return;
 
     const id = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `cat-${Date.now()}`;
-    if (categories.some(c => c.id === id)) return;
+    if (categories.some(c => c.id === id)) {
+      throw new Error(`A category with a similar name already exists.`);
+    }
 
     const { color, bg } = getCategoryColor(categories.length);
     const updated = [...categories, { id, label: trimmed, color, bg }];

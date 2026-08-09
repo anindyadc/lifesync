@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
+import React, { useState, useMemo } from 'react';
+import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard, Trash2 } from 'lucide-react';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { safeGetDate } from '../../lib/utils';
 import Dashboard from './components/DashboardStats';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
@@ -32,12 +33,29 @@ const WalletWatchApp = ({ user }) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isMiscOpen, setIsMiscOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const [deleteCategoryId, setDeleteCategoryId] = useState(null);
+  const [deleteCategoryError, setDeleteCategoryError] = useState('');
   const [relatedTxn, setRelatedTxn] = useState(null);
+  const [confirmOldDataOpen, setConfirmOldDataOpen] = useState(false);
+  const [oldDataError, setOldDataError] = useState('');
 
   const APP_ID = 'default-app-id';
+
+  // Transactions older than a year — surfaced in Settings as an optional bulk cleanup;
+  // nothing here runs automatically, since silently deleting financial history without
+  // an explicit confirm would be far worse than leaving old rows around.
+  const oldExpenses = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+    return allExpenses.filter(e => {
+      const d = safeGetDate(e.date);
+      return d && d < cutoff;
+    });
+  }, [allExpenses]);
 
   if (loading) {
     return (
@@ -49,40 +67,42 @@ const WalletWatchApp = ({ user }) => {
   }
   const handleSave = async (formData, keepOpen = false) => {
     const col = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses');
-    
+
     // Convert YYYY-MM-DD string to local midnight Date object
     const [year, month, day] = formData.date.split('-').map(Number);
     const localDate = new Date(year, month - 1, day);
 
-    const finalAmount = formData.category === 'reimbursement' 
-      ? Math.abs(Number(formData.amount)) 
+    const finalAmount = formData.category === 'reimbursement'
+      ? Math.abs(Number(formData.amount))
       : -Math.abs(Number(formData.amount));
+
+    // TransactionForm's local state never carries a `relatedId` field, so a plain edit
+    // (not a settle action) must preserve the original doc's own relatedId itself —
+    // otherwise every edit of a linked refund/settlement silently severs the link.
+    const existing = editingId ? allExpenses.find(e => e.id === editingId) : null;
+    const relatedId = relatedTxn ? relatedTxn.id : (existing ? (existing.relatedId ?? null) : null);
 
     const payload = {
       ...formData,
       amount: finalAmount,
       date: Timestamp.fromDate(localDate),
       updatedAt: serverTimestamp(),
-      relatedId: relatedTxn ? relatedTxn.id : (formData.relatedId || null)
+      relatedId
     };
 
-    try {
-      if (editingId) {
-        await updateDoc(doc(col, editingId), payload);
-      } else {
-        await addDoc(col, { ...payload, createdAt: serverTimestamp() });
-        if (relatedTxn) {
-          await updateDoc(doc(col, relatedTxn.id), { reimbursementStatus: 'settled' });
-        }
+    if (editingId) {
+      await updateDoc(doc(col, editingId), payload);
+    } else {
+      await addDoc(col, { ...payload, createdAt: serverTimestamp() });
+      if (relatedTxn) {
+        await updateDoc(doc(col, relatedTxn.id), { reimbursementStatus: 'settled' });
       }
-      
-      if (!keepOpen) {
-        setEditingId(null);
-        setRelatedTxn(null);
-        setIsAddOpen(false);
-      }
-    } catch (error) {
-      console.error("Save Error:", error);
+    }
+
+    if (!keepOpen) {
+      setEditingId(null);
+      setRelatedTxn(null);
+      setIsAddOpen(false);
     }
   };
 
@@ -92,10 +112,14 @@ const WalletWatchApp = ({ user }) => {
     setRelatedTxn(null);
   };
 
-  const handleAddCategory = () => {
-    if (newCatName.trim()) {
-      addCategory(newCatName);
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    try {
+      await addCategory(newCatName);
       setNewCatName('');
+      setCategoryError('');
+    } catch (err) {
+      setCategoryError(err?.message || 'Could not add that category — please try again.');
     }
   };
 
@@ -104,16 +128,45 @@ const WalletWatchApp = ({ user }) => {
     try {
       await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', deleteId));
       setDeleteId(null);
+      setDeleteError('');
     } catch (err) {
       console.error("Delete Error:", err);
+      setDeleteError(err?.message || 'Could not delete this transaction — please try again.');
     }
   };
 
   const categoryUsageCount = deleteCategoryId ? allExpenses.filter(e => e.category === deleteCategoryId).length : 0;
   const confirmDeleteCategory = async () => {
     if (!deleteCategoryId) return;
-    await removeCategory(deleteCategoryId);
-    setDeleteCategoryId(null);
+    try {
+      await removeCategory(deleteCategoryId);
+      setDeleteCategoryId(null);
+      setDeleteCategoryError('');
+    } catch (err) {
+      console.error("Delete Category Error:", err);
+      setDeleteCategoryError(err?.message || 'Could not delete this category — please try again.');
+    }
+  };
+
+  const confirmDeleteOldData = async () => {
+    if (oldExpenses.length === 0) return;
+    try {
+      // Firestore batched writes cap at 500 ops — chunk defensively even though a
+      // personal expense history cleanup is unlikely to ever hit that in one go.
+      const CHUNK_SIZE = 450;
+      for (let i = 0; i < oldExpenses.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        oldExpenses.slice(i, i + CHUNK_SIZE).forEach(e => {
+          batch.delete(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'expenses', e.id));
+        });
+        await batch.commit();
+      }
+      setConfirmOldDataOpen(false);
+      setOldDataError('');
+    } catch (err) {
+      console.error("Delete Old Data Error:", err);
+      setOldDataError(err?.message || 'Could not delete old transactions — please try again.');
+    }
   };
 
   return (
@@ -122,8 +175,9 @@ const WalletWatchApp = ({ user }) => {
         isOpen={!!deleteId}
         title="Delete Record"
         message="Permanently remove this transaction? This will update your charts."
+        error={deleteError}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteId(null)}
+        onCancel={() => { setDeleteId(null); setDeleteError(''); }}
       />
 
       <ConfirmModal
@@ -132,26 +186,37 @@ const WalletWatchApp = ({ user }) => {
         message={categoryUsageCount > 0
           ? `${categoryUsageCount} existing transaction${categoryUsageCount !== 1 ? 's' : ''} still use this category — they'll show its raw ID instead of a label until re-categorized. Remove it anyway?`
           : 'Permanently remove this category from your list?'}
+        error={deleteCategoryError}
         onConfirm={confirmDeleteCategory}
-        onCancel={() => setDeleteCategoryId(null)}
+        onCancel={() => { setDeleteCategoryId(null); setDeleteCategoryError(''); }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmOldDataOpen}
+        title="Delete Old Transactions"
+        message={`Permanently delete ${oldExpenses.length} transaction${oldExpenses.length !== 1 ? 's' : ''} dated more than a year ago? This can't be undone and will change your past reports and exports.`}
+        error={oldDataError}
+        onConfirm={confirmDeleteOldData}
+        onCancel={() => { setConfirmOldDataOpen(false); setOldDataError(''); }}
       />
 
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 animate-in zoom-in-95 max-h-[90dvh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-1">
-              <h3 className="text-lg font-bold text-slate-800">Manage Categories</h3>
+              <h3 className="text-lg font-bold text-slate-800">Settings</h3>
               <button onClick={() => setIsSettingsOpen(false)} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
                 <X size={20}/>
               </button>
             </div>
-            <p className="text-xs text-slate-400 font-medium mb-5">{categories.length} categories &middot; tap &times; to remove</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-4 mb-2">Categories</p>
+            <p className="text-xs text-slate-400 font-medium mb-3">{categories.length} categories &middot; tap &times; to remove</p>
 
-            <div className="flex gap-2 mb-5">
+            <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={newCatName}
-                onChange={e => setNewCatName(e.target.value)}
+                onChange={e => { setNewCatName(e.target.value); setCategoryError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
                 placeholder="New category..."
                 className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium min-w-0"
@@ -160,6 +225,11 @@ const WalletWatchApp = ({ user }) => {
                 <Plus size={18}/>
               </button>
             </div>
+            {categoryError ? (
+              <p className="text-[11px] font-semibold text-red-500 mb-3">{categoryError}</p>
+            ) : (
+              <div className="mb-3" />
+            )}
 
             <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-1 custom-scrollbar">
               {categories.map(c => (
@@ -176,6 +246,22 @@ const WalletWatchApp = ({ user }) => {
                   </button>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">Data Cleanup</p>
+              <p className="text-xs text-slate-400 font-medium mb-3">
+                {oldExpenses.length > 0
+                  ? `${oldExpenses.length} transaction${oldExpenses.length !== 1 ? 's' : ''} dated more than a year ago`
+                  : 'No transactions older than a year'}
+              </p>
+              <button
+                onClick={() => setConfirmOldDataOpen(true)}
+                disabled={oldExpenses.length === 0}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-600 font-bold text-sm rounded-xl border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-50"
+              >
+                <Trash2 size={14} /> Delete Transactions Older Than 1 Year
+              </button>
             </div>
 
             <button
@@ -342,7 +428,7 @@ const WalletWatchApp = ({ user }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <TransactionForm
-              initialData={editingId ? allExpenses.find(e => e.id === editingId) : (relatedTxn ? { ...relatedTxn, description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' } : null)}
+              initialData={editingId ? allExpenses.find(e => e.id === editingId) : (relatedTxn ? { ...relatedTxn, date: new Date(), description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' } : null)}
               categories={categories}
               expenses={allExpenses}
               isSettling={!!relatedTxn}

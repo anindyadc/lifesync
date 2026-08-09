@@ -46,3 +46,23 @@ export const getNextCycle = (cycle, cycleStartDay) => {
   dayAfter.setDate(dayAfter.getDate() + 1);
   return getCycleForDate(dayAfter, cycleStartDay);
 };
+
+// Walks `steps` cycles backward from whichever cycle `date` falls in — for callers that
+// only need "N cycles ago" (e.g. a prev/next cycle stepper) rather than a full history list.
+export const getCycleNStepsBack = (date, cycleStartDay, steps) => {
+  let cycle = getCycleForDate(date, cycleStartDay);
+  const stepCount = Math.max(0, steps || 0);
+  for (let i = 0; i < stepCount; i++) {
+    cycle = getPreviousCycle(cycle, cycleStartDay);
+  }
+  return cycle;
+};
+
+// Shared by CreditCardBilling's cycle list and DashboardStats' "By Account" drill-down —
+// both formatted a [start, end] range identically before this was extracted.
+export const formatCycleRange = (start, end) => {
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
+  const endLabel = end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${startLabel} – ${endLabel}`;
+};

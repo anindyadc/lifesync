@@ -80,3 +80,15 @@ export const getAccountKey = (e) => {
   const modeLabel = PAYMENT_MODES.find(m => m.id === e.paymentMode)?.label || e.paymentMode || 'Other';
   return e.paymentAccount && e.paymentAccount.trim() ? e.paymentAccount.trim() : modeLabel;
 };
+
+// Shared by TransactionForm's tag-suggestion list and TransactionList's Tags filter —
+// both collected the identical set from an expenses array before this was extracted.
+export const getAvailableTags = (expenses) => {
+  const tagsSet = new Set();
+  expenses.forEach(exp => {
+    if (exp.tags && Array.isArray(exp.tags)) {
+      exp.tags.forEach(t => tagsSet.add(t));
+    }
+  });
+  return Array.from(tagsSet).sort();
+};

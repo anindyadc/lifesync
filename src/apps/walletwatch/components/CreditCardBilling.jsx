@@ -6,14 +6,8 @@ import {
 import { formatCurrency, toISODate } from '../../../lib/utils';
 import { PAYMENT_MODES, getAccountKey } from '../constants';
 import { csvEscape, downloadCsvContent } from '../hooks/useExport';
+import { formatCycleRange } from '../lib/cardCycles';
 import ConfirmModal from './ConfirmModal';
-
-const formatCycleRange = (start, end) => {
-  const sameYear = start.getFullYear() === end.getFullYear();
-  const startLabel = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: sameYear ? undefined : 'numeric' });
-  const endLabel = end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${startLabel} – ${endLabel}`;
-};
 
 const STATUS_META = {
   settled: { label: 'Settled', className: 'bg-emerald-100 text-emerald-600', icon: CheckCircle2 },

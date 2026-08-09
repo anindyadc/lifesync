@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import imageCompression from 'browser-image-compression';
 import { Camera, Plus, Save, Trash2, X, Upload } from 'lucide-react';
+import { toISODate } from '../../../lib/utils';
 
 const MAX_PHOTOS = 8;
 // Firestore documents cap out at 1MiB; Base64 encoding adds ~37% overhead on top of the
@@ -22,6 +23,7 @@ const AutocompleteDropdown = ({ options, value, onSelect, isOpen }) => {
         <li
           key={idx}
           className="px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer border-b border-slate-50 last:border-0"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onSelect(opt)}
         >
           {opt}
@@ -36,7 +38,7 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
   const [relation, setRelation] = useState(initialData?.relation || 'Self');
   const [doctorName, setDoctorName] = useState(initialData?.doctorName || '');
   const [disease, setDisease] = useState(initialData?.disease || '');
-  const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(initialData?.date || toISODate(new Date()));
   const [medicines, setMedicines] = useState(initialData?.medicines || []);
   const [existingPhotos, setExistingPhotos] = useState(initialData?.photoUrls || (initialData?.photoUrl ? [initialData.photoUrl] : []));
   const [photoFiles, setPhotoFiles] = useState([]);
@@ -45,13 +47,15 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileError, setFileError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [compressionProgress, setCompressionProgress] = useState(null); // { done, total } | null
 
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB limit
 
-  // Extract unique values for autocomplete
-  const uniquePatients = [...new Set(prescriptions.map(p => p.patientName).filter(Boolean))];
-  const uniqueDoctors = [...new Set(prescriptions.map(p => p.doctorName).filter(Boolean))];
-  const uniqueDiseases = [...new Set(prescriptions.map(p => p.disease).filter(Boolean))];
+  // Extract unique values for autocomplete — only depend on `prescriptions`, not
+  // rebuilt on every keystroke/render of this form.
+  const uniquePatients = useMemo(() => [...new Set(prescriptions.map(p => p.patientName).filter(Boolean))], [prescriptions]);
+  const uniqueDoctors = useMemo(() => [...new Set(prescriptions.map(p => p.doctorName).filter(Boolean))], [prescriptions]);
+  const uniqueDiseases = useMemo(() => [...new Set(prescriptions.map(p => p.disease).filter(Boolean))], [prescriptions]);
 
   // State for controlling custom dropdown visibility
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -86,28 +90,37 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
         useWebWorker: true,
       };
 
-      // We'll process compressions in parallel for speed
-      const compressionPromises = filesToProcess.map(async (file) => {
-        console.log(`Starting compression for ${file.name}, original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+      let doneCount = 0;
+      setCompressionProgress({ done: 0, total: filesToProcess.length });
+
+      // Processed in parallel for speed — each failure is collected instead of calling
+      // setFileError immediately, since multiple files failing for different reasons
+      // used to overwrite each other and only the last-resolved message ever showed.
+      const compressionResults = await Promise.all(filesToProcess.map(async (file) => {
         try {
           const compressedFile = await imageCompression(file, compressionOptions);
-          console.log(`Finished compression for ${file.name}, new size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
 
           if (compressedFile.size > MAX_FILE_SIZE) {
-            setFileError(`File "${file.name}" is still too large after compression.`);
-            return null;
+            return { file, error: `"${file.name}" is still too large after compression.` };
           }
 
           setPhotoFiles(prev => [...prev, compressedFile]);
           setPhotoPreviews(prev => [...prev, URL.createObjectURL(compressedFile)]);
-
+          return { file, error: null };
         } catch (error) {
           console.error("Compression Error:", error);
-          setFileError(`Could not process file: ${file.name}`);
+          return { file, error: `Could not process file: ${file.name}` };
+        } finally {
+          doneCount += 1;
+          setCompressionProgress({ done: doneCount, total: filesToProcess.length });
         }
-      });
+      }));
 
-      await Promise.all(compressionPromises);
+      const failures = compressionResults.filter(r => r.error).map(r => r.error);
+      if (failures.length > 0) {
+        setFileError(prev => [prev, ...failures].filter(Boolean).join(' '));
+      }
+      setCompressionProgress(null);
     }
     e.target.value = ''; // Reset input
   };
@@ -385,6 +398,12 @@ const PrescriptionForm = ({ onSubmit, onCancel, initialData = null, prescription
               </div>
               <div className="text-sm text-slate-500 flex-1">
                 Take photos of the physical prescription pages with your mobile camera or upload existing images.
+                {compressionProgress && (
+                  <p className="text-indigo-600 mt-2 font-medium flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin shrink-0" />
+                    Processing {compressionProgress.done}/{compressionProgress.total} photo{compressionProgress.total !== 1 ? 's' : ''}...
+                  </p>
+                )}
                 {fileError && <p className="text-red-500 mt-2 font-medium animate-pulse">{fileError}</p>}
                 <p className="text-[10px] mt-1 text-slate-400 uppercase tracking-wider font-bold">Max {MAX_PHOTOS} photos • 2MB per file</p>
               </div>

@@ -47,7 +47,10 @@ export function useMedical(user) {
     );
 
     return () => unsubscribe();
-  }, [user]);
+    // user?.uid, not the `user` object reference — a new object per parent render
+    // (common with Firebase auth listeners) would otherwise tear down and resubscribe
+    // this listener on every unrelated re-render of the parent.
+  }, [user?.uid]);
 
   const archivePrescription = async (id, isArchived = true) => {
     if (!user?.uid || !id) return;
@@ -91,9 +94,12 @@ export function useMedical(user) {
 
       console.log("Adding document to Firestore...");
       const prescriptionsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'prescriptions');
+      // No separate `photoUrl` field here — it used to duplicate the full Base64 payload
+      // of the first photo a second time in the same doc, doubling its size against the
+      // 1MiB Firestore limit. `photoUrls` is the only source of truth for new documents;
+      // `photoUrl` only still gets *read* as a fallback for legacy pre-array docs.
       const docRef = await addDoc(prescriptionsRef, {
         ...dataToSave,
-        photoUrl: photoUrls.length > 0 ? photoUrls[0] : '',
         photoUrls: photoUrls,
         archived: false,
         createdAt: serverTimestamp(),
@@ -126,7 +132,6 @@ export function useMedical(user) {
       await updateDoc(docRef, {
         ...dataToSave,
         photoUrls: finalPhotoUrls,
-        photoUrl: finalPhotoUrls.length > 0 ? finalPhotoUrls[0] : '',
         updatedAt: serverTimestamp(),
       });
 
@@ -152,8 +157,12 @@ export function useMedical(user) {
       const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'prescriptions', id);
       await deleteDoc(docRef);
 
-      // Attempt to delete photos from storage if exists
-      const urlsToDelete = (photoUrls && photoUrls.length > 0) ? photoUrls : (photoUrl ? [photoUrl] : []);
+      // Attempt to delete photos from storage if exists — only Storage-backed (legacy)
+      // URLs, same filter updatePrescription already applies. A Base64 `data:` URI isn't
+      // a Storage object at all, so passing it to deleteObject threw an "invalid-argument"
+      // error per photo on every delete of a (now-typical) Base64-photo prescription.
+      const urlsToDelete = ((photoUrls && photoUrls.length > 0) ? photoUrls : (photoUrl ? [photoUrl] : []))
+        .filter((url) => !url.startsWith('data:'));
       const deletePromises = urlsToDelete.map(async (url) => {
         try {
           const fileRef = ref(storage, url);

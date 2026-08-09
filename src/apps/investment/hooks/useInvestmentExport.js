@@ -41,14 +41,18 @@ export const useInvestmentExport = (investments) => {
   };
 
   const exportCSV = () => {
+    // Every field quoted/escaped, not just the free-text ones — formatAmount's 'en-IN'
+    // grouping commas (e.g. "1,00,000") were shifting every later column when left
+    // unquoted.
+    const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const headers = ['Holder', 'Type', 'Name', 'Amount', 'Maturity Date', 'Details'];
     const rows = investments.map(inv => [
-      inv.holder || '',
-      inv.type || '',
-      `"${(inv.name || '').replace(/"/g, '""')}"`,
-      formatAmount(inv.amount),
-      formatMaturityDate(inv.maturityDate),
-      `"${(inv.details || '').replace(/"/g, '""')}"`
+      csvEscape(inv.holder || ''),
+      csvEscape(inv.type || ''),
+      csvEscape(inv.name || ''),
+      csvEscape(formatAmount(inv.amount)),
+      csvEscape(formatMaturityDate(inv.maturityDate)),
+      csvEscape(inv.details || '')
     ].join(','));
 
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');

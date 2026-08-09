@@ -85,6 +85,13 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
 
           <FormGroup>
             <Label htmlFor="amount">Amount (₹)</Label>
+            {initialData && initialData.amount === null && (
+              <p className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-1">
+                The original amount couldn't be decrypted and is not shown here — entering
+                a new value below will permanently overwrite it. Cancel instead if you just
+                wanted to view this record.
+              </p>
+            )}
             <Input
               id="amount"
               type="number"

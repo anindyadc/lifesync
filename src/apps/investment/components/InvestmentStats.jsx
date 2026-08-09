@@ -6,6 +6,7 @@ const InvestmentStats = ({ investments }) => {
   const stats = useMemo(() => {
     const validAmounts = investments.filter(inv => typeof inv.amount === 'number' && !isNaN(inv.amount));
     const totalInvested = validAmounts.reduce((sum, inv) => sum + inv.amount, 0);
+    const undecryptableCount = investments.filter(inv => inv.amount === null).length;
 
     const now = new Date();
     const in30 = new Date(now);
@@ -20,6 +21,7 @@ const InvestmentStats = ({ investments }) => {
 
     return {
       totalInvested,
+      undecryptableCount,
       maturingIn30: maturingWithin(in30),
       maturingIn90: maturingWithin(in90),
     };
@@ -32,6 +34,11 @@ const InvestmentStats = ({ investments }) => {
         <div>
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Invested</p>
           <p className="text-xl font-bold text-slate-800">₹{stats.totalInvested.toLocaleString('en-IN')}</p>
+          {stats.undecryptableCount > 0 && (
+            <p className="text-[11px] font-medium text-amber-600 mt-0.5">
+              Excludes {stats.undecryptableCount} record{stats.undecryptableCount !== 1 ? 's' : ''} that couldn't be decrypted
+            </p>
+          )}
         </div>
       </div>
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
@@ -9,9 +9,13 @@ import { safeGetDate } from '../../../lib/utils';
 // FullCalendar CSS imports moved to index.css
 import './MaturityCalendar.css'; // Import custom styles
 
-const MaturityCalendar = ({ investments }) => {
-  const events = investments.map(inv => {
-    const startDate = inv.maturityDate ? safeGetDate(inv.maturityDate) : new Date();
+const MaturityCalendar = ({ investments, onEdit }) => {
+  const events = useMemo(() => investments.map(inv => {
+    // A missing/malformed maturityDate used to fall back to `new Date()`, making the
+    // investment render as maturing *today* instead of being left off the calendar.
+    const startDate = safeGetDate(inv.maturityDate);
+    if (!startDate || isNaN(startDate.getTime())) return null;
+
     const eventName = inv.name ? String(inv.name) : 'Unnamed Investment';
     const eventAmount = inv.amount === null
       ? '⚠ Unable to decrypt'
@@ -29,7 +33,7 @@ const MaturityCalendar = ({ investments }) => {
         resource: inv,
       },
     };
-  }).filter(event => !isNaN(event.start.getTime())); // Filter out events with invalid dates
+  }).filter(Boolean), [investments]);
 
   // FullCalendar options and callbacks
   const calendarOptions = {
@@ -43,6 +47,7 @@ const MaturityCalendar = ({ investments }) => {
     editable: false,
     selectable: false,
     weekends: true,
+    eventClick: (info) => onEdit?.(info.event.extendedProps.resource),
     events: events,
     eventDisplay: 'block',
     eventColor: '#4F46E5', // Indigo color for events

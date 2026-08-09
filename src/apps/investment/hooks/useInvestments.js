@@ -23,9 +23,10 @@ const encryptAmount = (amount) => {
 };
 
 // Returns null (not 0) when the value can't be trusted, so callers can tell
-// "decryption failed / key mismatch" apart from a real zero-amount investment.
+// "decryption failed / key mismatch / never recorded" apart from a real zero-amount
+// investment — a missing amountEncrypted used to read back as a trustworthy 0 here.
 const decryptAmount = (encryptedAmount) => {
-  if (!encryptedAmount) return 0;
+  if (!encryptedAmount) return null;
   try {
     const decryptedBytes = CryptoJS.AES.decrypt(encryptedAmount, SECRET_KEY);
     const decryptedAmount = decryptedBytes.toString(CryptoJS.enc.Utf8);

@@ -14,7 +14,9 @@ const InvestmentList = ({ investments, onEdit, onDelete }) => {
     return investments.filter(inv => {
       const matchesSearch = !search ||
         inv.name?.toLowerCase().includes(search.toLowerCase()) ||
-        inv.details?.toLowerCase().includes(search.toLowerCase());
+        inv.details?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.holder?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.type?.toLowerCase().includes(search.toLowerCase());
       const matchesHolder = holderFilter === 'all' || inv.holder === holderFilter;
       const matchesType = typeFilter === 'all' || inv.type === typeFilter;
       return matchesSearch && matchesHolder && matchesType;
@@ -38,7 +40,7 @@ const InvestmentList = ({ investments, onEdit, onDelete }) => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
-            placeholder="Search by name or details..."
+            placeholder="Search by name, holder, type, or details..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"

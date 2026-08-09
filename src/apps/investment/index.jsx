@@ -113,7 +113,7 @@ const InvestmentsApp = ({ user }) => {
 
           {activeTab === 'calendar' && (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <MaturityCalendar investments={investments} />
+              <MaturityCalendar investments={investments} onEdit={handleEdit} />
             </div>
           )}
         </>

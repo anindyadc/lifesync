@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
+const ConfirmModal = ({ isOpen, title, message, error, onConfirm, onCancel }) => {
   const [busy, setBusy] = useState(false);
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const cancelRef = useRef(null);
@@ -43,9 +43,13 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setBusy(true);
-    onConfirm();
+    try {
+      await onConfirm();
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -62,7 +66,8 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id="confirm-modal-title" className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
-        <p className="text-slate-600 mb-6">{message}</p>
+        <p className="text-slate-600 mb-4">{message}</p>
+        {error && <p className="text-sm font-semibold text-red-500 mb-4">{error}</p>}
         <div className="flex justify-end space-x-3">
           <button
             ref={cancelRef}

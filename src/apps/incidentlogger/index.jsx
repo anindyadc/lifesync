@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShieldAlert, Plus, FileText, Download, Loader2, X, Save, Search, XCircle } from 'lucide-react';
+import { ShieldAlert, Plus, FileText, Download, Loader2, X, Save, Search, XCircle, LayoutGrid, List } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { safeGetDate, toISODate } from '../../lib/utils';
 
 // Modular Imports
 import StatSummary from './components/StatSummary';
 import IncidentCard from './components/IncidentCard';
+import IncidentRow from './components/IncidentRow';
 import ResolveModal from './components/ResolveModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import { useIncidentExport } from './hooks/useIncidentExport';
+
+const VIEW_MODE_KEY = 'incidentlogger-incidentlist-view-mode';
 
 const IncidentLoggerApp = ({ user }) => {
   const [incidents, setIncidents] = useState([]);
@@ -15,12 +20,29 @@ const IncidentLoggerApp = ({ user }) => {
   const [view, setView] = useState('dashboard');
   const [resolvingIncident, setResolvingIncident] = useState(null);
   const [editingIncident, setEditingIncident] = useState(null);
+  const [deletingIncidentId, setDeletingIncidentId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const [filterStatus, setFilterStatus] = useState('open');
+  const [filterPriority, setFilterPriority] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
+  // Persisted across visits, same convention as WalletWatch's History / TaskFlow's My
+  // Tasks / ChangeManager's list view toggle.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'card';
+    } catch {
+      return 'card';
+    }
+  });
+
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore (private browsing, etc.) */ }
+  };
 
   const [formData, setFormData] = useState({
     title: '', serverName: '', application: '', priority: 'medium',
-    issueDescription: '', reportedBy: '', dateReported: new Date().toISOString().split('T')[0],
+    issueDescription: '', reportedBy: '', dateReported: toISODate(new Date()),
     fixProvided: '', status: 'open'
   });
 
@@ -33,9 +55,7 @@ const IncidentLoggerApp = ({ user }) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       data.sort((a, b) => {
         if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
-        const da = a.dateReported?.toDate ? a.dateReported.toDate() : new Date(a.dateReported);
-        const db = b.dateReported?.toDate ? b.dateReported.toDate() : new Date(b.dateReported);
-        return db - da;
+        return (safeGetDate(b.dateReported) || 0) - (safeGetDate(a.dateReported) || 0);
       });
       setIncidents(data);
       setLoading(false);
@@ -44,33 +64,38 @@ const IncidentLoggerApp = ({ user }) => {
   }, [user]);
 
   const handleEdit = (incident) => {
-    const d = incident.dateReported?.toDate ? incident.dateReported.toDate() : new Date(incident.dateReported);
     setFormData({
       title: incident.title || '', serverName: incident.serverName || '',
       application: incident.application || '', priority: incident.priority || 'medium',
       issueDescription: incident.issueDescription || '', reportedBy: incident.reportedBy || '',
-      dateReported: d.toISOString().split('T')[0], fixProvided: incident.fixProvided || '',
+      dateReported: toISODate(safeGetDate(incident.dateReported)) || toISODate(new Date()),
+      fixProvided: incident.fixProvided || '',
       status: incident.status || 'open'
     });
     setEditingIncident(incident);
     setView('log');
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this incident?")) {
-      try {
-        const docRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents', id);
-        await deleteDoc(docRef);
-      } catch (error) {
-        console.error("Error deleting incident: ", error);
-        // Optionally, show a user-friendly error message
-      }
+  const handleDelete = (id) => {
+    setDeletingIncidentId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingIncidentId) return;
+    try {
+      const docRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents', deletingIncidentId);
+      await deleteDoc(docRef);
+      setDeletingIncidentId(null);
+      setDeleteError('');
+    } catch (error) {
+      console.error("Error deleting incident: ", error);
+      setDeleteError(error?.message || 'Could not delete this incident — please try again.');
     }
   };
 
   const handleSaveIncident = async (e) => {
     e.preventDefault();
-    const tsDate = new Date(formData.dateReported);
+    const tsDate = safeGetDate(formData.dateReported) || new Date();
     const payload = { ...formData, dateReported: Timestamp.fromDate(tsDate), updatedAt: serverTimestamp() };
     const colRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents');
 
@@ -85,34 +110,52 @@ const IncidentLoggerApp = ({ user }) => {
     setEditingIncident(null);
     setFormData({
       title: '', serverName: '', application: '', priority: 'medium',
-      issueDescription: '', reportedBy: '', dateReported: new Date().toISOString().split('T')[0],
+      issueDescription: '', reportedBy: '', dateReported: toISODate(new Date()),
       fixProvided: '', status: 'open'
     });
   };
 
   const filteredIncidents = useMemo(() => {
-    const byStatus = filterStatus === 'all' ? incidents : incidents.filter(i => i.status === filterStatus);
-    if (!filterSearch) return byStatus;
-    const term = filterSearch.toLowerCase();
-    return byStatus.filter(i =>
-      i.serverName?.toLowerCase().includes(term) ||
-      i.application?.toLowerCase().includes(term)
-    );
-  }, [incidents, filterStatus, filterSearch]);
+    let result = filterStatus === 'all' ? incidents : incidents.filter(i => i.status === filterStatus);
+    if (filterPriority) result = result.filter(i => i.priority === filterPriority);
+    if (filterSearch) {
+      const term = filterSearch.toLowerCase();
+      result = result.filter(i =>
+        i.title?.toLowerCase().includes(term) ||
+        i.issueDescription?.toLowerCase().includes(term) ||
+        i.serverName?.toLowerCase().includes(term) ||
+        i.application?.toLowerCase().includes(term)
+      );
+    }
+    return result;
+  }, [incidents, filterStatus, filterPriority, filterSearch]);
+
+  const toggleCriticalFilter = () => {
+    setFilterPriority(prev => prev === 'critical' ? '' : 'critical');
+  };
 
   const { exportPDF, exportCSV } = useIncidentExport(filteredIncidents);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6">
-      <ResolveModal 
-        incident={resolvingIncident} 
-        onClose={() => setResolvingIncident(null)} 
+      <ResolveModal
+        incident={resolvingIncident}
+        onClose={() => setResolvingIncident(null)}
         onConfirm={async (id, fix) => {
           await updateDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid, 'incidents', id), {
             status: 'resolved', fixProvided: fix, resolvedBy: user.displayName || user.email, resolvedDate: serverTimestamp()
           });
           setResolvingIncident(null);
-        }} 
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={!!deletingIncidentId}
+        title="Delete Incident"
+        message="Are you sure you want to permanently delete this incident? This cannot be undone."
+        error={deleteError}
+        onConfirm={confirmDelete}
+        onCancel={() => { setDeletingIncidentId(null); setDeleteError(''); }}
       />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -128,10 +171,10 @@ const IncidentLoggerApp = ({ user }) => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search server or app..."
+              placeholder="Search title, description, server, app..."
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
-              aria-label="Search incidents by server or application"
+              aria-label="Search incidents by title, description, server, or application"
               className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
             {filterSearch && (
@@ -156,31 +199,89 @@ const IncidentLoggerApp = ({ user }) => {
         <>
           {view === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
-              <StatSummary incidents={incidents} />
+              <StatSummary
+                incidents={incidents}
+                onCriticalClick={toggleCriticalFilter}
+                isCriticalFilterActive={filterPriority === 'critical'}
+              />
 
-              <div className="flex gap-2">
-                {['open', 'resolved', 'all'].map(status => (
-                  <button 
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${filterStatus === status ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {['open', 'resolved', 'all'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors ${filterStatus === status ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                  <select
+                    value={filterPriority}
+                    onChange={(e) => setFilterPriority(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-sm font-medium text-slate-600 outline-none cursor-pointer"
+                    aria-label="Filter by priority"
                   >
-                    {status}
+                    <option value="">All Priorities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5 shrink-0">
+                  <button
+                    onClick={() => changeViewMode('card')}
+                    aria-label="Card view"
+                    title="Card view"
+                    aria-pressed={viewMode === 'card'}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <LayoutGrid size={15}/>
                   </button>
-                ))}
+                  <button
+                    onClick={() => changeViewMode('list')}
+                    aria-label="List view"
+                    title="List view"
+                    aria-pressed={viewMode === 'list'}
+                    className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <List size={15}/>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {filteredIncidents.map(incident => (
-                  <IncidentCard 
-                    key={incident.id} 
-                    incident={incident} 
-                    onResolve={setResolvingIncident}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+              {viewMode === 'card' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {filteredIncidents.map(incident => (
+                    <IncidentCard
+                      key={incident.id}
+                      incident={incident}
+                      onResolve={setResolvingIncident}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+                  {filteredIncidents.map(incident => (
+                    <IncidentRow
+                      key={incident.id}
+                      incident={incident}
+                      onResolve={setResolvingIncident}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {filteredIncidents.length === 0 && (
+                <div className="py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                  No incidents found matching your criteria.
+                </div>
+              )}
             </div>
           )}
 

@@ -1,11 +1,6 @@
 import React from 'react';
 import { AlertOctagon, CheckCircle, Pencil, Server, Laptop, Calendar, User, Trash2 } from 'lucide-react';
-
-const formatDate = (dateField) => {
-  if (!dateField) return '-';
-  const d = dateField?.toDate ? dateField.toDate() : new Date(dateField);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-};
+import { formatDate } from '../../../lib/utils';
 
 const StatusBadge = ({ status }) => {
   if (status === 'resolved') {

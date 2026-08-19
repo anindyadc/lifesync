@@ -4,7 +4,13 @@ import { formatDate } from '../../../lib/utils';
 
 // Every field quoted/escaped, not just the free-text ones — an unquoted serverName or
 // application containing a comma (e.g. "Web, Prod-01") used to shift every later column.
-const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+// A leading =, +, -, @, tab, or CR is prefixed with a quote first so Excel/Sheets treats
+// the value as text instead of a formula on open (CSV/Excel formula injection).
+const csvEscape = (value) => {
+  let str = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  return `"${str.replace(/"/g, '""')}"`;
+};
 
 export const useChangeExport = (changes, filterServer) => {
 

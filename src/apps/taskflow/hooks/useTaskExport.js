@@ -15,7 +15,13 @@ const scopeLabel = (t) => {
 export const useTaskExport = (tasks) => {
   const [exporting, setExporting] = useState(false);
 
-  const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  // A leading =, +, -, @, tab, or CR is prefixed with a quote first so Excel/Sheets
+  // treats the value as text instead of a formula on open (CSV/Excel formula injection).
+  const csvEscape = (value) => {
+    let str = String(value ?? '');
+    if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
 
   const exportToCSV = (tasksToExport) => {
     const data = tasksToExport || tasks;

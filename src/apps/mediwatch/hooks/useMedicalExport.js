@@ -39,7 +39,13 @@ export const useMedicalExport = (prescriptions) => {
 
   const exportCSV = () => {
     const headers = ['Date', 'Patient', 'Relation', 'Doctor', 'Disease', 'Medicines'];
-    const escape = (val) => `"${(val || '').toString().replace(/"/g, '""')}"`;
+    // A leading =, +, -, @, tab, or CR is prefixed with a quote first so Excel/Sheets
+    // treats the value as text instead of a formula on open (CSV/Excel formula injection).
+    const escape = (val) => {
+      let str = (val || '').toString();
+      if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+      return `"${str.replace(/"/g, '""')}"`;
+    };
     const rows = prescriptions.map((p) => [
       fmt(p.date),
       escape(p.patientName),

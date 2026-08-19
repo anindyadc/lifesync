@@ -43,8 +43,14 @@ export const useInvestmentExport = (investments) => {
   const exportCSV = () => {
     // Every field quoted/escaped, not just the free-text ones — formatAmount's 'en-IN'
     // grouping commas (e.g. "1,00,000") were shifting every later column when left
-    // unquoted.
-    const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    // unquoted. A leading =, +, -, @, tab, or CR is prefixed with a quote first so
+    // Excel/Sheets treats the value as text instead of a formula on open (CSV/Excel
+    // formula injection).
+    const csvEscape = (value) => {
+      let str = String(value ?? '');
+      if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+      return `"${str.replace(/"/g, '""')}"`;
+    };
     const headers = ['Holder', 'Type', 'Name', 'Amount', 'Maturity Date', 'Details'];
     const rows = investments.map(inv => [
       csvEscape(inv.holder || ''),

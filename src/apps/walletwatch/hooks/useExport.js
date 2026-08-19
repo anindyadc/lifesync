@@ -18,8 +18,13 @@ const toRow = (e, categories) => [
 // are user-editable free text and could contain a comma too. Exported so other
 // non-expense-shaped CSV exports (e.g. CreditCardBilling's cycle history) can reuse the
 // same escaping/download plumbing instead of re-implementing it.
+// A value starting with =, +, -, @, tab, or CR is prefixed with a quote first so Excel/
+// Sheets treats it as text instead of a formula when the file is opened (CSV/Excel
+// formula injection, CWE-1236) — otherwise a pasted description like
+// `=HYPERLINK("http://evil","x")` executes on open.
 export const csvEscape = (value) => {
-  const str = String(value ?? '');
+  let str = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 };
 

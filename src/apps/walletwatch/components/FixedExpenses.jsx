@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Plus, Pencil, Trash2, Pause, Play, CheckCircle2, Clock, AlertTriangle, X, Loader2,
-  Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown,
+  Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown, LayoutGrid, List,
 } from 'lucide-react';
 import { formatCurrency, formatDate, toISODate, safeGetDate } from '../../../lib/utils';
 import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, PAYMENT_MODES } from '../constants';
@@ -42,6 +42,10 @@ const STATUS_META = {
   skipped: { label: 'Skipped', className: 'bg-slate-100 text-slate-400', icon: SkipForward },
 };
 
+// Persisted across visits, same pattern as TaskFlow's My Tasks / WalletWatch's
+// History card-vs-list toggle.
+const VIEW_MODE_KEY = 'walletwatch-fixedexpenses-view-mode';
+
 const StatusChip = ({ status }) => {
   const meta = STATUS_META[status] || STATUS_META.due;
   const Icon = meta.icon;
@@ -58,6 +62,18 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
   const [deleteTemplateId, setDeleteTemplateId] = useState(null);
   const [payingContext, setPayingContext] = useState(null); // { template, instance }
   const [expandedHistory, setExpandedHistory] = useState({}); // { [templateId]: boolean }
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'card';
+    } catch {
+      return 'card';
+    }
+  });
+
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore (private browsing, etc.) */ }
+  };
 
   const monthKey = monthKeyOf(new Date());
 
@@ -135,12 +151,34 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
             </p>
           </div>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all active:scale-95"
-        >
-          <Plus size={16} /> Add Fixed Expense
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+            <button
+              onClick={() => changeViewMode('card')}
+              aria-label="Card view"
+              title="Card view"
+              aria-pressed={viewMode === 'card'}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              onClick={() => changeViewMode('list')}
+              aria-label="List view"
+              title="List view"
+              aria-pressed={viewMode === 'list'}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <List size={15} />
+            </button>
+          </div>
+          <button
+            onClick={openAdd}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all active:scale-95"
+          >
+            <Plus size={16} /> Add Fixed Expense
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -152,79 +190,26 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
           <p className="text-sm text-slate-500 mt-2">Track rent, EMIs, or subscriptions — they'll come due automatically each month.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className={viewMode === 'card' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'flex flex-col gap-2'}>
           {rows.map(({ tpl, currentInstance, carriedOver, status }) => {
-            const category = categories.find(c => c.id === tpl.category);
-            const CategoryIcon = CATEGORY_ICONS[tpl.category] || DEFAULT_CATEGORY_ICON;
-            const canMarkPaid = currentInstance && currentInstance.status === 'pending';
-
+            const RowComponent = viewMode === 'card' ? FixedExpenseCard : FixedExpenseRow;
             return (
-              <div key={tpl.id} className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${category?.bg || 'bg-slate-100'}`}>
-                    <CategoryIcon size={18} className="opacity-70" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-slate-800 truncate">{tpl.label}</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
-                      {periodLabel(tpl)} &middot; {category?.label || tpl.category}
-                    </p>
-                  </div>
-                  <div className="flex gap-0.5 shrink-0 -mr-1 -mt-1">
-                    <button onClick={() => toggleTemplateActive(tpl.id, !tpl.active)} aria-label={tpl.active ? 'Pause' : 'Resume'} title={tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
-                      {tpl.active ? <Pause size={14} /> : <Play size={14} />}
-                    </button>
-                    <button onClick={() => openEdit(tpl)} aria-label="Edit fixed expense" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Pencil size={14} /></button>
-                    <button onClick={() => setDeleteTemplateId(tpl.id)} aria-label="Delete fixed expense" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="font-black text-base text-slate-900">{formatCurrency(tpl.amount)}</span>
-                  <div className="flex items-center gap-2">
-                    <StatusChip status={status} />
-                    {canMarkPaid && (
-                      <button
-                        onClick={() => setPayingContext({ template: tpl, instance: currentInstance })}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
-                      >
-                        <CheckCircle2 size={13} /> Mark Paid
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {carriedOver.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {carriedOver.map(inst => (
-                      <div key={inst.id} className="flex items-center justify-between text-xs bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
-                        <span className="font-bold text-red-600">Also unpaid: {inst.monthKey}</span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setPayingContext({ template: tpl, instance: inst })}
-                            className="px-2 py-0.5 bg-white text-emerald-600 rounded-md font-bold hover:bg-emerald-50 border border-emerald-200"
-                          >
-                            Pay
-                          </button>
-                          <button
-                            onClick={() => skipInstance(inst.id)}
-                            className="px-2 py-0.5 bg-white text-slate-500 rounded-md font-bold hover:bg-slate-50 border border-slate-200"
-                          >
-                            Skip
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <PaymentHistory
-                  templateId={tpl.id}
-                  allExpenses={allExpenses}
-                  expanded={!!expandedHistory[tpl.id]}
-                  onToggle={() => setExpandedHistory(prev => ({ ...prev, [tpl.id]: !prev[tpl.id] }))}
-                />
-              </div>
+              <RowComponent
+                key={tpl.id}
+                tpl={tpl}
+                currentInstance={currentInstance}
+                carriedOver={carriedOver}
+                status={status}
+                category={categories.find(c => c.id === tpl.category)}
+                allExpenses={allExpenses}
+                expanded={!!expandedHistory[tpl.id]}
+                onToggleHistory={() => setExpandedHistory(prev => ({ ...prev, [tpl.id]: !prev[tpl.id] }))}
+                onToggleActive={() => toggleTemplateActive(tpl.id, !tpl.active)}
+                onEdit={() => openEdit(tpl)}
+                onDelete={() => setDeleteTemplateId(tpl.id)}
+                onPay={(instance) => setPayingContext({ template: tpl, instance })}
+                onSkip={(instanceId) => skipInstance(instanceId)}
+              />
             );
           })}
         </div>
@@ -254,6 +239,135 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
 };
 
 export default FixedExpenses;
+
+// Shared by both FixedExpenseCard and FixedExpenseRow so "carried over unpaid" instances
+// (from a prior month, still pending) render identically regardless of view mode.
+const CarriedOverList = ({ carriedOver, onPay, onSkip }) => (
+  <div className="space-y-1.5">
+    {carriedOver.map(inst => (
+      <div key={inst.id} className="flex items-center justify-between text-xs bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+        <span className="font-bold text-red-600">Also unpaid: {inst.monthKey}</span>
+        <div className="flex items-center gap-1">
+          <button onClick={() => onPay(inst)} className="px-2 py-0.5 bg-white text-emerald-600 rounded-md font-bold hover:bg-emerald-50 border border-emerald-200">
+            Pay
+          </button>
+          <button onClick={() => onSkip(inst.id)} className="px-2 py-0.5 bg-white text-slate-500 rounded-md font-bold hover:bg-slate-50 border border-slate-200">
+            Skip
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * FixedExpenseCard — the original bento-card layout, used in Card view.
+ */
+const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+  const CategoryIcon = CATEGORY_ICONS[tpl.category] || DEFAULT_CATEGORY_ICON;
+  const canMarkPaid = currentInstance && currentInstance.status === 'pending';
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${category?.bg || 'bg-slate-100'}`}>
+          <CategoryIcon size={18} className="opacity-70" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-bold text-slate-800 truncate">{tpl.label}</h4>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+            {periodLabel(tpl)} &middot; {category?.label || tpl.category}
+          </p>
+        </div>
+        <div className="flex gap-0.5 shrink-0 -mr-1 -mt-1">
+          <button onClick={onToggleActive} aria-label={tpl.active ? 'Pause' : 'Resume'} title={tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+            {tpl.active ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+          <button onClick={onEdit} aria-label="Edit fixed expense" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Pencil size={14} /></button>
+          <button onClick={onDelete} aria-label="Delete fixed expense" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+        <span className="font-black text-base text-slate-900">{formatCurrency(tpl.amount)}</span>
+        <div className="flex items-center gap-2">
+          <StatusChip status={status} />
+          {canMarkPaid && (
+            <button
+              onClick={() => onPay(currentInstance)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
+            >
+              <CheckCircle2 size={13} /> Mark Paid
+            </button>
+          )}
+        </div>
+      </div>
+
+      {carriedOver.length > 0 && <div className="pt-1"><CarriedOverList carriedOver={carriedOver} onPay={onPay} onSkip={onSkip} /></div>}
+
+      <PaymentHistory templateId={tpl.id} allExpenses={allExpenses} expanded={expanded} onToggle={onToggleHistory} />
+    </div>
+  );
+};
+
+/**
+ * FixedExpenseRow — dense single-line layout for List view, same pattern as
+ * TaskFlow's TaskRow / WalletWatch's TransactionRow: a `sm:grid-cols-[...]` row sized to
+ * fill the row's actual width, with carried-over/payment-history detail collapsed below.
+ */
+const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+  const CategoryIcon = CATEGORY_ICONS[tpl.category] || DEFAULT_CATEGORY_ICON;
+  const canMarkPaid = currentInstance && currentInstance.status === 'pending';
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 px-3 py-2.5 flex flex-col gap-2">
+      <div className="flex items-center gap-3 sm:grid sm:grid-cols-[2fr_1fr_auto_auto] sm:items-center sm:gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${category?.bg || 'bg-slate-100'}`}>
+            <CategoryIcon size={15} className="opacity-70" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-sm font-bold text-slate-800 truncate">{tpl.label}</h4>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{category?.label || tpl.category}</p>
+          </div>
+        </div>
+        <p className="hidden sm:block text-xs text-slate-500 font-medium truncate">{periodLabel(tpl)}</p>
+        <div className="hidden sm:flex items-center gap-2">
+          <span className="font-black text-sm text-slate-900">{formatCurrency(tpl.amount)}</span>
+          <StatusChip status={status} />
+        </div>
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
+          {canMarkPaid && (
+            <button
+              onClick={() => onPay(currentInstance)}
+              className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-[11px] font-bold"
+            >
+              <CheckCircle2 size={12} /> <span className="hidden md:inline">Mark Paid</span>
+            </button>
+          )}
+          <button onClick={onToggleActive} aria-label={tpl.active ? 'Pause' : 'Resume'} title={tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+            {tpl.active ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+          <button onClick={onEdit} aria-label="Edit fixed expense" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Pencil size={14} /></button>
+          <button onClick={onDelete} aria-label="Delete fixed expense" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
+        </div>
+      </div>
+
+      {/* Amount/period/status collapse onto a second line below sm, where the grid above hides them. */}
+      <div className="flex sm:hidden items-center justify-between text-xs">
+        <span className="text-slate-500 font-medium">{periodLabel(tpl)}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-black text-slate-900">{formatCurrency(tpl.amount)}</span>
+          <StatusChip status={status} />
+        </div>
+      </div>
+
+      {carriedOver.length > 0 && <CarriedOverList carriedOver={carriedOver} onPay={onPay} onSkip={onSkip} />}
+
+      <PaymentHistory templateId={tpl.id} allExpenses={allExpenses} expanded={expanded} onToggle={onToggleHistory} />
+    </div>
+  );
+};
 
 /**
  * PaymentHistory — past paid instances for one template (matched via

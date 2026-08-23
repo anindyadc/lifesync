@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard, Trash2 } from 'lucide-react';
+import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard, Trash2, Banknote } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { safeGetDate } from '../../lib/utils';
@@ -10,11 +10,13 @@ import ConfirmModal from './components/ConfirmModal';
 import MiscExpenseModal from './components/MiscExpenseModal';
 import FixedExpenses from './components/FixedExpenses';
 import CreditCardBilling from './components/CreditCardBilling';
+import CashBalance from './components/CashBalance';
 import { useExpenses } from './hooks/useExpenses';
 import { useExport } from './hooks/useExport';
 import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { useCreditCards } from './hooks/useCreditCards';
+import { useCashBalance } from './hooks/useCashBalance';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -27,6 +29,7 @@ const WalletWatchApp = ({ user }) => {
   const { draftItems, addDraftItem, removeDraftItem, clearDraft } = useMiscExpenseDraft(user);
   const fixedExpenses = useFixedExpenses(user);
   const creditCards = useCreditCards(user, allExpenses);
+  const cashBalance = useCashBalance(user, allExpenses);
 
   const [view, setView] = useState('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -40,6 +43,10 @@ const WalletWatchApp = ({ user }) => {
   const [deleteCategoryId, setDeleteCategoryId] = useState(null);
   const [deleteCategoryError, setDeleteCategoryError] = useState('');
   const [relatedTxn, setRelatedTxn] = useState(null);
+  // Bulk "Settle All" for a whole event/trip group at once (TransactionList's Event
+  // grouping) — { items, label } for the pending items being settled together, as
+  // opposed to relatedTxn's single-item settle. Mutually exclusive with relatedTxn.
+  const [settleGroup, setSettleGroup] = useState(null);
   const [confirmOldDataOpen, setConfirmOldDataOpen] = useState(false);
   const [oldDataError, setOldDataError] = useState('');
 
@@ -56,6 +63,26 @@ const WalletWatchApp = ({ user }) => {
       return d && d < cutoff;
     });
   }, [allExpenses]);
+
+  // Pre-fills the settle form for a bulk group settle: one refund covering every pending
+  // item's amount, defaulting Payment/Account/Official from the group's own items (all
+  // official if every pending item in the group is, matching how a real reimbursement for
+  // an official trip would be paid back) rather than requiring the user to re-enter them.
+  const settleGroupInitialData = useMemo(() => {
+    if (!settleGroup) return null;
+    const total = settleGroup.items.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+    const first = settleGroup.items[0] || {};
+    return {
+      date: new Date(),
+      description: `Refund: ${settleGroup.label}`,
+      category: 'reimbursement',
+      group: settleGroup.label,
+      amount: total,
+      paymentMode: first.paymentMode || 'upi',
+      paymentAccount: first.paymentAccount || '',
+      isOfficial: settleGroup.items.every(e => e.isOfficial),
+    };
+  }, [settleGroup]);
 
   if (loading) {
     return (
@@ -87,7 +114,10 @@ const WalletWatchApp = ({ user }) => {
       amount: finalAmount,
       date: Timestamp.fromDate(localDate),
       updatedAt: serverTimestamp(),
-      relatedId
+      relatedId,
+      // Bulk group-settle links back to every item it covers via `relatedIds` instead
+      // of the single-item `relatedId` above — see settleGroup/onSettleGroup.
+      ...(settleGroup ? { relatedIds: settleGroup.items.map(i => i.id) } : {}),
     };
 
     if (editingId) {
@@ -97,11 +127,17 @@ const WalletWatchApp = ({ user }) => {
       if (relatedTxn) {
         await updateDoc(doc(col, relatedTxn.id), { reimbursementStatus: 'settled' });
       }
+      if (settleGroup) {
+        await Promise.all(settleGroup.items.map(item =>
+          updateDoc(doc(col, item.id), { reimbursementStatus: 'settled' })
+        ));
+      }
     }
 
     if (!keepOpen) {
       setEditingId(null);
       setRelatedTxn(null);
+      setSettleGroup(null);
       setIsAddOpen(false);
     }
   };
@@ -110,6 +146,14 @@ const WalletWatchApp = ({ user }) => {
     setIsAddOpen(false);
     setEditingId(null);
     setRelatedTxn(null);
+    setSettleGroup(null);
+  };
+
+  const handleSettleGroup = (items, label) => {
+    setEditingId(null);
+    setRelatedTxn(null);
+    setSettleGroup({ items, label });
+    setIsAddOpen(true);
   };
 
   const handleAddCategory = async () => {
@@ -300,6 +344,12 @@ const WalletWatchApp = ({ user }) => {
           >
             <CreditCard size={14} /> Cards
           </button>
+          <button
+            onClick={() => setView('cash')}
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cash' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Banknote size={14} /> Cash
+          </button>
         </div>
         <div className="flex gap-2 justify-end w-full sm:w-auto">
           {/* Scoped to the Dashboard tab's selected month — History has its own
@@ -334,7 +384,7 @@ const WalletWatchApp = ({ user }) => {
             )}
           </button>
           <button
-            onClick={() => { setEditingId(null); setRelatedTxn(null); setIsAddOpen(true); }}
+            onClick={() => { setEditingId(null); setRelatedTxn(null); setSettleGroup(null); setIsAddOpen(true); }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-700 transition-all active:scale-95"
           >
             <Plus size={16} /> Add Entry
@@ -359,8 +409,9 @@ const WalletWatchApp = ({ user }) => {
           <TransactionList
             expenses={allExpenses}
             categories={categories}
-            onEdit={(exp) => { setEditingId(exp.id); setRelatedTxn(null); setIsAddOpen(true); }}
-            onSettle={(exp) => { setRelatedTxn(exp); setIsAddOpen(true); }}
+            onEdit={(exp) => { setEditingId(exp.id); setRelatedTxn(null); setSettleGroup(null); setIsAddOpen(true); }}
+            onSettle={(exp) => { setRelatedTxn(exp); setSettleGroup(null); setIsAddOpen(true); }}
+            onSettleGroup={handleSettleGroup}
             onDelete={setDeleteId}
           />
         )}
@@ -392,6 +443,18 @@ const WalletWatchApp = ({ user }) => {
             cyclesForCard={creditCards.cyclesForCard}
             settleCycle={creditCards.settleCycle}
             deleteSettlement={creditCards.deleteSettlement}
+          />
+        )}
+
+        {view === 'cash' && (
+          <CashBalance
+            snapshots={cashBalance.snapshots}
+            loading={cashBalance.loading}
+            currentExpectedBalance={cashBalance.currentExpectedBalance}
+            computeExpected={cashBalance.computeExpected}
+            addSnapshot={cashBalance.addSnapshot}
+            updateSnapshot={cashBalance.updateSnapshot}
+            deleteSnapshot={cashBalance.deleteSnapshot}
           />
         )}
       </div>
@@ -428,10 +491,14 @@ const WalletWatchApp = ({ user }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <TransactionForm
-              initialData={editingId ? allExpenses.find(e => e.id === editingId) : (relatedTxn ? { ...relatedTxn, date: new Date(), description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' } : null)}
+              initialData={editingId
+                ? allExpenses.find(e => e.id === editingId)
+                : relatedTxn
+                  ? { ...relatedTxn, date: new Date(), description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' }
+                  : settleGroupInitialData}
               categories={categories}
               expenses={allExpenses}
-              isSettling={!!relatedTxn}
+              isSettling={!!relatedTxn || !!settleGroup}
               onSubmit={handleSave}
               onCancel={closeAddModal}
             />

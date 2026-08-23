@@ -114,5 +114,12 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) && hasAppPermission('mediwatch');
     }
 
+    // 12. Specific rule for WalletWatch's Cash Balance snapshots — top-level
+    // collection whose path segment ('cashBalanceSnapshots') doesn't match the
+    // 'walletwatch' allowedApps key, same reason as fixedExpenseTemplates/Instances above.
+    match /artifacts/default-app-id/users/{userId}/cashBalanceSnapshots/{docId} {
+      allow read, write: if isOwner(userId) && hasAppPermission('walletwatch');
+    }
+
   }
 }

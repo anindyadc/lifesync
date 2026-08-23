@@ -66,11 +66,17 @@ export const PAYMENT_MODES = [
 export const getCategoryColor = (existingCount) =>
   CATEGORICAL_PALETTE[existingCount % CATEGORICAL_PALETTE.length];
 
-// "Personal" spend excludes pending lent amounts (not yet actually spent) AND
-// Official-trip expenses (employer-reimbursed, reported separately). Shared by
-// DashboardStats' KPIs/charts and TransactionList's group subtotals so "spent"
-// means the same thing everywhere in the app instead of a raw signed-amount sum.
-export const isSettledSpend = (e) => Number(e.amount) < 0 && e.reimbursementStatus !== 'pending' && !e.isOfficial;
+// "Personal" spend excludes lent amounts, whether still pending or already paid back
+// (`reimbursementStatus` 'pending'/'settled') — a lend nets to zero once reimbursed, so
+// it never counts as spend, not even after settling — AND Official-trip expenses
+// (employer-reimbursed, reported separately). Shared by DashboardStats' KPIs/charts and
+// TransactionList's group subtotals so "spent" means the same thing everywhere in the
+// app instead of a raw signed-amount sum.
+export const isSettledSpend = (e) =>
+  Number(e.amount) < 0 &&
+  e.reimbursementStatus !== 'pending' &&
+  e.reimbursementStatus !== 'settled' &&
+  !e.isOfficial;
 
 // Account identity for grouping/filtering: the free-text account if set (e.g. "GPay-300"),
 // otherwise the Payment Mode's label (e.g. plain "Cash") — shared by the Dashboard's

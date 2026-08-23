@@ -356,7 +356,16 @@ export const GroupSubtotals = ({ expenses, categories }) => {
 /**
  * OfficialTripsSummary — employer-reimbursed trips, reported separately from personal
  * spend. Scoped to `allExpenses` (not the month navigator) since a reimbursement claim
- * usually covers a whole trip regardless of which calendar month it's currently viewed in.
+ * usually covers a whole trip regardless of which calendar month it's currently viewed in
+ * — this is why a trip logged in one month keeps appearing on later months' dashboards
+ * until it's actually reimbursed (see the `reimbursementStatus !== 'settled'` filter
+ * below), not a bug tied to the month navigator.
+ *
+ * Capturing the reimbursement: check BOTH "Official" and "Lent to someone?" on an
+ * official-trip expense when logging it — this sets `reimbursementStatus: 'pending'` the
+ * same way a personal lend does. Once the employer pays it back, hit "Settle" on that
+ * transaction from History (same flow as settling a personal lend); the expense flips to
+ * `reimbursementStatus: 'settled'` and drops out of this "pending claim" total.
  */
 export const OfficialTripsSummary = ({ allExpenses, categories }) => {
   const [selectedTrip, setSelectedTrip] = useState(null);
@@ -365,7 +374,7 @@ export const OfficialTripsSummary = ({ allExpenses, categories }) => {
   const trips = useMemo(() => {
     const map = {};
     allExpenses.forEach(e => {
-      if (e.isOfficial && e.amount < 0) {
+      if (e.isOfficial && e.amount < 0 && e.reimbursementStatus !== 'settled') {
         const key = e.group && e.group.trim() ? e.group.trim() : 'Unspecified Trip';
         if (!map[key]) map[key] = { total: 0, items: [] };
         map[key].total += Math.abs(Number(e.amount) || 0);

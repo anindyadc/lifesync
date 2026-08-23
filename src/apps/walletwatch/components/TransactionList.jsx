@@ -107,7 +107,7 @@ const MultiSelectFilter = ({ label, icon: Icon, options, selected, onToggle, onS
  * TransactionList Component
  * Optimized for clear settlement visibility.
  */
-const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) => {
+const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onSettleGroup }) => {
   const [grouping, setGrouping] = useState('month'); // 'none', 'month', 'event'
   const [sortBy, setSortBy] = useState('date-desc'); // 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -330,19 +330,34 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
     </div>
   );
 
+  // A settle can link back to one original (`relatedId`, the everyday single-item Settle
+  // flow) or to several at once (`relatedIds`, from a group Settle All — see
+  // onSettleGroup/renderGroupedByEvent) — this resolves either shape to one display string
+  // so TransactionCard/Row don't need to know which flow produced the entry.
+  const relatedLabelFor = (exp) => {
+    if (exp.relatedId) {
+      const original = expenseById[exp.relatedId];
+      return original ? `Refund for "${original.description}"` : null;
+    }
+    if (exp.relatedIds && exp.relatedIds.length > 0) {
+      return `Refund for ${exp.relatedIds.length} item${exp.relatedIds.length !== 1 ? 's' : ''}`;
+    }
+    return null;
+  };
+
   // Shared by every grouping mode (month/event/individual, bucketed or not) so card vs.
   // list rendering only needs to be decided in one place.
   const renderTransactionItems = (items) => (
     viewMode === 'card' ? (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-3 bg-slate-50/50 animate-in fade-in duration-200">
         {items.map(exp => (
-          <TransactionCard key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedExpense={exp.relatedId ? expenseById[exp.relatedId] : null} />
+          <TransactionCard key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedLabel={relatedLabelFor(exp)} />
         ))}
       </div>
     ) : (
       <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
         {items.map(exp => (
-          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedExpense={exp.relatedId ? expenseById[exp.relatedId] : null} />
+          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedLabel={relatedLabelFor(exp)} />
         ))}
       </div>
     )
@@ -409,22 +424,38 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
         {groupsToShow.map(([name, items]) => {
           const isTransactionListExpanded = !!expandedTransactionGroups[name];
           const transactionsToShow = isTransactionListExpanded ? items : items.slice(0, 5);
+          // Any still-pending item in the group (personal lend or official-trip claim
+          // alike — unlike the `lent`/`official` totals split, this deliberately doesn't
+          // care which) can be swept into one bulk Settle All instead of settling each
+          // transaction individually.
+          const pendingItems = items.filter(e => e.reimbursementStatus === 'pending');
 
           return (
             <div key={name} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm transition-all duration-300">
-              <button
-                onClick={() => toggleGroup(name)}
-                className="p-4 w-full flex justify-between items-center bg-slate-50/50 hover:bg-slate-100/50"
-              >
-                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Folder size={18}/></div>
-                   <h4 className="font-bold text-slate-800">{name}</h4>
-                 </div>
-                 <div className="flex items-center gap-4">
-                  {renderGroupTotals(groupedData.totals[name])}
-                  <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[name] && 'rotate-180'}`} />
-                </div>
-              </button>
+              <div className="w-full flex items-center bg-slate-50/50 hover:bg-slate-100/50">
+                <button
+                  onClick={() => toggleGroup(name)}
+                  className="flex-1 min-w-0 p-4 flex justify-between items-center text-left"
+                >
+                   <div className="flex items-center gap-3 min-w-0">
+                     <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl shrink-0"><Folder size={18}/></div>
+                     <h4 className="font-bold text-slate-800 truncate">{name}</h4>
+                   </div>
+                   <div className="flex items-center gap-4 shrink-0">
+                    {renderGroupTotals(groupedData.totals[name])}
+                    <ChevronDown size={18} className={`text-slate-500 transition-transform ${!collapsedGroups[name] && 'rotate-180'}`} />
+                  </div>
+                </button>
+                {onSettleGroup && pendingItems.length > 0 && (
+                  <button
+                    onClick={() => onSettleGroup(pendingItems, name)}
+                    className="mr-3 shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold whitespace-nowrap transition-all active:scale-95"
+                    title={`Settle all ${pendingItems.length} pending item${pendingItems.length !== 1 ? 's' : ''} in this group at once`}
+                  >
+                    <RefreshCcw size={12}/> Settle All ({pendingItems.length})
+                  </button>
+                )}
+              </div>
                {!collapsedGroups[name] && (
                 <div className="animate-in fade-in duration-200">
                     {renderTransactionItems(transactionsToShow)}
@@ -729,7 +760,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle }) =
  * transactions lay out as a responsive multi-column grid instead of one stacked column,
  * mirroring TaskFlow's My Tasks card view.
  */
-const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
+const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -754,9 +785,9 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
         </div>
       </div>
 
-      {relatedExpense && (
+      {relatedLabel && (
         <p className="flex items-center gap-1 text-[9px] text-indigo-500 font-bold uppercase tracking-wider">
-          <Link2 size={9} /> Refund for "{relatedExpense.description}"
+          <Link2 size={9} /> {relatedLabel}
         </p>
       )}
 
@@ -815,7 +846,7 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
 // share of the row's actual width, and date/account sit on one line instead of account
 // being pushed into the tag-wrap row below, now that there's room to fit both. Below sm
 // it collapses to a single stacked column (grid-cols-1), same as before.
-const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedExpense }) => {
+const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -832,9 +863,9 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, rela
           <div className="min-w-0">
             <h4 className="text-sm font-bold text-slate-800 truncate">{exp.description}</h4>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">{category?.label || exp.category}</p>
-            {relatedExpense && (
+            {relatedLabel && (
               <p className="flex items-center gap-1 text-[9px] text-indigo-500 font-bold uppercase tracking-wider mt-1">
-                <Link2 size={9} /> Refund for "{relatedExpense.description}"
+                <Link2 size={9} /> {relatedLabel}
               </p>
             )}
           </div>

@@ -117,6 +117,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterScope, setFilterScope] = useState(''); // '' | 'personal' | 'official'
+  const [filterReimbursement, setFilterReimbursement] = useState(''); // '' | 'pending' | 'settled'
   const [filterTags, setFilterTags] = useState([]);
   const [filterGroups, setFilterGroups] = useState([]);
   const [filterAccounts, setFilterAccounts] = useState([]);
@@ -180,6 +181,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
       if (filterCategory && exp.category !== filterCategory) return false;
       if (filterScope === 'personal' && exp.isOfficial) return false;
       if (filterScope === 'official' && !exp.isOfficial) return false;
+      if (filterReimbursement && exp.reimbursementStatus !== filterReimbursement) return false;
       if (filterTags.length > 0 && !(exp.tags || []).some(t => filterTags.includes(t))) return false;
       if (filterGroups.length > 0 && !filterGroups.includes(exp.group)) return false;
       if (filterAccounts.length > 0 && !filterAccounts.includes(getAccountKey(exp))) return false;
@@ -206,7 +208,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
 
       return true;
     });
-  }, [expenses, categories, filterCategory, filterScope, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, dateRangeInvalid, search]);
+  }, [expenses, categories, filterCategory, filterScope, filterReimbursement, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, dateRangeInvalid, search]);
 
   const sortedExpenses = useMemo(() => {
     const arr = [...filteredExpenses];
@@ -220,7 +222,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
   }, [filteredExpenses, sortBy]);
 
   const hasActiveFilters = !!(
-    search.trim() || filterCategory || filterScope || filterTags.length || filterGroups.length ||
+    search.trim() || filterCategory || filterScope || filterReimbursement || filterTags.length || filterGroups.length ||
     filterAccounts.length || filterPaymentModes.length || dateFrom || dateTo
   );
 
@@ -228,6 +230,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
     setSearch('');
     setFilterCategory('');
     setFilterScope('');
+    setFilterReimbursement('');
     setFilterTags([]);
     setFilterGroups([]);
     setFilterAccounts([]);
@@ -604,6 +607,23 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
                 onClick={() => setFilterScope(value)}
                 className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
                   filterScope === value ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* reimbursementStatus filter — the only way to isolate "Lent"/"Settled" items
+              before this was scanning for the badge on every row by eye. */}
+          <div className="flex items-center gap-1">
+            {[['', 'Any Status'], ['pending', 'Lent'], ['settled', 'Settled']].map(([value, label]) => (
+              <button
+                key={value || 'any-status'}
+                type="button"
+                onClick={() => setFilterReimbursement(value)}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                  filterReimbursement === value ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
               >
                 {label}

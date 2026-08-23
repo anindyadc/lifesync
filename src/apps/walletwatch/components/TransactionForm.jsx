@@ -118,13 +118,19 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         paymentMode: initialData.paymentMode || 'upi',
         paymentAccount: initialData.paymentAccount || '',
         date: toISODate(d),
-        isReimbursable: initialData.reimbursementStatus === 'pending',
+        // A settle form's initialData is built by spreading the ORIGINAL expense being
+        // settled (see walletwatch/index.jsx) — which is 'pending' by definition, that's
+        // why it was eligible to settle. Blindly inheriting that here would flag the new
+        // REFUND entry itself as 'pending' (the "Lent to someone?" checkbox is hidden
+        // while isSettling, so the user has no way to see or correct it), making the
+        // refund look unsettled and settleable again — a refund of a refund.
+        isReimbursable: !isSettling && initialData.reimbursementStatus === 'pending',
         isOfficial: !!initialData.isOfficial
       });
     } else if (categories && categories.length > 0 && !formData.category) {
       setFormData(prev => ({ ...prev, category: categories[0].id }));
     }
-  }, [initialData, categories]);
+  }, [initialData, categories, isSettling]);
 
   // Quality-of-life: once a trip/group has been marked Official once, default new
   // entries under the same group name to Official too, so the user isn't re-checking

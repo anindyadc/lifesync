@@ -1,9 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { safeGetDate } from '../../../lib/utils';
+import { MARKET_LINKED_TYPES } from '../constants';
 
-const formatMaturityDate = (maturityDate) => {
-  const d = safeGetDate(maturityDate);
+const formatDateField = (dateValue) => {
+  const d = safeGetDate(dateValue);
   return d ? d.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 };
 
@@ -13,9 +14,42 @@ const formatAmount = (amount) => {
   return amount.toLocaleString('en-IN');
 };
 
+const statusLabel = (inv) => {
+  if (!MARKET_LINKED_TYPES.includes(inv.type)) return '-';
+  return inv.status === 'sold' ? 'Sold' : (inv.investmentMode === 'sip' ? `SIP (${inv.sipFrequency || 'monthly'})` : 'Lump Sum · Active');
+};
+
+const gainLossLabel = (inv) => {
+  const compareValue = inv.status === 'sold' ? inv.saleValue : inv.currentValue;
+  if (typeof inv.amount !== 'number' || typeof compareValue !== 'number') return '-';
+  const diff = compareValue - inv.amount;
+  return `${diff >= 0 ? '+' : '-'}${formatAmount(Math.abs(diff))}`;
+};
+
+// Every CSV export in this codebase quotes/escapes every column (not just free-text
+// ones) and prefixes a leading =, +, -, @, tab, or CR with a quote before quoting, so a
+// pasted description can't execute as a formula when the file is opened in Excel/Sheets
+// (CSV/Excel formula injection, CWE-1236) — duplicated per-module rather than shared.
+const csvEscape = (value) => {
+  let str = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  return `"${str.replace(/"/g, '""')}"`;
+};
+
+const downloadCSV = (headers, rows, filename) => {
+  const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export const useInvestmentExport = (investments) => {
   const exportPDF = () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(20);
     doc.setTextColor(79, 70, 229);
     doc.text("Investment Report", 14, 22);
@@ -26,50 +60,76 @@ export const useInvestmentExport = (investments) => {
 
     autoTable(doc, {
       startY: 38,
-      head: [['Holder', 'Type', 'Name', 'Amount (₹)', 'Maturity Date', 'Details']],
+      head: [['Holder', 'Type', 'Name', 'Amount (₹)', 'Current Value (₹)', 'Gain/Loss', 'Mode / Status', 'Investment Date', 'Maturity Date', 'Details']],
       body: investments.map(inv => [
         inv.holder || '-',
         inv.type || '-',
         inv.name || '-',
         formatAmount(inv.amount),
-        formatMaturityDate(inv.maturityDate),
+        formatAmount(MARKET_LINKED_TYPES.includes(inv.type) ? (inv.status === 'sold' ? inv.saleValue : inv.currentValue) : undefined),
+        gainLossLabel(inv),
+        statusLabel(inv),
+        MARKET_LINKED_TYPES.includes(inv.type) || inv.investmentDate ? formatDateField(inv.investmentDate) : '-',
+        inv.maturityDate ? formatDateField(inv.maturityDate) : '-',
         inv.details || '-'
       ]),
-      headStyles: { fillColor: [79, 70, 229] }
+      headStyles: { fillColor: [79, 70, 229] },
+      styles: { fontSize: 8 },
     });
     doc.save('investments_report.pdf');
   };
 
   const exportCSV = () => {
-    // Every field quoted/escaped, not just the free-text ones — formatAmount's 'en-IN'
-    // grouping commas (e.g. "1,00,000") were shifting every later column when left
-    // unquoted. A leading =, +, -, @, tab, or CR is prefixed with a quote first so
-    // Excel/Sheets treats the value as text instead of a formula on open (CSV/Excel
-    // formula injection).
-    const csvEscape = (value) => {
-      let str = String(value ?? '');
-      if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
-      return `"${str.replace(/"/g, '""')}"`;
-    };
-    const headers = ['Holder', 'Type', 'Name', 'Amount', 'Maturity Date', 'Details'];
+    const headers = ['Holder', 'Type', 'Name', 'Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Sold Date', 'Sale Value', 'Details'];
     const rows = investments.map(inv => [
       csvEscape(inv.holder || ''),
       csvEscape(inv.type || ''),
       csvEscape(inv.name || ''),
       csvEscape(formatAmount(inv.amount)),
-      csvEscape(formatMaturityDate(inv.maturityDate)),
+      csvEscape(inv.investmentMode || '-'),
+      csvEscape(inv.units || '-'),
+      csvEscape(formatAmount(inv.purchasePrice)),
+      csvEscape(formatAmount(inv.currentValue)),
+      csvEscape(gainLossLabel(inv)),
+      csvEscape(inv.status === 'sold' ? 'Sold' : 'Active'),
+      csvEscape(inv.investmentDate ? formatDateField(inv.investmentDate) : '-'),
+      csvEscape(inv.maturityDate ? formatDateField(inv.maturityDate) : '-'),
+      csvEscape(inv.interestRate ? `${inv.interestRate}%` : '-'),
+      csvEscape(inv.soldDate ? formatDateField(inv.soldDate) : '-'),
+      csvEscape(formatAmount(inv.saleValue)),
       csvEscape(inv.details || '')
     ].join(','));
 
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "investments_export.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(headers, rows, 'investments_export.csv');
   };
 
-  return { exportPDF, exportCSV };
+  // FY-scoped export for the Tax Summary tab: FD/NSC accrued interest rows plus
+  // realized-sale capital-gains rows for the selected financial year.
+  const exportTaxCSV = (fyLabel, interestRows, gainRows) => {
+    const headers = ['Section', 'Holder', 'Name', 'Principal / Invested', 'Rate / Sale Value', 'Interest / Gain', 'Classification'];
+    const rows = [
+      ...interestRows.map(row => [
+        csvEscape('FD/NSC Interest'),
+        csvEscape(row.holder || ''),
+        csvEscape(row.name || ''),
+        csvEscape(formatAmount(row.amount)),
+        csvEscape(`${row.interestRate}%`),
+        csvEscape(formatAmount(row.interest)),
+        csvEscape('Interest Income'),
+      ].join(',')),
+      ...gainRows.map(row => [
+        csvEscape('Capital Gains'),
+        csvEscape(row.holder || ''),
+        csvEscape(row.name || ''),
+        csvEscape(formatAmount(row.amount)),
+        csvEscape(formatAmount(row.saleValue)),
+        csvEscape(`${row.gain >= 0 ? '+' : '-'}${formatAmount(Math.abs(row.gain))}`),
+        csvEscape(row.classification || 'Unknown'),
+      ].join(',')),
+    ];
+
+    downloadCSV(headers, rows, `tax_summary_FY${fyLabel}.csv`);
+  };
+
+  return { exportPDF, exportCSV, exportTaxCSV };
 };

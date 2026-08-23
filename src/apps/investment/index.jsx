@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { PlusCircle, PiggyBank, CalendarDays, Loader2, AlertCircle, FileText, Download } from 'lucide-react';
+import { PlusCircle, PiggyBank, CalendarDays, Loader2, AlertCircle, FileText, Download, Receipt } from 'lucide-react';
 import InvestmentList from './components/InvestmentList';
 import InvestmentForm from './components/InvestmentForm';
 import MaturityCalendar from './components/MaturityCalendar';
 import InvestmentStats from './components/InvestmentStats';
+import TaxSummary from './components/TaxSummary';
 import { useInvestments } from './hooks/useInvestments';
 import { useInvestmentExport } from './hooks/useInvestmentExport';
 
 const InvestmentsApp = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
-  const [activeTab, setActiveTab] = useState('investment'); // 'list', 'calendar'
-  const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment } = useInvestments(user.uid);
-  const { exportPDF, exportCSV } = useInvestmentExport(investments);
+  const [activeTab, setActiveTab] = useState('investment'); // 'investment', 'calendar', 'tax'
+  const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment, sellInvestment, reopenInvestment } = useInvestments(user.uid);
+  const { exportPDF, exportCSV, exportTaxCSV } = useInvestmentExport(investments);
 
   const handleSave = async (investmentData) => {
     if (editInvestment) {
@@ -60,6 +61,12 @@ const InvestmentsApp = ({ user }) => {
           >
             <CalendarDays className="inline-block mr-2" size={18} /> Calendar
           </button>
+          <button
+            onClick={() => setActiveTab('tax')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tax' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
+          >
+            <Receipt className="inline-block mr-2" size={18} /> Tax Summary
+          </button>
           <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export CSV" aria-label="Export CSV"><FileText size={18}/></button>
           <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export PDF" aria-label="Export PDF"><Download size={18}/></button>
         </div>
@@ -103,10 +110,12 @@ const InvestmentsApp = ({ user }) => {
                   <span>Add Investment</span>
                 </button>
               </div>
-              <InvestmentList 
+              <InvestmentList
                 investments={investments}
                 onEdit={handleEdit}
                 onDelete={deleteInvestment}
+                onSell={sellInvestment}
+                onReopen={reopenInvestment}
               />
             </div>
           )}
@@ -115,6 +124,10 @@ const InvestmentsApp = ({ user }) => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <MaturityCalendar investments={investments} onEdit={handleEdit} />
             </div>
+          )}
+
+          {activeTab === 'tax' && (
+            <TaxSummary investments={investments} exportTaxCSV={exportTaxCSV} />
           )}
         </>
       )}

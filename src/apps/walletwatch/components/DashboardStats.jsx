@@ -220,7 +220,7 @@ export const GroupSubtotals = ({ expenses, categories }) => {
   const groups = useMemo(() => {
     const map = {};
     expenses.forEach(e => {
-      if (e.group && e.amount < 0 && !e.isOfficial) {
+      if (e.group && isSettledSpend(e)) {
         if (!map[e.group]) {
           map[e.group] = { total: 0, items: [] };
         }
@@ -521,7 +521,7 @@ export const CategoryBreakdown = ({ categories, expenses }) => {
 
   const data = useMemo(() => {
     const totals = categories.map(cat => {
-      const items = expenses.filter(e => e.category === cat.id && e.amount < 0 && !e.isOfficial);
+      const items = expenses.filter(e => e.category === cat.id && isSettledSpend(e));
       const value = items.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0);
       return { id: cat.id, label: cat.label, color: cat.color, bg: cat.bg, value, items };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value);

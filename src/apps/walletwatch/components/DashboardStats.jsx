@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   Wallet, Clock, Calendar, Receipt, PieChart, Layers, ChevronLeft, ChevronRight,
-  TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X, Repeat, AlertTriangle
+  TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X, Repeat, AlertTriangle, Pencil
 } from 'lucide-react';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey } from '../constants';
@@ -46,7 +46,7 @@ const MonthNavigator = ({ selectedMonth, setSelectedMonth }) => {
 // returns null when it has nothing to show for the month (e.g. no official trips) — since
 // a null child renders no DOM node, the grid never reserves empty space for it, so no
 // separate "does the sidebar have anything to show" check is needed here.
-const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth, fixedInstances = [], cards = [] }) => {
+const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelectedMonth, fixedInstances = [], cards = [], onEdit }) => {
   return (
     <div>
       <MonthNavigator selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />
@@ -54,7 +54,7 @@ const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelect
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
         <div className="lg:col-span-2">
-          <DailyCalendar expenses={expenses} categories={categories} selectedMonth={selectedMonth} />
+          <DailyCalendar expenses={expenses} categories={categories} selectedMonth={selectedMonth} onEdit={onEdit} />
         </div>
         <div className="lg:col-span-3">
           <MonthlyTrendChart allExpenses={allExpenses} />
@@ -62,12 +62,12 @@ const Dashboard = ({ categories, expenses, allExpenses, selectedMonth, setSelect
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <CategoryBreakdown categories={categories} expenses={expenses} />
+        <CategoryBreakdown categories={categories} expenses={expenses} onEdit={onEdit} />
         <WeeklyBarChart expenses={allExpenses} />
         <PaymentModeBreakdown expenses={expenses} />
-        <PaymentAccountBreakdown expenses={expenses} allExpenses={allExpenses} categories={categories} cards={cards} selectedMonth={selectedMonth} />
-        <GroupSubtotals categories={categories} expenses={expenses} />
-        <OfficialTripsSummary categories={categories} allExpenses={allExpenses} />
+        <PaymentAccountBreakdown expenses={expenses} allExpenses={allExpenses} categories={categories} cards={cards} selectedMonth={selectedMonth} onEdit={onEdit} />
+        <GroupSubtotals categories={categories} expenses={expenses} onEdit={onEdit} />
+        <OfficialTripsSummary categories={categories} allExpenses={allExpenses} onEdit={onEdit} />
         <FixedBillsDueCard instances={fixedInstances} selectedMonth={selectedMonth} />
       </div>
     </div>
@@ -207,13 +207,44 @@ export const SummaryCards = ({ expenses, allExpenses = [], selectedMonth }) => {
 };
 
 /**
+ * DrillDownExpenseRow — the individual-transaction row shared by every Dashboard
+ * drill-down modal (Category/Group/Trip/Account breakdowns below plus DailyCalendar
+ * in OverviewCharts.jsx). Shows an Edit button when `onEdit` is passed — Dashboard
+ * threads it down from index.jsx's shared handleEdit, the same one History uses.
+ */
+const DrillDownExpenseRow = ({ exp, onEdit }) => (
+  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
+    <div className="min-w-0 pr-3">
+      <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
+      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+        {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+      </p>
+    </div>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(exp)}
+          aria-label="Edit transaction"
+          title="Edit"
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+        >
+          <Pencil size={14} />
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+/**
  * GroupSubtotals — "Top Trips & Events (Personal)".
  * Every expense's `group` field doubles as a trip tag (e.g. "Trip: Goa Dec 2025") —
  * this card ranks them and the drill-down modal gives a per-category breakdown plus
  * a scoped CSV/PDF export for just that trip. Official (employer-reimbursed) trips
  * are excluded here — see OfficialTripsSummary below for those.
  */
-export const GroupSubtotals = ({ expenses, categories }) => {
+export const GroupSubtotals = ({ expenses, categories, onEdit }) => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -334,15 +365,7 @@ export const GroupSubtotals = ({ expenses, categories }) => {
 
               <div className="space-y-3">
                 {selectedGroup.items.map(exp => (
-                  <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
-                    <div className="min-w-0 pr-3">
-                      <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
-                  </div>
+                  <DrillDownExpenseRow key={exp.id} exp={exp} onEdit={onEdit} />
                 ))}
               </div>
             </div>
@@ -367,7 +390,7 @@ export const GroupSubtotals = ({ expenses, categories }) => {
  * transaction from History (same flow as settling a personal lend); the expense flips to
  * `reimbursementStatus: 'settled'` and drops out of this "pending claim" total.
  */
-export const OfficialTripsSummary = ({ allExpenses, categories }) => {
+export const OfficialTripsSummary = ({ allExpenses, categories, onEdit }) => {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -491,15 +514,7 @@ export const OfficialTripsSummary = ({ allExpenses, categories }) => {
 
               <div className="space-y-3">
                 {selectedTrip.items.map(exp => (
-                  <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
-                    <div className="min-w-0 pr-3">
-                      <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
-                  </div>
+                  <DrillDownExpenseRow key={exp.id} exp={exp} onEdit={onEdit} />
                 ))}
               </div>
             </div>
@@ -520,7 +535,7 @@ const MISC_SHARE_THRESHOLD = 0.05;
  * distinctly from the real "Other" category (constants.js's DEFAULT_CATEGORIES) so
  * the two don't look like the same slice twice when both are present.
  */
-export const CategoryBreakdown = ({ categories, expenses }) => {
+export const CategoryBreakdown = ({ categories, expenses, onEdit }) => {
   const [selectedCat, setSelectedCat] = useState(null);
   const [hoveredSlice, setHoveredSlice] = useState(null);
 
@@ -664,15 +679,7 @@ export const CategoryBreakdown = ({ categories, expenses }) => {
             <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {selectedCat.items.length > 0 ? (
                 selectedCat.items.map(exp => (
-                  <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
-                    <div className="min-w-0 pr-3">
-                      <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
-                  </div>
+                  <DrillDownExpenseRow key={exp.id} exp={exp} onEdit={onEdit} />
                 ))
               ) : (
                 <div className="text-center py-8 text-slate-400 text-sm font-medium">No transactions found</div>
@@ -776,7 +783,7 @@ const MAX_CYCLE_STEPS_BACK = 12;
  * "By Category" / "By Payment Mode" split above the flat transaction list, computed
  * only from that account's already-scoped items.
  */
-export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, cards = [], selectedMonth }) => {
+export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, cards = [], selectedMonth, onEdit }) => {
   const [mode, setMode] = useState('month');
   const [cycleStep, setCycleStep] = useState(0);
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -1070,15 +1077,7 @@ export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, car
                 </div>
               )}
               {selectedAccount.items.map(exp => (
-                <div key={exp.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center hover:border-slate-200 transition-colors">
-                  <div className="min-w-0 pr-3">
-                    <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                      {safeGetDate(exp.date)?.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
-                </div>
+                <DrillDownExpenseRow key={exp.id} exp={exp} onEdit={onEdit} />
               ))}
             </div>
           </div>

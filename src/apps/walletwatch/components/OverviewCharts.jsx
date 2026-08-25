@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { TrendingUp, Activity, BarChart3, Calendar as CalendarIcon, X, FileText, Download, Loader2 } from 'lucide-react';
+import { TrendingUp, Activity, BarChart3, Calendar as CalendarIcon, X, FileText, Download, Loader2, Pencil } from 'lucide-react';
 import { formatCurrency, toISODate, safeGetDate } from '../../../lib/utils.js';
 import { isSettledSpend, OTHER_SLOT } from '../constants.js';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
@@ -36,7 +36,7 @@ const heatColor = (ratio) => {
  * transactions. `expenses` here is already scoped to the selected month by
  * useExpenses, so this only needs to bucket by day-of-month.
  */
-export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth }) => {
+export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth, onEdit }) => {
   const [selectedDay, setSelectedDay] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [hovered, setHovered] = useState(null);
@@ -215,7 +215,20 @@ export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth })
                     <div className="min-w-0 pr-3">
                       <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
                     </div>
-                    <span className="font-black text-slate-900 shrink-0">{formatCurrency(Math.abs(exp.amount))}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+                      {onEdit && (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(exp)}
+                          aria-label="Edit transaction"
+                          title="Edit"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

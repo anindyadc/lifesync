@@ -149,6 +149,8 @@ const WalletWatchApp = ({ user }) => {
     setSettleGroup(null);
   };
 
+  const handleEdit = (exp) => { setEditingId(exp.id); setRelatedTxn(null); setSettleGroup(null); setIsAddOpen(true); };
+
   const handleSettleGroup = (items, label) => {
     setEditingId(null);
     setRelatedTxn(null);
@@ -402,6 +404,7 @@ const WalletWatchApp = ({ user }) => {
             setSelectedMonth={setSelectedMonth}
             fixedInstances={fixedExpenses.instances}
             cards={creditCards.cards}
+            onEdit={handleEdit}
           />
         )}
 
@@ -409,7 +412,7 @@ const WalletWatchApp = ({ user }) => {
           <TransactionList
             expenses={allExpenses}
             categories={categories}
-            onEdit={(exp) => { setEditingId(exp.id); setRelatedTxn(null); setSettleGroup(null); setIsAddOpen(true); }}
+            onEdit={handleEdit}
             onSettle={(exp) => { setRelatedTxn(exp); setSettleGroup(null); setIsAddOpen(true); }}
             onSettleGroup={handleSettleGroup}
             onDelete={setDeleteId}

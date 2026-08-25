@@ -510,10 +510,15 @@ export const OfficialTripsSummary = ({ allExpenses, categories }) => {
   );
 };
 
+const MISC_SHARE_THRESHOLD = 0.05;
+
 /**
  * CategoryBreakdown — consolidated donut + ranked list (replaces the old separate
  * CategoryDistribution + CategorySubtotals cards, which duplicated the same data).
- * 7th+ category folds into a muted "Other" bucket (dataviz series-count ladder).
+ * Every category with more than 5% of the month's total spend gets its own slice;
+ * the long tail of smaller categories folds into a muted "Rest Categories" bucket — named
+ * distinctly from the real "Other" category (constants.js's DEFAULT_CATEGORIES) so
+ * the two don't look like the same slice twice when both are present.
  */
 export const CategoryBreakdown = ({ categories, expenses }) => {
   const [selectedCat, setSelectedCat] = useState(null);
@@ -526,20 +531,23 @@ export const CategoryBreakdown = ({ categories, expenses }) => {
       return { id: cat.id, label: cat.label, color: cat.color, bg: cat.bg, value, items };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
 
-    const visible = totals.slice(0, 6);
-    const rest = totals.slice(6);
+    const totalVal = totals.reduce((acc, curr) => acc + curr.value, 0);
+
+    const visible = totalVal > 0 ? totals.filter(c => c.value / totalVal > MISC_SHARE_THRESHOLD) : [];
+    const rest = totalVal > 0 ? totals.filter(c => c.value / totalVal <= MISC_SHARE_THRESHOLD) : [];
     if (rest.length > 0) {
       visible.push({
         id: '__other__',
-        label: 'Other',
+        label: 'Rest Categories',
         color: OTHER_SLOT.color,
         bg: OTHER_SLOT.bg,
         value: rest.reduce((acc, c) => acc + c.value, 0),
         items: rest.flatMap(c => c.items),
+        // Kept so the drill-down modal can list which real categories were folded in.
+        subcategories: rest,
       });
     }
 
-    const totalVal = totals.reduce((acc, curr) => acc + curr.value, 0);
     return { visible, totalVal };
   }, [categories, expenses]);
 
@@ -637,6 +645,22 @@ export const CategoryBreakdown = ({ categories, expenses }) => {
                 <X size={20} />
               </button>
             </div>
+            {selectedCat.subcategories && selectedCat.subcategories.length > 0 && (
+              <div className="px-6 pt-4 pb-3 border-b border-slate-100 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Included Categories</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedCat.subcategories.map(sub => (
+                    <span
+                      key={sub.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: sub.color }} />
+                      {sub.label} · {formatCurrency(sub.value)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {selectedCat.items.length > 0 ? (
                 selectedCat.items.map(exp => (

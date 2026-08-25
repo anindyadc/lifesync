@@ -1,9 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle2, Loader2, X, Calculator, Delete } from 'lucide-react';
 import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
 // Modular import for local deployment - ensuring single source of truth
 import { PAYMENT_MODES, getAvailableTags } from '../constants';
+
+// Safe arithmetic evaluator for the inline Amount calculator — hand-rolled recursive
+// descent (+ - * / and parens only) instead of eval()/Function() since the expression
+// is built from free-form button taps, not a trusted constant.
+function evaluateExpression(expr) {
+  const tokens = expr.match(/(\d+\.?\d*|\.\d+|[+\-*/()])/g);
+  if (!tokens || tokens.length === 0) throw new Error('Empty expression');
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const consume = () => tokens[pos++];
+
+  function parseExpr() {
+    let value = parseTerm();
+    while (peek() === '+' || peek() === '-') {
+      const op = consume();
+      const rhs = parseTerm();
+      value = op === '+' ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+  function parseTerm() {
+    let value = parseFactor();
+    while (peek() === '*' || peek() === '/') {
+      const op = consume();
+      const rhs = parseFactor();
+      if (op === '/') {
+        if (rhs === 0) throw new Error('Cannot divide by zero');
+        value = value / rhs;
+      } else {
+        value = value * rhs;
+      }
+    }
+    return value;
+  }
+  function parseFactor() {
+    if (peek() === '-') { consume(); return -parseFactor(); }
+    if (peek() === '(') {
+      consume();
+      const value = parseExpr();
+      if (peek() !== ')') throw new Error('Mismatched parentheses');
+      consume();
+      return value;
+    }
+    const token = consume();
+    const num = parseFloat(token);
+    if (token === undefined || isNaN(num)) throw new Error('Invalid expression');
+    return num;
+  }
+
+  const result = parseExpr();
+  if (pos !== tokens.length) throw new Error('Invalid expression');
+  if (!isFinite(result)) throw new Error('Invalid result');
+  return result;
+}
+
+// Indian digit grouping (last 3 digits, then pairs — e.g. 1234567 -> "12,34,567")
+// for display only; formData.amount itself stays a plain unformatted numeric string.
+function formatIndianNumber(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  const str = String(value);
+  const negative = str.startsWith('-');
+  const unsigned = negative ? str.slice(1) : str;
+  const [intPart, decPart] = unsigned.split('.');
+  if (!intPart) return unsigned;
+  const lastThree = intPart.slice(-3);
+  const otherDigits = intPart.slice(0, -3);
+  const formattedInt = otherDigits === ''
+    ? lastThree
+    : otherDigits.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
+  const result = decPart !== undefined ? `${formattedInt}.${decPart}` : formattedInt;
+  return (negative ? '-' : '') + result;
+}
 
 /**
  * TransactionForm Component
@@ -34,6 +106,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
   const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
   const [amountError, setAmountError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcExpr, setCalcExpr] = useState('');
+  const [calcError, setCalcError] = useState('');
   // Quick-add is the fast path (just Amount/Description/Category); editing an existing
   // entry or recording a refund always shows every field since they may already be set.
   const [showDetails, setShowDetails] = useState(!!initialData || isSettling);
@@ -130,7 +205,43 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     } else if (categories && categories.length > 0 && !formData.category) {
       setFormData(prev => ({ ...prev, category: categories[0].id }));
     }
+    setShowCalculator(false);
+    setCalcExpr('');
+    setCalcError('');
   }, [initialData, categories, isSettling]);
+
+  const calcPreview = React.useMemo(() => {
+    if (!calcExpr) return null;
+    try {
+      return evaluateExpression(calcExpr);
+    } catch {
+      return null;
+    }
+  }, [calcExpr]);
+
+  const handleCalcButton = (val) => {
+    setCalcError('');
+    if (val === 'C') { setCalcExpr(''); return; }
+    if (val === 'back') { setCalcExpr(prev => prev.slice(0, -1)); return; }
+    setCalcExpr(prev => prev + val);
+  };
+
+  const handleUseCalcResult = () => {
+    try {
+      const result = evaluateExpression(calcExpr);
+      if (!isFinite(result) || result <= 0) {
+        setCalcError('Enter a valid positive amount');
+        return;
+      }
+      setFormData(prev => ({ ...prev, amount: Math.round(result * 100) / 100 }));
+      setAmountError('');
+      setShowCalculator(false);
+      setCalcExpr('');
+      setCalcError('');
+    } catch {
+      setCalcError('Invalid expression');
+    }
+  };
 
   // Quality-of-life: once a trip/group has been marked Official once, default new
   // entries under the same group name to Official too, so the user isn't re-checking
@@ -215,23 +326,86 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-4 space-y-4">
           {/* Amount — focal field: bigger type, same compact height as other inputs */}
           <div>
-            <label className={labelClass}>Amount</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className={labelClass + " mb-0"}>Amount</label>
+              <button
+                type="button"
+                onClick={() => setShowCalculator(v => !v)}
+                aria-label="Toggle calculator"
+                title="Calculator"
+                className={`p-1 rounded-md transition-colors ${showCalculator ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+              >
+                <Calculator size={13} />
+              </button>
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">₹</span>
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                value={formData.amount}
-                onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); setAmountError(''); }}
+                value={formatIndianNumber(formData.amount)}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/,/g, '');
+                  if (raw !== '' && !/^\d*\.?\d{0,2}$/.test(raw)) return;
+                  setFormData({ ...formData, amount: raw });
+                  setAmountError('');
+                }}
                 placeholder="0.00"
-                className="w-full pl-7 pr-3 py-2 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-full pl-7 pr-3 py-2 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all"
                 required
                 autoFocus={!initialData}
               />
             </div>
             {amountError && <p className="text-[11px] font-semibold text-red-500 mt-1">{amountError}</p>}
+
+            {showCalculator && (
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between px-1 mb-2 min-h-[18px]">
+                  <div className="flex-1 min-w-0 font-mono text-sm font-semibold text-slate-700 truncate">
+                    {calcExpr || '0'}
+                  </div>
+                  {calcExpr && calcPreview !== null && (
+                    <div className="text-xs font-semibold text-indigo-500 shrink-0 ml-2">= {calcPreview}</div>
+                  )}
+                </div>
+                {calcError && <p className="text-[11px] font-semibold text-red-500 px-1 mb-1.5">{calcError}</p>}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '.', '0', 'C', '+'].map(key => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleCalcButton(key)}
+                      className={`py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                        ['/', '*', '-', '+'].includes(key)
+                          ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                          : key === 'C'
+                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      {key === '/' ? '÷' : key === '*' ? '×' : key}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-1.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCalcButton('back')}
+                    aria-label="Backspace"
+                    className="px-3 py-1.5 rounded-md text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors flex items-center justify-center"
+                  >
+                    <Delete size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseCalcResult}
+                    className="py-1.5 rounded-md text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    Use Result
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Description */}

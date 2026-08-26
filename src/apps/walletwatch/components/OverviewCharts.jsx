@@ -269,12 +269,11 @@ export const MonthlyTrendChart = ({ allExpenses = [] }) => {
     }
 
     allExpenses.forEach(e => {
-      const amt = Number(e.amount) || 0;
-      if (amt >= 0 || e.reimbursementStatus === 'pending' || e.isOfficial) return;
+      if (!isSettledSpend(e)) return;
       const d = safeGetDate(e.date);
       if (!d) return;
       const bucket = buckets.find(b => b.year === d.getFullYear() && b.month === d.getMonth());
-      if (bucket) bucket.total += Math.abs(amt);
+      if (bucket) bucket.total += Math.abs(Number(e.amount) || 0);
     });
 
     return buckets;

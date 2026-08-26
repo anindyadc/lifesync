@@ -5,7 +5,7 @@ import {
   LayoutGrid, List, Repeat, AlertCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
-import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey, getAvailableTags } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const VIEW_MODE_KEY = 'walletwatch-transactionlist-view-mode';
@@ -178,7 +178,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
     const to = (dateTo && !dateRangeInvalid) ? safeGetDate(dateTo) : null;
 
     return expenses.filter(exp => {
-      if (filterCategory && exp.category !== filterCategory) return false;
+      if (filterCategory && !categoryMatchesId(exp, filterCategory, categories)) return false;
       if (filterScope === 'personal' && exp.isOfficial) return false;
       if (filterScope === 'official' && !exp.isOfficial) return false;
       if (filterReimbursement && exp.reimbursementStatus !== filterReimbursement) return false;
@@ -594,9 +594,19 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
             className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer max-w-[130px] truncate"
           >
             <option value="">All Categories</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
+            {getTopLevelCategories(categories).map(c => {
+              const children = getChildCategories(categories, c.id);
+              return children.length > 0 ? (
+                <optgroup key={c.id} label={c.label}>
+                  <option value={c.id}>{c.label} (all)</option>
+                  {children.map(child => (
+                    <option key={child.id} value={child.id}>{child.label}</option>
+                  ))}
+                </optgroup>
+              ) : (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              );
+            })}
           </select>
 
           <div className="flex items-center gap-1">
@@ -782,7 +792,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
  */
 const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
-  const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
+  const CategoryIcon = CATEGORY_ICONS[exp.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
   const PaymentIcon = paymentMode?.icon;
   const accountLabel = exp.paymentAccount?.trim() || paymentMode?.label;
@@ -868,7 +878,7 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
 // it collapses to a single stacked column (grid-cols-1), same as before.
 const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
-  const CategoryIcon = CATEGORY_ICONS[exp.category] || DEFAULT_CATEGORY_ICON;
+  const CategoryIcon = CATEGORY_ICONS[exp.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
   const PaymentIcon = paymentMode?.icon;
   const accountLabel = exp.paymentAccount?.trim() || paymentMode?.label;

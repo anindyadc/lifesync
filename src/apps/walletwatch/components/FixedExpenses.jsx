@@ -4,8 +4,9 @@ import {
   Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown, LayoutGrid, List,
 } from 'lucide-react';
 import { formatCurrency, formatDate, toISODate, safeGetDate } from '../../../lib/utils';
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, PAYMENT_MODES } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../constants';
 import ConfirmModal from './ConfirmModal';
+import CategoryPicker from './CategoryPicker';
 import { monthKeyOf } from '../hooks/useFixedExpenses';
 
 const ordinal = (n) => {
@@ -264,7 +265,7 @@ const CarriedOverList = ({ carriedOver, onPay, onSkip }) => (
  * FixedExpenseCard — the original bento-card layout, used in Card view.
  */
 const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
-  const CategoryIcon = CATEGORY_ICONS[tpl.category] || DEFAULT_CATEGORY_ICON;
+  const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
   return (
@@ -316,7 +317,7 @@ const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category,
  * fill the row's actual width, with carried-over/payment-history detail collapsed below.
  */
 const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
-  const CategoryIcon = CATEGORY_ICONS[tpl.category] || DEFAULT_CATEGORY_ICON;
+  const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
   return (
@@ -489,20 +490,11 @@ const FixedExpenseForm = ({ initialData, categories, onSubmit, onCancel }) => {
 
           <div>
             <label className={labelClass}>Category</label>
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-0.5 custom-scrollbar">
-              {categories.map(cat => {
-                const isSelected = formData.category === cat.id;
-                return (
-                  <button
-                    key={cat.id} type="button" onClick={() => setFormData({ ...formData, category: cat.id })}
-                    style={isSelected ? { borderColor: cat.color } : {}}
-                    className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${isSelected ? `${cat.bg || 'bg-indigo-50 text-indigo-700'}` : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'}`}
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
+            <CategoryPicker
+              categories={categories}
+              value={formData.category}
+              onChange={(id) => setFormData({ ...formData, category: id })}
+            />
           </div>
 
           <div>

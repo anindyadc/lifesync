@@ -4,6 +4,7 @@ import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
 // Modular import for local deployment - ensuring single source of truth
 import { PAYMENT_MODES, getAvailableTags } from '../constants';
+import CategoryPicker from './CategoryPicker';
 
 // Safe arithmetic evaluator for the inline Amount calculator — hand-rolled recursive
 // descent (+ - * / and parens only) instead of eval()/Function() since the expression
@@ -426,26 +427,11 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
           {/* Category — compact, evenly-sized pills with a subtle selected state */}
           <div>
             <label className={labelClass}>Category</label>
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-0.5 custom-scrollbar">
-              {categories.map(cat => {
-                const isSelected = formData.category === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, category: cat.id })}
-                    style={isSelected ? { borderColor: cat.color } : {}}
-                    className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${
-                      isSelected
-                        ? `${cat.bg || 'bg-indigo-50 text-indigo-700'}`
-                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
+            <CategoryPicker
+              categories={categories}
+              value={formData.category}
+              onChange={(id) => setFormData({ ...formData, category: id })}
+            />
           </div>
 
           {/* More details toggle — collapsed by default for quick logging; a dot

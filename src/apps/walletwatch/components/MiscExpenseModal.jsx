@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Wallet, X, Loader2, Trash2 } from 'lucide-react';
 import { toISODate } from '../../../lib/utils';
+import CategoryPicker from './CategoryPicker';
 
 /**
  * MiscExpenseModal — a separate entry point from the main Add Transaction form.
@@ -158,26 +159,7 @@ const MiscExpenseModal = ({ draftItems = [], categories, onAddItem, onRemoveItem
 
             <div>
               <label className={labelClass}>Category</label>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-0.5 custom-scrollbar">
-                {(categories || []).map(cat => {
-                  const isSelected = category === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setCategory(cat.id)}
-                      style={isSelected ? { borderColor: cat.color } : {}}
-                      className={`px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${
-                        isSelected
-                          ? `${cat.bg || 'bg-indigo-50 text-indigo-700'}`
-                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <CategoryPicker categories={categories || []} value={category} onChange={setCategory} />
             </div>
 
             <div>

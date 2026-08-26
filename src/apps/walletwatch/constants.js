@@ -87,6 +87,25 @@ export const getAccountKey = (e) => {
   return e.paymentAccount && e.paymentAccount.trim() ? e.paymentAccount.trim() : modeLabel;
 };
 
+// Two-level category hierarchy: a category with no parentId is top-level; a category
+// whose parentId points at another category's id is that category's subcategory (e.g.
+// "food-snacks" under "food"). Exactly 2 levels — a child's parentId is never itself
+// a child. These three helpers are the single place that walks/queries that shape so
+// every consumer (Dashboard rollup, History filter, CategoryPicker) agrees on it.
+export const getTopLevelCategories = (categories) => categories.filter(c => !c.parentId);
+
+export const getChildCategories = (categories, parentId) => categories.filter(c => c.parentId === parentId);
+
+// True if an expense is tagged exactly `id`, or `id` names a top-level category and the
+// expense is tagged with one of that category's children — i.e. filtering/summing by a
+// parent rolls up its subcategories too, since a parent-only total would otherwise miss
+// most of that parent's spend once subcategories are in use.
+export const categoryMatchesId = (exp, id, categories) => {
+  if (!id) return false;
+  if (exp.category === id) return true;
+  return getChildCategories(categories, id).some(child => child.id === exp.category);
+};
+
 // Shared by TransactionForm's tag-suggestion list and TransactionList's Tags filter —
 // both collected the identical set from an expenses array before this was extracted.
 export const getAvailableTags = (expenses) => {

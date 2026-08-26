@@ -5,10 +5,21 @@ import html2canvas from 'html2canvas';
 import { formatDate } from '../../../lib/utils';
 import { PAYMENT_MODES } from '../constants';
 
+// A subcategory's label alone loses its parent's context outside the app, so a
+// subcategorized expense exports as "Parent > Child" in the single Category column
+// rather than adding a second column.
+const categoryLabelFor = (e, categories) => {
+  const cat = categories.find(c => c.id === e.category);
+  if (!cat) return e.category;
+  if (!cat.parentId) return cat.label;
+  const parent = categories.find(c => c.id === cat.parentId);
+  return parent ? `${parent.label} > ${cat.label}` : cat.label;
+};
+
 const toRow = (e, categories) => [
   formatDate(e.date),
   e.description || '',
-  categories.find(c => c.id === e.category)?.label || e.category,
+  categoryLabelFor(e, categories),
   PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode || '-',
   e.amount
 ];

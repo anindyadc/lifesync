@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard, Trash2, Banknote } from 'lucide-react';
+import { Settings, Plus, X, Loader2, FileText, Download, Wallet, Repeat, CreditCard, Trash2, Banknote, ChevronDown, Pencil } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { safeGetDate } from '../../lib/utils';
@@ -17,6 +17,7 @@ import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { useCreditCards } from './hooks/useCreditCards';
 import { useCashBalance } from './hooks/useCashBalance';
+import { getTopLevelCategories, getChildCategories } from './constants';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -24,7 +25,7 @@ const WalletWatchApp = ({ user }) => {
   // screen (previously the Dashboard tracked its own separate month, so the header
   // export silently ignored it and dumped every transaction ever logged).
   const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const { expenses, allExpenses, categories, loading, addCategory, removeCategory } = useExpenses(user, 'default-app-id', selectedMonth);
+  const { expenses, allExpenses, categories, loading, addCategory, updateCategory, removeCategory } = useExpenses(user, 'default-app-id', selectedMonth);
   const { exportToCSV, exportToPDF, exporting } = useExport(expenses, categories, 'walletwatch-dashboard-charts');
   const { draftItems, addDraftItem, removeDraftItem, clearDraft } = useMiscExpenseDraft(user);
   const fixedExpenses = useFixedExpenses(user);
@@ -37,6 +38,16 @@ const WalletWatchApp = ({ user }) => {
   const [isMiscOpen, setIsMiscOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [categoryError, setCategoryError] = useState('');
+  // Which top-level category rows show their subcategories (settings modal accordion) —
+  // keyed by category id, same collapsed/expanded-by-key convention as TransactionList's
+  // group accordion, just inverted (absent = collapsed, since this list can get long).
+  const [expandedCategoryGroups, setExpandedCategoryGroups] = useState({});
+  const [addingSubcategoryFor, setAddingSubcategoryFor] = useState(null);
+  const [newSubcatName, setNewSubcatName] = useState('');
+  const [subcategoryError, setSubcategoryError] = useState('');
+  const [renamingCategoryId, setRenamingCategoryId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [deleteError, setDeleteError] = useState('');
@@ -169,6 +180,40 @@ const WalletWatchApp = ({ user }) => {
     }
   };
 
+  const toggleCategoryExpand = (id) => {
+    setExpandedCategoryGroups(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleAddSubcategory = async () => {
+    if (!newSubcatName.trim() || !addingSubcategoryFor) return;
+    try {
+      await addCategory(newSubcatName, addingSubcategoryFor);
+      setNewSubcatName('');
+      setSubcategoryError('');
+      setAddingSubcategoryFor(null);
+    } catch (err) {
+      setSubcategoryError(err?.message || 'Could not add that subcategory — please try again.');
+    }
+  };
+
+  const startRenameCategory = (cat) => {
+    setRenamingCategoryId(cat.id);
+    setRenameValue(cat.label);
+    setRenameError('');
+  };
+
+  const commitRenameCategory = async () => {
+    if (!renamingCategoryId) return;
+    if (!renameValue.trim()) { setRenamingCategoryId(null); return; }
+    try {
+      await updateCategory(renamingCategoryId, renameValue);
+      setRenamingCategoryId(null);
+      setRenameError('');
+    } catch (err) {
+      setRenameError(err?.message || 'Could not rename that category — please try again.');
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
@@ -181,7 +226,13 @@ const WalletWatchApp = ({ user }) => {
     }
   };
 
-  const categoryUsageCount = deleteCategoryId ? allExpenses.filter(e => e.category === deleteCategoryId).length : 0;
+  // Deleting a top-level category cascades to its subcategories too (see removeCategory),
+  // so the usage count and warning below need to cover the parent's own directly-tagged
+  // expenses plus every child's.
+  const deleteCategoryChildren = deleteCategoryId ? getChildCategories(categories, deleteCategoryId) : [];
+  const categoryUsageCount = deleteCategoryId
+    ? allExpenses.filter(e => e.category === deleteCategoryId || deleteCategoryChildren.some(c => c.id === e.category)).length
+    : 0;
   const confirmDeleteCategory = async () => {
     if (!deleteCategoryId) return;
     try {
@@ -229,9 +280,13 @@ const WalletWatchApp = ({ user }) => {
       <ConfirmModal
         isOpen={!!deleteCategoryId}
         title="Delete Category"
-        message={categoryUsageCount > 0
-          ? `${categoryUsageCount} existing transaction${categoryUsageCount !== 1 ? 's' : ''} still use this category — they'll show its raw ID instead of a label until re-categorized. Remove it anyway?`
-          : 'Permanently remove this category from your list?'}
+        message={
+          deleteCategoryChildren.length > 0
+            ? `This will also remove its ${deleteCategoryChildren.length} subcategor${deleteCategoryChildren.length !== 1 ? 'ies' : 'y'} (${deleteCategoryChildren.map(c => c.label).join(', ')})${categoryUsageCount > 0 ? `. ${categoryUsageCount} existing transaction${categoryUsageCount !== 1 ? 's' : ''} still use one of them — they'll show a raw ID instead of a label until re-categorized` : ''}. Remove anyway?`
+            : categoryUsageCount > 0
+              ? `${categoryUsageCount} existing transaction${categoryUsageCount !== 1 ? 's' : ''} still use this category — they'll show its raw ID instead of a label until re-categorized. Remove it anyway?`
+              : 'Permanently remove this category from your list?'
+        }
         error={deleteCategoryError}
         onConfirm={confirmDeleteCategory}
         onCancel={() => { setDeleteCategoryId(null); setDeleteCategoryError(''); }}
@@ -256,7 +311,7 @@ const WalletWatchApp = ({ user }) => {
               </button>
             </div>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-4 mb-2">Categories</p>
-            <p className="text-xs text-slate-400 font-medium mb-3">{categories.length} categories &middot; tap &times; to remove</p>
+            <p className="text-xs text-slate-400 font-medium mb-3">{categories.length} categories &middot; tap a name to rename, the chevron for subcategories</p>
 
             <div className="flex gap-2 mb-2">
               <input
@@ -277,21 +332,132 @@ const WalletWatchApp = ({ user }) => {
               <div className="mb-3" />
             )}
 
-            <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto p-1 custom-scrollbar">
-              {categories.map(c => (
-                <div key={c.id} className="group flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                  <span className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{c.label}</span>
-                  <button
-                    onClick={() => setDeleteCategoryId(c.id)}
-                    aria-label={`Remove ${c.label}`}
-                    title={`Remove ${c.label}`}
-                    className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                  >
-                    <X size={12}/>
-                  </button>
-                </div>
-              ))}
+            <div className="space-y-1 max-h-72 overflow-y-auto p-1 custom-scrollbar">
+              {getTopLevelCategories(categories).map(c => {
+                const children = getChildCategories(categories, c.id);
+                const expanded = !!expandedCategoryGroups[c.id];
+                const isRenaming = renamingCategoryId === c.id;
+                return (
+                  <div key={c.id} className="rounded-xl border border-slate-200 bg-white">
+                    <div className="group flex items-center gap-1.5 pl-2.5 pr-1 py-1.5">
+                      <button
+                        onClick={() => toggleCategoryExpand(c.id)}
+                        aria-label={expanded ? `Collapse ${c.label}` : `Expand ${c.label}`}
+                        className="p-0.5 text-slate-400 hover:text-slate-600 shrink-0"
+                      >
+                        <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                      </button>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                      {isRenaming ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && commitRenameCategory()}
+                          onBlur={commitRenameCategory}
+                          className="flex-1 min-w-0 px-1.5 py-0.5 bg-slate-50 border border-indigo-300 rounded text-xs font-bold text-slate-700 outline-none"
+                        />
+                      ) : (
+                        <span className="flex-1 text-xs font-bold text-slate-700 truncate">{c.label}</span>
+                      )}
+                      <button
+                        onClick={() => startRenameCategory(c)}
+                        aria-label={`Rename ${c.label}`}
+                        title={`Rename ${c.label}`}
+                        className="p-1 text-slate-300 group-hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors"
+                      >
+                        <Pencil size={12}/>
+                      </button>
+                      <button
+                        onClick={() => setDeleteCategoryId(c.id)}
+                        aria-label={`Remove ${c.label}`}
+                        title={`Remove ${c.label}`}
+                        className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                      >
+                        <X size={12}/>
+                      </button>
+                    </div>
+                    {renamingCategoryId === c.id && renameError && (
+                      <p className="text-[11px] font-semibold text-red-500 px-3 pb-1.5">{renameError}</p>
+                    )}
+                    {expanded && (
+                      <div className="pl-6 pr-2 pb-2 space-y-1">
+                        {children.map(child => {
+                          const childRenaming = renamingCategoryId === child.id;
+                          return (
+                            <div key={child.id} className="group flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg border border-slate-100 bg-slate-50">
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: child.color }} />
+                              {childRenaming ? (
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={renameValue}
+                                  onChange={e => setRenameValue(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && commitRenameCategory()}
+                                  onBlur={commitRenameCategory}
+                                  className="flex-1 min-w-0 px-1.5 py-0.5 bg-white border border-indigo-300 rounded text-xs font-semibold text-slate-600 outline-none"
+                                />
+                              ) : (
+                                <span className="flex-1 text-xs font-semibold text-slate-600 truncate">{child.label}</span>
+                              )}
+                              <button
+                                onClick={() => startRenameCategory(child)}
+                                aria-label={`Rename ${child.label}`}
+                                title={`Rename ${child.label}`}
+                                className="p-1 text-slate-300 group-hover:text-indigo-500 hover:bg-indigo-100 rounded-full transition-colors"
+                              >
+                                <Pencil size={11}/>
+                              </button>
+                              <button
+                                onClick={() => setDeleteCategoryId(child.id)}
+                                aria-label={`Remove ${child.label}`}
+                                title={`Remove ${child.label}`}
+                                className="p-1 text-slate-300 group-hover:text-red-500 hover:bg-red-100 rounded-full transition-colors"
+                              >
+                                <X size={11}/>
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {addingSubcategoryFor === c.id ? (
+                          <div className="flex gap-1.5 pt-0.5">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={newSubcatName}
+                              onChange={e => { setNewSubcatName(e.target.value); setSubcategoryError(''); }}
+                              onKeyDown={e => e.key === 'Enter' && handleAddSubcategory()}
+                              placeholder="New subcategory..."
+                              className="flex-1 min-w-0 px-2.5 py-1 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
+                            />
+                            <button onClick={handleAddSubcategory} aria-label="Add subcategory" className="shrink-0 p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm active:scale-90 transition-all">
+                              <Plus size={14}/>
+                            </button>
+                            <button
+                              onClick={() => { setAddingSubcategoryFor(null); setNewSubcatName(''); setSubcategoryError(''); }}
+                              aria-label="Cancel"
+                              className="shrink-0 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                            >
+                              <X size={14}/>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setAddingSubcategoryFor(c.id); setNewSubcatName(''); setSubcategoryError(''); }}
+                            className="flex items-center gap-1 text-[11px] font-bold text-indigo-500 hover:text-indigo-700 pt-0.5"
+                          >
+                            <Plus size={12}/> Add subcategory
+                          </button>
+                        )}
+                        {addingSubcategoryFor === c.id && subcategoryError && (
+                          <p className="text-[11px] font-semibold text-red-500">{subcategoryError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-6 pt-5 border-t border-slate-100">

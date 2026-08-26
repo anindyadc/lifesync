@@ -4,7 +4,7 @@ import {
   TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X, Repeat, AlertTriangle, Pencil
 } from 'lucide-react';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
-import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey } from '../constants';
+import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
 import { monthKeyOf } from '../hooks/useFixedExpenses';
@@ -540,10 +540,29 @@ export const CategoryBreakdown = ({ categories, expenses, onEdit }) => {
   const [hoveredSlice, setHoveredSlice] = useState(null);
 
   const data = useMemo(() => {
-    const totals = categories.map(cat => {
-      const items = expenses.filter(e => e.category === cat.id && isSettledSpend(e));
+    // Only top-level categories get their own slice — a category's slice rolls up every
+    // expense tagged with it directly plus every expense tagged with one of its
+    // subcategories, so "Food" still reads as one bucket even once "Food > Snacks" /
+    // "Food > Meals" exist. The subcategory split is preserved separately (below) for
+    // the drill-down modal's "Included Categories" chips.
+    const totals = getTopLevelCategories(categories).map(cat => {
+      const items = expenses.filter(e => categoryMatchesId(e, cat.id, categories) && isSettledSpend(e));
       const value = items.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0);
-      return { id: cat.id, label: cat.label, color: cat.color, bg: cat.bg, value, items };
+      const children = getChildCategories(categories, cat.id);
+      const subcategories = children.length > 0
+        ? children.map(child => {
+            const childItems = expenses.filter(e => e.category === child.id && isSettledSpend(e));
+            return {
+              id: child.id,
+              label: child.label,
+              color: child.color,
+              bg: child.bg,
+              value: childItems.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0),
+              items: childItems,
+            };
+          }).filter(c => c.value > 0)
+        : undefined;
+      return { id: cat.id, label: cat.label, color: cat.color, bg: cat.bg, value, items, subcategories };
     }).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
 
     const totalVal = totals.reduce((acc, curr) => acc + curr.value, 0);

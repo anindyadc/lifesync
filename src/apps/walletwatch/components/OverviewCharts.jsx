@@ -293,32 +293,46 @@ export const MonthlyTrendChart = ({ allExpenses = [] }) => {
           {months.map((m, i) => (
             <div
               key={i}
-              className="relative flex-1 flex flex-col justify-end items-center gap-2 h-full cursor-pointer"
+              className="relative flex-1 flex flex-col items-center gap-2 h-full cursor-pointer"
               onMouseEnter={() => setActive(i)}
               onMouseLeave={() => setActive(null)}
               onClick={() => setActive(active === i ? null : i)}
             >
-              {active === i && <ChartTooltip label={m.label} value={m.total} />}
-              {i === currentIndex && m.total > 0 && (
-                <span className="text-[9px] font-black text-indigo-600">{formatCurrency(m.total)}</span>
-              )}
-              {i === currentIndex && m.total === 0 ? (
-                // No spend logged yet this month — a dashed outline reads as "nothing
-                // here yet" instead of the near-invisible hairline a solid 1% bar gives.
-                <div
-                  className="w-full h-6 rounded-t border-2 border-dashed"
-                  style={{ borderColor: ACCENT, borderBottomWidth: 0, opacity: 0.4 }}
-                />
-              ) : (
-                <div
-                  className="w-full transition-all duration-500 ease-out"
-                  style={{
-                    height: `${Math.max((m.total / maxVal) * 100, m.total > 0 ? 4 : 1)}%`,
-                    backgroundColor: i === currentIndex ? ACCENT : MUTED,
-                    borderRadius: '4px 4px 0 0',
-                  }}
-                />
-              )}
+              {/* A separate flex-1 area for just the bar, so the month-name label below (and,
+                  for the current month, the amount label above) never compete with the bar's
+                  height:X% for the column's box — an in-flow label sharing this box with the
+                  bar gets flex-shrink triggered on whichever bar is tall enough to overflow,
+                  silently rendering it shorter than its true percentage (worst when the
+                  current month, which alone also carries an amount label, is also the tallest:
+                  its bar can render shorter than an earlier, lower-total month's un-squeezed bar). */}
+              <div className="relative w-full flex-1 flex flex-col justify-end items-center">
+                {active === i && <ChartTooltip label={m.label} value={m.total} />}
+                {i === currentIndex && m.total > 0 && (
+                  <span
+                    className="absolute whitespace-nowrap text-[9px] font-black text-indigo-600"
+                    style={{ bottom: `calc(${Math.max((m.total / maxVal) * 100, 4)}% + 4px)` }}
+                  >
+                    {formatCurrency(m.total)}
+                  </span>
+                )}
+                {i === currentIndex && m.total === 0 ? (
+                  // No spend logged yet this month — a dashed outline reads as "nothing
+                  // here yet" instead of the near-invisible hairline a solid 1% bar gives.
+                  <div
+                    className="w-full h-6 rounded-t border-2 border-dashed"
+                    style={{ borderColor: ACCENT, borderBottomWidth: 0, opacity: 0.4 }}
+                  />
+                ) : (
+                  <div
+                    className="w-full transition-all duration-500 ease-out"
+                    style={{
+                      height: `${Math.max((m.total / maxVal) * 100, m.total > 0 ? 4 : 1)}%`,
+                      backgroundColor: i === currentIndex ? ACCENT : MUTED,
+                      borderRadius: '4px 4px 0 0',
+                    }}
+                  />
+                )}
+              </div>
               <span className={`text-[9px] font-bold uppercase ${i === currentIndex ? 'text-indigo-600' : 'text-slate-400'}`}>{m.label}</span>
             </div>
           ))}

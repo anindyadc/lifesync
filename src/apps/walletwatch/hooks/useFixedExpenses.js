@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 const APP_ID = 'default-app-id';
@@ -171,9 +171,17 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
     await updateDoc(ref, { active, updatedAt: serverTimestamp() });
   };
 
+  // Also removes the template's still-pending instances: with the template gone nothing
+  // can render them, so they'd sit in Firestore as orphans nobody can pay or skip. Paid and
+  // skipped instances are kept (paid ones are what the linked History expenses point at).
   const deleteTemplate = async (id) => {
     if (!user) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseTemplates', id));
+    const batch = writeBatch(db);
+    instances
+      .filter(i => i.templateId === id && i.status === 'pending')
+      .forEach(i => batch.delete(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseInstances', i.id)));
+    batch.delete(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseTemplates', id));
+    await batch.commit();
   };
 
   const skipInstance = async (id) => {
@@ -224,11 +232,19 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
     });
   };
 
+  // Instances whose template no longer exists (e.g. left behind by a delete + re-add before
+  // deleteTemplate cascaded) can't be shown, paid or skipped from any card, so exclude them
+  // from everything the UI counts — otherwise they inflate "Pending & Overdue" invisibly.
+  const liveInstances = useMemo(() => {
+    const ids = new Set(templates.map(t => t.id));
+    return instances.filter(i => ids.has(i.templateId));
+  }, [templates, instances]);
+
   const loading = !templatesLoaded || !instancesLoaded;
 
   return {
     templates,
-    instances,
+    instances: liveInstances,
     loading,
     addTemplate,
     updateTemplate,

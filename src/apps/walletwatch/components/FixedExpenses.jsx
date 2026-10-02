@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Plus, Pencil, Trash2, Pause, Play, CheckCircle2, Clock, AlertTriangle, X, Loader2,
-  Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown, LayoutGrid, List,
+  Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List,
 } from 'lucide-react';
 import { formatCurrency, formatDate, toISODate, safeGetDate } from '../../../lib/utils';
 import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../constants';
@@ -34,7 +34,19 @@ const computeStatus = (tpl, currentInstance) => {
   return new Date().getDate() >= tpl.periodStartDay ? 'due' : 'upcoming';
 };
 
+// Shifts a 'YYYY-MM' key by `delta` months.
+const shiftMonthKey = (key, delta) => {
+  const [y, m] = key.split('-').map(Number);
+  return monthKeyOf(new Date(y, m - 1 + delta, 1));
+};
+
+const monthKeyLabel = (key) => {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+};
+
 const STATUS_META = {
+  none: { label: 'No bill', className: 'bg-slate-100 text-slate-400', icon: X },
   paid: { label: 'Paid', className: 'bg-emerald-100 text-emerald-600', icon: CheckCircle2 },
   due: { label: 'Due', className: 'bg-amber-100 text-amber-600', icon: Clock },
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-600', icon: AlertTriangle },
@@ -76,15 +88,30 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
     try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore (private browsing, etc.) */ }
   };
 
-  const monthKey = monthKeyOf(new Date());
+  const nowMonthKey = monthKeyOf(new Date());
+  const [monthKey, setMonthKey] = useState(nowMonthKey);
+  const isCurrentMonth = monthKey === nowMonthKey;
+
+  // Navigation is capped at the current month (instances are only ever generated for it)
+  // and at the earliest month that has any instance.
+  const earliestMonthKey = useMemo(
+    () => instances.reduce((min, i) => (i.monthKey && i.monthKey < min ? i.monthKey : min), nowMonthKey),
+    [instances, nowMonthKey]
+  );
 
   const rows = useMemo(() => templates.map(tpl => {
     const currentInstance = instances.find(i => i.templateId === tpl.id && i.monthKey === monthKey);
-    const carriedOver = instances
+    // "Also unpaid" rows are relative to today's month, so they only show on the current view.
+    const carriedOver = !isCurrentMonth ? [] : instances
       .filter(i => i.templateId === tpl.id && i.status === 'pending' && i.monthKey !== monthKey)
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-    return { tpl, currentInstance, carriedOver, status: computeStatus(tpl, currentInstance) };
-  }), [templates, instances, monthKey]);
+    const paidExpense = currentInstance?.status === 'paid'
+      ? allExpenses.find(e => e.id === currentInstance.paidExpenseId)
+      : null;
+    const displayAmount = paidExpense ? Math.abs(Number(paidExpense.amount) || 0) : (currentInstance?.amount ?? tpl.amount);
+    const status = !isCurrentMonth && !currentInstance ? 'none' : computeStatus(tpl, currentInstance);
+    return { tpl, currentInstance, carriedOver, status, displayAmount };
+  }), [templates, instances, allExpenses, monthKey, isCurrentMonth]);
 
   const summary = useMemo(() => {
     const pending = instances.filter(i => i.status === 'pending');
@@ -182,6 +209,33 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
         </div>
       </div>
 
+      <div className="flex items-center justify-center gap-3">
+        <button
+          onClick={() => setMonthKey(shiftMonthKey(monthKey, -1))}
+          disabled={monthKey <= earliestMonthKey}
+          aria-label="Previous month"
+          className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-500"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="min-w-[10rem] text-center">
+          <p className="text-sm font-black text-slate-800">{monthKeyLabel(monthKey)}</p>
+          {!isCurrentMonth && (
+            <button onClick={() => setMonthKey(nowMonthKey)} className="text-[10px] font-bold text-indigo-600 hover:underline">
+              Back to this month
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setMonthKey(shiftMonthKey(monthKey, 1))}
+          disabled={isCurrentMonth}
+          aria-label="Next month"
+          className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-500"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
       {rows.length === 0 ? (
         <div className="bg-white rounded-[2rem] border border-slate-100 p-10 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -192,7 +246,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
         </div>
       ) : (
         <div className={viewMode === 'card' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'flex flex-col gap-2'}>
-          {rows.map(({ tpl, currentInstance, carriedOver, status }) => {
+          {rows.map(({ tpl, currentInstance, carriedOver, status, displayAmount }) => {
             const RowComponent = viewMode === 'card' ? FixedExpenseCard : FixedExpenseRow;
             return (
               <RowComponent
@@ -201,6 +255,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
                 currentInstance={currentInstance}
                 carriedOver={carriedOver}
                 status={status}
+                displayAmount={displayAmount}
                 category={categories.find(c => c.id === tpl.category)}
                 allExpenses={allExpenses}
                 expanded={!!expandedHistory[tpl.id]}
@@ -264,7 +319,7 @@ const CarriedOverList = ({ carriedOver, onPay, onSkip }) => (
 /**
  * FixedExpenseCard — the original bento-card layout, used in Card view.
  */
-const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
   const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
@@ -290,7 +345,7 @@ const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category,
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-        <span className="font-black text-base text-slate-900">{formatCurrency(tpl.amount)}</span>
+        <span className="font-black text-base text-slate-900">{formatCurrency(displayAmount)}</span>
         <div className="flex items-center gap-2">
           <StatusChip status={status} />
           {canMarkPaid && (
@@ -316,7 +371,7 @@ const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, category,
  * TaskFlow's TaskRow / WalletWatch's TransactionRow: a `sm:grid-cols-[...]` row sized to
  * fill the row's actual width, with carried-over/payment-history detail collapsed below.
  */
-const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
   const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
@@ -334,7 +389,7 @@ const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, category, 
         </div>
         <p className="hidden sm:block text-xs text-slate-500 font-medium truncate">{periodLabel(tpl)}</p>
         <div className="hidden sm:flex items-center gap-2">
-          <span className="font-black text-sm text-slate-900">{formatCurrency(tpl.amount)}</span>
+          <span className="font-black text-sm text-slate-900">{formatCurrency(displayAmount)}</span>
           <StatusChip status={status} />
         </div>
         <div className="flex items-center gap-1 shrink-0 ml-auto">
@@ -358,7 +413,7 @@ const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, category, 
       <div className="flex sm:hidden items-center justify-between text-xs">
         <span className="text-slate-500 font-medium">{periodLabel(tpl)}</span>
         <div className="flex items-center gap-2">
-          <span className="font-black text-slate-900">{formatCurrency(tpl.amount)}</span>
+          <span className="font-black text-slate-900">{formatCurrency(displayAmount)}</span>
           <StatusChip status={status} />
         </div>
       </div>

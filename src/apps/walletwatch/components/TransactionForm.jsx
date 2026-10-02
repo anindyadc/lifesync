@@ -474,7 +474,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleGroupClick(group)}
-                          className="px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
+                          className="shrink-0 px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
                         >
                           {group}
                         </button>
@@ -544,14 +544,16 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                     className={fieldClass}
                   />
                   {showAccountSuggestions && availableAccounts.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-36 overflow-y-auto p-1.5 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                    // Opens upward: this row sits at the bottom of the sheet's scroll body, so a
+                    // downward list gets clipped by the sticky footer / scroll edge.
+                    <div className="absolute z-10 w-full bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-36 overflow-y-auto p-1.5 flex flex-col gap-0.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
                       {availableAccounts.filter(a => a.toLowerCase().includes((formData.paymentAccount || '').toLowerCase())).map(account => (
                         <button
                           key={account}
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleAccountClick(account)}
-                          className="px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
+                          className="shrink-0 px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
                         >
                           {account}
                         </button>

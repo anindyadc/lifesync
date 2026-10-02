@@ -7,7 +7,7 @@ import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
-import { monthKeyOf } from '../hooks/useFixedExpenses';
+import { monthKeyOf, isPastDue } from '../hooks/useFixedExpenses';
 import { getCycleNStepsBack, formatCycleRange } from '../lib/cardCycles';
 
 const monthKey = (d) => `${d.getFullYear()}-${d.getMonth()}`;
@@ -101,8 +101,7 @@ export const FixedBillsDueCard = ({ instances, selectedMonth }) => {
       <p className="text-xl font-black text-slate-900 mb-4">{formatCurrency(total)}</p>
       <div className="space-y-2.5">
         {pending.map(i => {
-          const dueEnd = safeGetDate(i.dueEnd);
-          const overdue = dueEnd && today > dueEnd;
+          const overdue = isPastDue(safeGetDate(i.dueEnd), today);
           return (
             <div key={i.id} className="flex items-center justify-between text-[11px] font-bold">
               <span className={overdue ? 'text-red-600 flex items-center gap-1' : 'text-slate-600'}>

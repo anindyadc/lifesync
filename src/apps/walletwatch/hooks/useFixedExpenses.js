@@ -13,6 +13,15 @@ export const clampDayToMonth = (year, month, day) => {
   return Math.min(Math.max(1, day), lastDay);
 };
 
+// An instance's `dueEnd` is stored as midnight at the START of its last due day, so a plain
+// `now > dueEnd` flips to overdue at 00:00 on that day. A bill is only overdue once that
+// whole day has passed, so compare against the end of the day instead.
+export const isPastDue = (dueEnd, now = new Date()) => {
+  if (!dueEnd) return false;
+  const endOfDay = new Date(dueEnd.getFullYear(), dueEnd.getMonth(), dueEnd.getDate() + 1);
+  return now >= endOfDay;
+};
+
 /**
  * WalletWatch Fixed Expenses (recurring bills).
  *

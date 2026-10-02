@@ -7,7 +7,7 @@ import { formatCurrency, formatDate, toISODate, safeGetDate } from '../../../lib
 import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../constants';
 import ConfirmModal from './ConfirmModal';
 import CategoryPicker from './CategoryPicker';
-import { monthKeyOf } from '../hooks/useFixedExpenses';
+import { monthKeyOf, isPastDue } from '../hooks/useFixedExpenses';
 
 const ordinal = (n) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -28,8 +28,7 @@ const computeStatus = (tpl, currentInstance) => {
   if (currentInstance) {
     if (currentInstance.status === 'paid') return 'paid';
     if (currentInstance.status === 'skipped') return 'skipped';
-    const dueEnd = safeGetDate(currentInstance.dueEnd);
-    return dueEnd && new Date() > dueEnd ? 'overdue' : 'due';
+    return isPastDue(safeGetDate(currentInstance.dueEnd)) ? 'overdue' : 'due';
   }
   return new Date().getDate() >= tpl.periodStartDay ? 'due' : 'upcoming';
 };
@@ -118,10 +117,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
     return {
       count: pending.length,
       total: pending.reduce((s, i) => s + Math.abs(Number(i.amount) || 0), 0),
-      overdue: pending.filter(i => {
-        const dueEnd = safeGetDate(i.dueEnd);
-        return dueEnd && new Date() > dueEnd;
-      }).length,
+      overdue: pending.filter(i => isPastDue(safeGetDate(i.dueEnd))).length,
     };
   }, [instances]);
 

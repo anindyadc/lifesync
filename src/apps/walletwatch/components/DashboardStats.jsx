@@ -4,7 +4,7 @@ import {
   TrendingUp, TrendingDown, CreditCard, Download, FileText, Loader2, X, Repeat, AlertTriangle, Pencil
 } from 'lucide-react';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
-import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, getAccountKey, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
+import { PAYMENT_MODES, OTHER_SLOT, STATUS_COLORS, CATEGORICAL_PALETTE, isSettledSpend, spendValue, flowValue, getAccountKey, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { formatCurrency, safeGetDate } from '../../../lib/utils';
 import { MonthlyTrendChart, WeeklyBarChart, DailyCalendar } from './OverviewCharts';
 import { monthKeyOf, isPastDue } from '../hooks/useFixedExpenses';
@@ -126,19 +126,20 @@ export default Dashboard;
 export const SummaryCards = ({ expenses, allExpenses = [], selectedMonth }) => {
   const stats = useMemo(() => {
     const personalExpenses = expenses.filter(e => !e.isOfficial);
-    const spent = personalExpenses.filter(isSettledSpend).reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
+    // Clamped: a refund landing in a month with little spend shouldn't read as negative spend.
+    const spent = Math.max(0, personalExpenses.filter(isSettledSpend).reduce((acc, curr) => acc + spendValue(curr), 0));
     const lent = personalExpenses
       .filter(e => e.reimbursementStatus === 'pending')
       .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
 
     const prevMonthDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
     const prevKey = monthKey(prevMonthDate);
-    const prevSpent = allExpenses
+    const prevSpent = Math.max(0, allExpenses
       .filter(e => {
         const d = safeGetDate(e.date);
         return d && monthKey(d) === prevKey && isSettledSpend(e);
       })
-      .reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
+      .reduce((acc, curr) => acc + spendValue(curr), 0));
 
     const today = new Date();
     const isCurrentMonth = monthKey(today) === monthKey(selectedMonth);
@@ -220,7 +221,11 @@ const DrillDownExpenseRow = ({ exp, onEdit }) => (
       </p>
     </div>
     <div className="flex items-center gap-1.5 shrink-0">
-      <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+      {Number(exp.amount) > 0 ? (
+        <span className="font-black text-emerald-600" title="Refund / credit">−{formatCurrency(exp.amount)}</span>
+      ) : (
+        <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+      )}
       {onEdit && (
         <button
           type="button"
@@ -254,7 +259,7 @@ export const GroupSubtotals = ({ expenses, categories, onEdit }) => {
         if (!map[e.group]) {
           map[e.group] = { total: 0, items: [] };
         }
-        map[e.group].total += Math.abs(Number(e.amount) || 0);
+        map[e.group].total += spendValue(e);
         map[e.group].items.push(e);
       }
     });
@@ -271,9 +276,9 @@ export const GroupSubtotals = ({ expenses, categories, onEdit }) => {
       const cat = categories.find(c => c.id === e.category);
       const key = cat?.id || e.category;
       if (!totals[key]) totals[key] = { label: cat?.label || e.category, color: cat?.color || OTHER_SLOT.color, value: 0 };
-      totals[key].value += Math.abs(Number(e.amount) || 0);
+      totals[key].value += spendValue(e);
     });
-    return Object.values(totals).sort((a, b) => b.value - a.value);
+    return Object.values(totals).filter(t => t.value > 0).sort((a, b) => b.value - a.value);
   }, [selectedGroup, categories]);
 
   const handleExportCsv = () => {
@@ -396,10 +401,11 @@ export const OfficialTripsSummary = ({ allExpenses, categories, onEdit }) => {
   const trips = useMemo(() => {
     const map = {};
     allExpenses.forEach(e => {
-      if (e.isOfficial && e.amount < 0 && e.reimbursementStatus !== 'settled') {
+      // An official refund (positive, isRefund) reduces the claim like a negative expense.
+      if (e.isOfficial && (e.amount < 0 || (e.isRefund && e.amount > 0)) && e.reimbursementStatus !== 'settled') {
         const key = e.group && e.group.trim() ? e.group.trim() : 'Unspecified Trip';
         if (!map[key]) map[key] = { total: 0, items: [] };
-        map[key].total += Math.abs(Number(e.amount) || 0);
+        map[key].total += flowValue(e);
         map[key].items.push(e);
       }
     });
@@ -415,9 +421,9 @@ export const OfficialTripsSummary = ({ allExpenses, categories, onEdit }) => {
       const cat = categories.find(c => c.id === e.category);
       const key = cat?.id || e.category;
       if (!totals[key]) totals[key] = { label: cat?.label || e.category, color: cat?.color || OTHER_SLOT.color, value: 0 };
-      totals[key].value += Math.abs(Number(e.amount) || 0);
+      totals[key].value += flowValue(e);
     });
-    return Object.values(totals).sort((a, b) => b.value - a.value);
+    return Object.values(totals).filter(t => t.value > 0).sort((a, b) => b.value - a.value);
   }, [selectedTrip, categories]);
 
   const handleExportCsv = () => {
@@ -546,7 +552,7 @@ export const CategoryBreakdown = ({ categories, expenses, onEdit }) => {
     // the drill-down modal's "Included Categories" chips.
     const totals = getTopLevelCategories(categories).map(cat => {
       const items = expenses.filter(e => categoryMatchesId(e, cat.id, categories) && isSettledSpend(e));
-      const value = items.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0);
+      const value = items.reduce((acc, curr) => acc + spendValue(curr), 0);
       const children = getChildCategories(categories, cat.id);
       const subcategories = children.length > 0
         ? children.map(child => {
@@ -556,7 +562,7 @@ export const CategoryBreakdown = ({ categories, expenses, onEdit }) => {
               label: child.label,
               color: child.color,
               bg: child.bg,
-              value: childItems.reduce((acc, curr) => acc + Math.abs(Number(curr.amount) || 0), 0),
+              value: childItems.reduce((acc, curr) => acc + spendValue(curr), 0),
               items: childItems,
             };
           }).filter(c => c.value > 0)
@@ -721,9 +727,10 @@ export const PaymentModeBreakdown = ({ expenses }) => {
     const totals = PAYMENT_MODES.map(mode => ({ ...mode, value: 0 }));
     let unspecified = 0;
 
-    expenses.filter(e => e.amount < 0 && !e.isOfficial).forEach(e => {
+    // Net per-mode flow: a refund/credit (positive entry) offsets the mode it landed on.
+    expenses.filter(e => !e.isOfficial).forEach(e => {
       const entry = totals.find(t => t.id === e.paymentMode);
-      const amt = Math.abs(Number(e.amount) || 0);
+      const amt = flowValue(e);
       if (entry) entry.value += amt;
       else unspecified += amt;
     });
@@ -832,7 +839,7 @@ export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, car
               return d && d >= range.start && d <= range.end;
             })
           : items;
-        const total = matched.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+        const total = matched.reduce((sum, e) => sum + flowValue(e), 0);
         return { name, total, items: matched, range, card: cardByName.get(name) || null };
       })
       .filter(r => r.total > 0)
@@ -864,7 +871,7 @@ export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, car
       // Everything else (Cash/plain UPI, no card config) stays Personal-only, matching
       // every other Personal-scoped card on this Dashboard.
       const byAccount = {};
-      allExpenses.filter(e => Number(e.amount) < 0).forEach(e => {
+      allExpenses.forEach(e => {
         const key = getAccountKey(e);
         if (e.isOfficial && !cardByName.has(key)) return;
         (byAccount[key] ||= []).push(e);
@@ -882,7 +889,7 @@ export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, car
       : null;
 
     const byAccount = {};
-    expenses.filter(e => e.amount < 0 && !e.isOfficial).forEach(e => {
+    expenses.filter(e => !e.isOfficial).forEach(e => {
       (byAccount[getAccountKey(e)] ||= []).push(e);
     });
 
@@ -903,9 +910,9 @@ export const PaymentAccountBreakdown = ({ expenses, allExpenses, categories, car
         const entry = getEntry(e);
         const key = entry?.id ?? '__other__';
         if (!map[key]) map[key] = { label: entry?.label || 'Other', color: entry?.color || OTHER_SLOT.color, value: 0 };
-        map[key].value += Math.abs(Number(e.amount) || 0);
+        map[key].value += flowValue(e);
       });
-      return Object.values(map).sort((a, b) => b.value - a.value);
+      return Object.values(map).filter(t => t.value > 0).sort((a, b) => b.value - a.value);
     };
 
     return {

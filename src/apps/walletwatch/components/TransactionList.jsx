@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import {
-  CreditCard, Trash2, Pencil, RefreshCcw, Folder, ChevronDown, Tag, Filter, XCircle,
+  CreditCard, Trash2, Pencil, RefreshCcw, RotateCcw, Folder, ChevronDown, Tag, Filter, XCircle,
   Link2, MapPin, Search, ArrowUpDown, Calendar, Wallet, Download, FileText, Loader2,
   LayoutGrid, List, Repeat, AlertCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
-import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, spendValue, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const VIEW_MODE_KEY = 'walletwatch-transactionlist-view-mode';
@@ -29,7 +29,7 @@ const getDateBucket = (date) => {
 // instead of a raw sum of signed amounts (which understates spend once a positive
 // reimbursement entry lands in the same bucket).
 const getGroupTotals = (items) => ({
-  spent: items.filter(isSettledSpend).reduce((s, e) => s + Math.abs(Number(e.amount)), 0),
+  spent: Math.max(0, items.filter(isSettledSpend).reduce((s, e) => s + spendValue(e), 0)),
   lent: items.filter(e => e.reimbursementStatus === 'pending' && !e.isOfficial).reduce((s, e) => s + Math.abs(Number(e.amount)), 0),
   official: items.filter(e => e.isOfficial && Number(e.amount) < 0).reduce((s, e) => s + Math.abs(Number(e.amount)), 0),
 });
@@ -107,7 +107,7 @@ const MultiSelectFilter = ({ label, icon: Icon, options, selected, onToggle, onS
  * TransactionList Component
  * Optimized for clear settlement visibility.
  */
-const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onSettleGroup }) => {
+const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onRefund, onSettleGroup }) => {
   const [grouping, setGrouping] = useState('month'); // 'none', 'month', 'event'
   const [sortBy, setSortBy] = useState('date-desc'); // 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -163,6 +163,16 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
   const expenseById = useMemo(() => {
     const map = {};
     expenses.forEach(e => { map[e.id] = e; });
+    return map;
+  }, [expenses]);
+
+  // Total already refunded against each original (`isRefund` entries link back via
+  // `relatedId`), so a purchase can show a "Refunded ₹X" chip — partial refunds included.
+  const refundedById = useMemo(() => {
+    const map = {};
+    expenses.forEach(e => {
+      if (e.isRefund && e.relatedId && Number(e.amount) > 0) map[e.relatedId] = (map[e.relatedId] || 0) + Number(e.amount);
+    });
     return map;
   }, [expenses]);
 
@@ -354,13 +364,13 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
     viewMode === 'card' ? (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 p-3 bg-slate-50/50 animate-in fade-in duration-200">
         {items.map(exp => (
-          <TransactionCard key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedLabel={relatedLabelFor(exp)} />
+          <TransactionCard key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} onRefund={onRefund} refundedAmount={refundedById[exp.id]} relatedLabel={relatedLabelFor(exp)} />
         ))}
       </div>
     ) : (
       <div className="divide-y divide-slate-50 animate-in fade-in duration-200">
         {items.map(exp => (
-          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} relatedLabel={relatedLabelFor(exp)} />
+          <TransactionRow key={exp.id} exp={exp} categories={categories} onEdit={onEdit} onDelete={onDelete} onSettle={onSettle} onRefund={onRefund} refundedAmount={refundedById[exp.id]} relatedLabel={relatedLabelFor(exp)} />
         ))}
       </div>
     )
@@ -790,7 +800,15 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onS
  * transactions lay out as a responsive multi-column grid instead of one stacked column,
  * mirroring TaskFlow's My Tasks card view.
  */
-const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
+// An expense can be refunded (a return, cancelled order, chargeback) unless it's a lend —
+// lends have their own Settle flow — or already a credit itself.
+const canRefund = (exp) => Number(exp.amount) < 0 && (!exp.reimbursementStatus || exp.reimbursementStatus === 'none');
+
+const RefundedChip = ({ amount, size = 'text-[9px]' }) => amount > 0 ? (
+  <span className={`${size} bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter`}>Refunded {formatCurrency(amount)}</span>
+) : null;
+
+const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, onRefund, refundedAmount, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -841,6 +859,7 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
         {exp.reimbursementStatus === 'settled' && (
           <span className="text-[9px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Settled</span>
         )}
+        <RefundedChip amount={refundedAmount} />
         {exp.isOfficial && (
           <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Official</span>
         )}
@@ -862,6 +881,15 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
             <RefreshCcw size={13}/> Settle
           </button>
         )}
+        {onRefund && canRefund(exp) && (
+          <button
+            onClick={() => onRefund(exp)}
+            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
+            title="Record a refund / reversal for this transaction"
+          >
+            <RotateCcw size={13}/> Refund
+          </button>
+        )}
       </div>
     </div>
   );
@@ -876,7 +904,7 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, rel
 // share of the row's actual width, and date/account sit on one line instead of account
 // being pushed into the tag-wrap row below, now that there's room to fit both. Below sm
 // it collapses to a single stacked column (grid-cols-1), same as before.
-const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, relatedLabel }) => {
+const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, onRefund, refundedAmount, relatedLabel }) => {
   const category = categories.find(c => c.id === exp.category);
   const CategoryIcon = CATEGORY_ICONS[exp.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const paymentMode = PAYMENT_MODES.find(m => m.id === exp.paymentMode);
@@ -931,6 +959,7 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, rela
           {exp.reimbursementStatus === 'settled' && (
             <span className="text-[8px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Settled</span>
           )}
+          <RefundedChip amount={refundedAmount} size="text-[8px] mt-1" />
           {exp.isOfficial && (
             <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Official</span>
           )}
@@ -949,6 +978,15 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, rela
               title="Settle / Refund"
             >
               <RefreshCcw size={16}/>
+            </button>
+          )}
+          {onRefund && canRefund(exp) && (
+            <button
+              onClick={() => onRefund(exp)}
+              className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 shadow-sm transition-all active:scale-90"
+              title="Record a refund / reversal for this transaction"
+            >
+              <RotateCcw size={16}/>
             </button>
           )}
           <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">

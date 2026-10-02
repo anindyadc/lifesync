@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { TrendingUp, Activity, BarChart3, Calendar as CalendarIcon, X, FileText, Download, Loader2, Pencil } from 'lucide-react';
 import { formatCurrency, toISODate, safeGetDate } from '../../../lib/utils.js';
-import { isSettledSpend, OTHER_SLOT } from '../constants.js';
+import { isSettledSpend, spendValue, OTHER_SLOT } from '../constants.js';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const ACCENT = '#4f46e5'; // brand indigo — current-period emphasis
@@ -55,7 +55,7 @@ export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth, o
       const day = d.getDate();
       if (!byDay.has(day)) byDay.set(day, { total: 0, items: [] });
       const bucket = byDay.get(day);
-      bucket.total += Math.abs(Number(e.amount) || 0);
+      bucket.total += spendValue(e);
       bucket.items.push(e);
     });
 
@@ -68,7 +68,8 @@ export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth, o
       dayCells.push({
         day,
         date: new Date(year, month, day),
-        total: bucket?.total || 0,
+        // Clamped: a refund on a day with no spend of its own shouldn't go negative.
+        total: Math.max(0, bucket?.total || 0),
         items: bucket?.items || [],
         isToday: isCurrentMonth && today.getDate() === day,
       });
@@ -89,9 +90,9 @@ export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth, o
       const cat = categories.find(c => c.id === e.category);
       const key = cat?.id || e.category;
       if (!totals[key]) totals[key] = { label: cat?.label || e.category, color: cat?.color || OTHER_SLOT.color, value: 0 };
-      totals[key].value += Math.abs(Number(e.amount) || 0);
+      totals[key].value += spendValue(e);
     });
-    return Object.values(totals).sort((a, b) => b.value - a.value);
+    return Object.values(totals).filter(t => t.value > 0).sort((a, b) => b.value - a.value);
   }, [selectedDay, categories]);
 
   const dayLabel = (d) => d.date.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -216,7 +217,11 @@ export const DailyCalendar = ({ expenses = [], categories = [], selectedMonth, o
                       <p className="text-sm font-bold text-slate-800 truncate">{exp.description}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+                      {Number(exp.amount) > 0 ? (
+                        <span className="font-black text-emerald-600" title="Refund / credit">−{formatCurrency(exp.amount)}</span>
+                      ) : (
+                        <span className="font-black text-slate-900">{formatCurrency(Math.abs(exp.amount))}</span>
+                      )}
                       {onEdit && (
                         <button
                           type="button"
@@ -273,10 +278,10 @@ export const MonthlyTrendChart = ({ allExpenses = [] }) => {
       const d = safeGetDate(e.date);
       if (!d) return;
       const bucket = buckets.find(b => b.year === d.getFullYear() && b.month === d.getMonth());
-      if (bucket) bucket.total += Math.abs(Number(e.amount) || 0);
+      if (bucket) bucket.total += spendValue(e);
     });
 
-    return buckets;
+    return buckets.map(b => ({ ...b, total: Math.max(0, b.total) }));
   }, [allExpenses]);
 
   const maxVal = Math.max(...months.map(m => m.total), 1);
@@ -364,7 +369,8 @@ export const WeeklyBarChart = ({ expenses }) => {
       if (!isoKey) return;
 
       const currentTotal = dailyTotals.get(isoKey) || 0;
-      const amount = Math.abs(Number(e.amount) || 0);
+      // Signed: a refund (positive, tagged with the original's category) subtracts.
+      const amount = -(Number(e.amount) || 0);
       dailyTotals.set(isoKey, currentTotal + amount);
     });
 
@@ -375,7 +381,7 @@ export const WeeklyBarChart = ({ expenses }) => {
       d.setDate(today.getDate() - i);
 
       const isoKey = toISODate(d);
-      const total = dailyTotals.get(isoKey) || 0;
+      const total = Math.max(0, dailyTotals.get(isoKey) || 0);
 
       result.push({
         day: d.toLocaleDateString('en-IN', { weekday: 'short' }),

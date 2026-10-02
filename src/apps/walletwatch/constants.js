@@ -72,11 +72,32 @@ export const getCategoryColor = (existingCount) =>
 // (employer-reimbursed, reported separately). Shared by DashboardStats' KPIs/charts and
 // TransactionList's group subtotals so "spent" means the same thing everywhere in the
 // app instead of a raw signed-amount sum.
+//
+// A refund of a personal purchase (`isRefund`, a positive entry linked to the original via
+// `relatedId`) is also part of "spend" — as a negative contribution (`spendValue`), tagged
+// with the original's category — so a returned item nets out of the month's totals instead of
+// the original sitting there forever. Always sum spend with `spendValue`, not Math.abs.
+export const isPersonalRefund = (e) =>
+  e.isRefund === true && Number(e.amount) > 0 && !e.isOfficial;
+
 export const isSettledSpend = (e) =>
-  Number(e.amount) < 0 &&
-  e.reimbursementStatus !== 'pending' &&
-  e.reimbursementStatus !== 'settled' &&
-  !e.isOfficial;
+  isPersonalRefund(e) || (
+    Number(e.amount) < 0 &&
+    e.reimbursementStatus !== 'pending' &&
+    e.reimbursementStatus !== 'settled' &&
+    !e.isOfficial
+  );
+
+// Signed spend contribution of an entry already accepted by isSettledSpend.
+export const spendValue = (e) =>
+  isPersonalRefund(e) ? -Number(e.amount) : Math.abs(Number(e.amount) || 0);
+
+// Net money out of an account/card for ANY entry: a purchase (negative amount) is +, a credit
+// (any positive entry: a refund, or a lend paid back onto that account) is −. This is the
+// per-account view — the Cards tab's statement math and the Dashboard's By Account/By Mode
+// breakdowns — where "spend" means what actually moved through that account, regardless of
+// the Personal/Lent split that isSettledSpend applies.
+export const flowValue = (e) => -(Number(e.amount) || 0);
 
 // Account identity for grouping/filtering: the free-text account if set (e.g. "GPay-300"),
 // otherwise the Payment Mode's label (e.g. plain "Cash") — shared by the Dashboard's

@@ -54,6 +54,10 @@ const WalletWatchApp = ({ user }) => {
   const [deleteCategoryId, setDeleteCategoryId] = useState(null);
   const [deleteCategoryError, setDeleteCategoryError] = useState('');
   const [relatedTxn, setRelatedTxn] = useState(null);
+  // Refund of an ordinary (non-lent) purchase — a positive `isRefund` entry linked to the
+  // original, which is NOT marked settled (it stays counted; the refund nets against it, so
+  // partial refunds work). Mutually exclusive with relatedTxn/settleGroup.
+  const [refundOf, setRefundOf] = useState(null);
   // Bulk "Settle All" for a whole event/trip group at once (TransactionList's Event
   // grouping) — { items, label } for the pending items being settled together, as
   // opposed to relatedTxn's single-item settle. Mutually exclusive with relatedTxn.
@@ -110,15 +114,19 @@ const WalletWatchApp = ({ user }) => {
     const [year, month, day] = formData.date.split('-').map(Number);
     const localDate = new Date(year, month - 1, day);
 
-    const finalAmount = formData.category === 'reimbursement'
+    // Computed up front because the sign rule below depends on it: a refund keeps the
+    // original's category (so it nets against that category), so category alone can't mark it.
+    const existing = editingId ? allExpenses.find(e => e.id === editingId) : null;
+    const isRefund = !!refundOf || !!existing?.isRefund;
+
+    const finalAmount = (formData.category === 'reimbursement' || isRefund)
       ? Math.abs(Number(formData.amount))
       : -Math.abs(Number(formData.amount));
 
     // TransactionForm's local state never carries a `relatedId` field, so a plain edit
     // (not a settle action) must preserve the original doc's own relatedId itself —
     // otherwise every edit of a linked refund/settlement silently severs the link.
-    const existing = editingId ? allExpenses.find(e => e.id === editingId) : null;
-    const relatedId = relatedTxn ? relatedTxn.id : (existing ? (existing.relatedId ?? null) : null);
+    const relatedId = relatedTxn ? relatedTxn.id : refundOf ? refundOf.id : (existing ? (existing.relatedId ?? null) : null);
 
     const payload = {
       ...formData,
@@ -126,6 +134,7 @@ const WalletWatchApp = ({ user }) => {
       date: Timestamp.fromDate(localDate),
       updatedAt: serverTimestamp(),
       relatedId,
+      isRefund,
       // Bulk group-settle links back to every item it covers via `relatedIds` instead
       // of the single-item `relatedId` above — see settleGroup/onSettleGroup.
       ...(settleGroup ? { relatedIds: settleGroup.items.map(i => i.id) } : {}),
@@ -148,6 +157,7 @@ const WalletWatchApp = ({ user }) => {
     if (!keepOpen) {
       setEditingId(null);
       setRelatedTxn(null);
+      setRefundOf(null);
       setSettleGroup(null);
       setIsAddOpen(false);
     }
@@ -157,14 +167,24 @@ const WalletWatchApp = ({ user }) => {
     setIsAddOpen(false);
     setEditingId(null);
     setRelatedTxn(null);
+    setRefundOf(null);
     setSettleGroup(null);
   };
 
-  const handleEdit = (exp) => { setEditingId(exp.id); setRelatedTxn(null); setSettleGroup(null); setIsAddOpen(true); };
+  const handleEdit = (exp) => { setEditingId(exp.id); setRelatedTxn(null); setRefundOf(null); setSettleGroup(null); setIsAddOpen(true); };
+
+  const handleRefund = (exp) => {
+    setEditingId(null);
+    setRelatedTxn(null);
+    setSettleGroup(null);
+    setRefundOf(exp);
+    setIsAddOpen(true);
+  };
 
   const handleSettleGroup = (items, label) => {
     setEditingId(null);
     setRelatedTxn(null);
+    setRefundOf(null);
     setSettleGroup({ items, label });
     setIsAddOpen(true);
   };
@@ -579,7 +599,8 @@ const WalletWatchApp = ({ user }) => {
             expenses={allExpenses}
             categories={categories}
             onEdit={handleEdit}
-            onSettle={(exp) => { setRelatedTxn(exp); setSettleGroup(null); setIsAddOpen(true); }}
+            onSettle={(exp) => { setRelatedTxn(exp); setRefundOf(null); setSettleGroup(null); setIsAddOpen(true); }}
+            onRefund={handleRefund}
             onSettleGroup={handleSettleGroup}
             onDelete={setDeleteId}
           />
@@ -664,10 +685,14 @@ const WalletWatchApp = ({ user }) => {
                 ? allExpenses.find(e => e.id === editingId)
                 : relatedTxn
                   ? { ...relatedTxn, date: new Date(), description: `Refund: ${relatedTxn.description}`, category: 'reimbursement' }
-                  : settleGroupInitialData}
+                  : refundOf
+                    // Same category/account/mode as the original (a card purchase refunds to
+                    // that card by default); amount defaults to the full amount, edit for partial.
+                    ? { ...refundOf, date: new Date(), description: `Refund: ${refundOf.description}`, amount: Math.abs(Number(refundOf.amount)) }
+                    : settleGroupInitialData}
               categories={categories}
               expenses={allExpenses}
-              isSettling={!!relatedTxn || !!settleGroup}
+              isSettling={!!relatedTxn || !!settleGroup || !!refundOf}
               onSubmit={handleSave}
               onCancel={closeAddModal}
             />

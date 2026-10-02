@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { getAccountKey } from '../constants';
+import { getAccountKey, flowValue } from '../constants';
 import { safeGetDate, toISODate } from '../../../lib/utils';
 import { getCycleForDate, getPreviousCycle, getNextCycle } from '../lib/cardCycles';
 
@@ -119,14 +119,19 @@ export const useCreditCards = (user, allExpenses = [], appId = APP_ID) => {
     // credit card (e.g. RuPay-on-UPI) is logged with paymentMode 'upi' since that's how
     // the payment was made, but it's still a credit line with a statement to settle just
     // like a swiped card, as long as its Account text matches this card's configured name.
-    const cardExpenses = allExpenses.filter(e => getAccountKey(e) === cardName && Number(e.amount) < 0);
+    // Positive entries (refunds, or a lend paid back onto this card) are credits that reduce
+    // the cycle's total — what the real statement nets — so they stay in, signed.
+    const cardExpenses = allExpenses.filter(e => getAccountKey(e) === cardName);
 
     const spendInCycle = (cyc) => cardExpenses
       .filter(e => {
+        // A prepaid card's balance is driven by its configured refill, so a stray positive
+        // entry (e.g. a logged top-up) mustn't double-count — only a real refund credits it.
+        if (cardType === 'prepaid' && Number(e.amount) > 0 && !e.isRefund) return false;
         const d = safeGetDate(e.date);
         return d && d >= cyc.cycleStart && d <= cyc.cycleEnd;
       })
-      .reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+      .reduce((sum, e) => sum + flowValue(e), 0);
 
     if (cardType === 'prepaid') {
       const refillAmount = Number(card?.refillAmount) || 0;

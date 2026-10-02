@@ -44,6 +44,13 @@ const monthKeyLabel = (key) => {
   return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 };
 
+// Needs-attention-first ordering: anything overdue (including a bill that only has an older
+// month still unpaid) leads, then bills due now, then upcoming, with settled/inactive last.
+// Array.prototype.sort is stable, so ties keep the templates' alphabetical order.
+const URGENCY_ORDER = ['overdue', 'due', 'upcoming', 'paid', 'skipped', 'none', 'paused'];
+const urgencyRank = ({ status, carriedOver }) =>
+  status !== 'paused' && carriedOver.length > 0 ? 0 : URGENCY_ORDER.indexOf(status);
+
 const STATUS_META = {
   none: { label: 'No bill', className: 'bg-slate-100 text-slate-400', icon: X },
   paid: { label: 'Paid', className: 'bg-emerald-100 text-emerald-600', icon: CheckCircle2 },
@@ -110,7 +117,8 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
     const displayAmount = paidExpense ? Math.abs(Number(paidExpense.amount) || 0) : (currentInstance?.amount ?? tpl.amount);
     const status = !isCurrentMonth && !currentInstance ? 'none' : computeStatus(tpl, currentInstance);
     return { tpl, currentInstance, carriedOver, status, displayAmount };
-  }), [templates, instances, allExpenses, monthKey, isCurrentMonth]);
+  }).sort((a, b) => urgencyRank(a) - urgencyRank(b) || a.tpl.periodEndDay - b.tpl.periodEndDay),
+  [templates, instances, allExpenses, monthKey, isCurrentMonth]);
 
   const summary = useMemo(() => {
     const pending = instances.filter(i => i.status === 'pending');

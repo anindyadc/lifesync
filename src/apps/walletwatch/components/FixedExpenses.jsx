@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Plus, Pencil, Trash2, Pause, Play, CheckCircle2, Clock, AlertTriangle, X, Loader2,
-  Repeat, SkipForward, Calendar, CreditCard, History, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List,
+  Repeat, SkipForward, CircleSlash, Calendar, CreditCard, History, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List,
 } from 'lucide-react';
 import { formatCurrency, formatDate, toISODate, safeGetDate } from '../../../lib/utils';
 import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../constants';
@@ -24,6 +24,7 @@ const periodLabel = (tpl) => tpl.periodStartDay === tpl.periodEndDay
 // see useFixedExpenses' generation effect for why an instance may not exist yet even
 // though the template's window has technically opened (it appears on the next snapshot).
 const computeStatus = (tpl, currentInstance) => {
+  if (tpl.stopped) return 'stopped';
   if (!tpl.active) return 'paused';
   if (currentInstance) {
     if (currentInstance.status === 'paid') return 'paid';
@@ -47,7 +48,7 @@ const monthKeyLabel = (key) => {
 // Needs-attention-first ordering: anything overdue (including a bill that only has an older
 // month still unpaid) leads, then bills due now, then upcoming, with settled/inactive last.
 // Array.prototype.sort is stable, so ties keep the templates' alphabetical order.
-const URGENCY_ORDER = ['overdue', 'due', 'upcoming', 'paid', 'skipped', 'none', 'paused'];
+const URGENCY_ORDER = ['overdue', 'due', 'upcoming', 'paid', 'skipped', 'none', 'paused', 'stopped'];
 const urgencyRank = ({ status, carriedOver }) =>
   status !== 'paused' && carriedOver.length > 0 ? 0 : URGENCY_ORDER.indexOf(status);
 
@@ -57,6 +58,7 @@ const STATUS_META = {
   due: { label: 'Due', className: 'bg-amber-100 text-amber-600', icon: Clock },
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-600', icon: AlertTriangle },
   upcoming: { label: 'Not due yet', className: 'bg-slate-100 text-slate-500', icon: Clock },
+  stopped: { label: 'Stopped', className: 'bg-slate-200 text-slate-500', icon: CircleSlash },
   paused: { label: 'Paused', className: 'bg-slate-100 text-slate-400', icon: Pause },
   skipped: { label: 'Skipped', className: 'bg-slate-100 text-slate-400', icon: SkipForward },
 };
@@ -75,10 +77,12 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loading, addTemplate, updateTemplate, toggleTemplateActive, deleteTemplate, markPaid, skipInstance }) => {
+const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loading, addTemplate, updateTemplate, toggleTemplateActive, stopTemplate, deleteTemplate, markPaid, skipInstance }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [deleteTemplateId, setDeleteTemplateId] = useState(null);
+  const [stopTemplateId, setStopTemplateId] = useState(null);
+  const [showStopped, setShowStopped] = useState(false);
   const [payingContext, setPayingContext] = useState(null); // { template, instance }
   const [expandedHistory, setExpandedHistory] = useState({}); // { [templateId]: boolean }
   const [viewMode, setViewMode] = useState(() => {
@@ -115,10 +119,22 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
       ? allExpenses.find(e => e.id === currentInstance.paidExpenseId)
       : null;
     const displayAmount = paidExpense ? Math.abs(Number(paidExpense.amount) || 0) : (currentInstance?.amount ?? tpl.amount);
-    const status = !isCurrentMonth && !currentInstance ? 'none' : computeStatus(tpl, currentInstance);
+    const status = tpl.stopped ? 'stopped' : (!isCurrentMonth && !currentInstance ? 'none' : computeStatus(tpl, currentInstance));
     return { tpl, currentInstance, carriedOver, status, displayAmount };
   }).sort((a, b) => urgencyRank(a) - urgencyRank(b) || a.tpl.periodEndDay - b.tpl.periodEndDay),
   [templates, instances, allExpenses, monthKey, isCurrentMonth]);
+
+  const stoppedCount = useMemo(() => rows.filter(r => r.tpl.stopped).length, [rows]);
+  const visibleRows = useMemo(() => rows.filter(r => showStopped || !r.tpl.stopped), [rows, showStopped]);
+
+  const stopTarget = templates.find(t => t.id === stopTemplateId);
+  const stopPending = useMemo(() => instances.filter(i => i.templateId === stopTemplateId && i.status === 'pending'), [instances, stopTemplateId]);
+
+  const confirmStop = async () => {
+    if (!stopTemplateId) return;
+    await stopTemplate(stopTemplateId);
+    setStopTemplateId(null);
+  };
 
   const summary = useMemo(() => {
     const pending = instances.filter(i => i.status === 'pending');
@@ -159,6 +175,14 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
+      <ConfirmModal
+        isOpen={!!stopTemplateId}
+        title={`Stop "${stopTarget?.label ?? 'fixed expense'}"?`}
+        message={`No more bills will be generated for it.${stopPending.length > 0 ? ` ${stopPending.length} unpaid bill${stopPending.length !== 1 ? 's' : ''} (${formatCurrency(stopPending.reduce((s, i) => s + Math.abs(Number(i.amount) || 0), 0))}) will be cancelled — pay any you still owe first.` : ''} Paid history is kept, and you can restart it later from the Stopped list.`}
+        onConfirm={confirmStop}
+        onCancel={() => setStopTemplateId(null)}
+      />
+
       <ConfirmModal
         isOpen={!!deleteTemplateId}
         title="Delete Fixed Expense"
@@ -240,7 +264,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
         </button>
       </div>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 || (visibleRows.length === 0 && stoppedCount === 0) ? (
         <div className="bg-white rounded-[2rem] border border-slate-100 p-10 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <Repeat size={28} className="text-slate-300" />
@@ -250,7 +274,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
         </div>
       ) : (
         <div className={viewMode === 'card' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'flex flex-col gap-2'}>
-          {rows.map(({ tpl, currentInstance, carriedOver, status, displayAmount }) => {
+          {visibleRows.map(({ tpl, currentInstance, carriedOver, status, displayAmount }) => {
             const RowComponent = viewMode === 'card' ? FixedExpenseCard : FixedExpenseRow;
             return (
               <RowComponent
@@ -265,6 +289,7 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
                 expanded={!!expandedHistory[tpl.id]}
                 onToggleHistory={() => setExpandedHistory(prev => ({ ...prev, [tpl.id]: !prev[tpl.id] }))}
                 onToggleActive={() => toggleTemplateActive(tpl.id, !tpl.active)}
+                onStop={() => setStopTemplateId(tpl.id)}
                 onEdit={() => openEdit(tpl)}
                 onDelete={() => setDeleteTemplateId(tpl.id)}
                 onPay={(instance) => setPayingContext({ template: tpl, instance })}
@@ -273,6 +298,17 @@ const FixedExpenses = ({ templates, instances, categories, allExpenses = [], loa
             );
           })}
         </div>
+      )}
+
+      {stoppedCount > 0 && (
+        <button
+          onClick={() => setShowStopped(s => !s)}
+          aria-expanded={showStopped}
+          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-slate-500 hover:text-indigo-600 bg-white border border-dashed border-slate-300 rounded-xl"
+        >
+          <CircleSlash size={13} /> {showStopped ? 'Hide' : 'Show'} stopped ({stoppedCount})
+          <ChevronDown size={13} className={showStopped ? 'rotate-180 transition-transform' : 'transition-transform'} />
+        </button>
       )}
 
       {isFormOpen && (
@@ -323,7 +359,7 @@ const CarriedOverList = ({ carriedOver, onPay, onSkip }) => (
 /**
  * FixedExpenseCard — the original bento-card layout, used in Card view.
  */
-const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onStop, onEdit, onDelete, onPay, onSkip }) => {
   const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
@@ -340,9 +376,12 @@ const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, displayAm
           </p>
         </div>
         <div className="flex gap-0.5 shrink-0 -mr-1 -mt-1">
-          <button onClick={onToggleActive} aria-label={tpl.active ? 'Pause' : 'Resume'} title={tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+          <button onClick={onToggleActive} aria-label={tpl.stopped ? 'Restart' : tpl.active ? 'Pause' : 'Resume'} title={tpl.stopped ? 'Restart' : tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
             {tpl.active ? <Pause size={14} /> : <Play size={14} />}
           </button>
+          {!tpl.stopped && (
+            <button onClick={onStop} aria-label="Stop fixed expense" title="Stop — no longer needed" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-amber-600"><CircleSlash size={14} /></button>
+          )}
           <button onClick={onEdit} aria-label="Edit fixed expense" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Pencil size={14} /></button>
           <button onClick={onDelete} aria-label="Delete fixed expense" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
         </div>
@@ -375,7 +414,7 @@ const FixedExpenseCard = ({ tpl, currentInstance, carriedOver, status, displayAm
  * TaskFlow's TaskRow / WalletWatch's TransactionRow: a `sm:grid-cols-[...]` row sized to
  * fill the row's actual width, with carried-over/payment-history detail collapsed below.
  */
-const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onEdit, onDelete, onPay, onSkip }) => {
+const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, displayAmount, category, allExpenses, expanded, onToggleHistory, onToggleActive, onStop, onEdit, onDelete, onPay, onSkip }) => {
   const CategoryIcon = CATEGORY_ICONS[tpl.category] ?? CATEGORY_ICONS[category?.parentId] ?? DEFAULT_CATEGORY_ICON;
   const canMarkPaid = currentInstance && currentInstance.status === 'pending';
 
@@ -405,9 +444,12 @@ const FixedExpenseRow = ({ tpl, currentInstance, carriedOver, status, displayAmo
               <CheckCircle2 size={12} /> <span className="hidden md:inline">Mark Paid</span>
             </button>
           )}
-          <button onClick={onToggleActive} aria-label={tpl.active ? 'Pause' : 'Resume'} title={tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
+          <button onClick={onToggleActive} aria-label={tpl.stopped ? 'Restart' : tpl.active ? 'Pause' : 'Resume'} title={tpl.stopped ? 'Restart' : tpl.active ? 'Pause' : 'Resume'} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600">
             {tpl.active ? <Pause size={14} /> : <Play size={14} />}
           </button>
+          {!tpl.stopped && (
+            <button onClick={onStop} aria-label="Stop fixed expense" title="Stop — no longer needed" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-amber-600"><CircleSlash size={14} /></button>
+          )}
           <button onClick={onEdit} aria-label="Edit fixed expense" title="Edit" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600"><Pencil size={14} /></button>
           <button onClick={onDelete} aria-label="Delete fixed expense" title="Delete" className="p-1.5 hover:bg-slate-100 rounded text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
         </div>

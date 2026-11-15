@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 const APP_ID = 'default-app-id';
@@ -161,6 +161,8 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
       periodStartDay: Number(data.periodStartDay),
       periodEndDay: Number(data.periodEndDay),
       active: data.active !== false,
+      // Re-activating through the edit form also lifts a previous Stop.
+      ...(data.active !== false ? { stopped: false, stoppedAt: deleteField() } : {}),
       updatedAt: serverTimestamp(),
     });
   };
@@ -168,7 +170,28 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
   const toggleTemplateActive = async (id, active) => {
     if (!user) return;
     const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseTemplates', id);
-    await updateDoc(ref, { active, updatedAt: serverTimestamp() });
+    // Resuming (including Restart after a Stop) clears the stopped flag.
+    await updateDoc(ref, { active, ...(active ? { stopped: false, stoppedAt: deleteField() } : {}), updatedAt: serverTimestamp() });
+  };
+
+  // Permanently ends a bill that is no longer needed (cancelled subscription, loan fully
+  // repaid...) without losing it: the template stays, flagged `stopped`, so its Payment
+  // History survives and it can be restarted. Unlike Pause, any still-pending instances are
+  // cancelled (marked 'skipped') in the same batch so they stop showing as due/overdue.
+  // Paid instances and their linked expenses are untouched.
+  const stopTemplate = async (id) => {
+    if (!user) return;
+    const batch = writeBatch(db);
+    instances
+      .filter(i => i.templateId === id && i.status === 'pending')
+      .forEach(i => batch.update(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseInstances', i.id), { status: 'skipped' }));
+    batch.update(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseTemplates', id), {
+      active: false,
+      stopped: true,
+      stoppedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
   };
 
   // Also removes the template's still-pending instances: with the template gone nothing
@@ -249,6 +272,7 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
     addTemplate,
     updateTemplate,
     toggleTemplateActive,
+    stopTemplate,
     deleteTemplate,
     markPaid,
     skipInstance,

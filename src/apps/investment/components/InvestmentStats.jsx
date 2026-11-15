@@ -3,6 +3,19 @@ import { PiggyBank, CalendarClock, TrendingUp, LineChart } from 'lucide-react';
 import { safeGetDate } from '../../../lib/utils';
 import { isActiveHolding } from '../constants';
 
+const Tile = ({ icon, tint, label, value, sub, hero }) => (
+  <div className={`relative overflow-hidden rounded-2xl p-5 border shadow-sm ${hero ? 'bg-gradient-to-br from-indigo-600 to-violet-600 border-transparent text-white' : 'bg-white border-slate-200'}`}>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className={`text-[11px] font-semibold uppercase tracking-wider ${hero ? 'text-indigo-100' : 'text-slate-500'}`}>{label}</p>
+        <p className={`text-2xl font-bold mt-1 tabular-nums ${hero ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+        {sub}
+      </div>
+      <div className={`p-2.5 rounded-xl shrink-0 ${hero ? 'bg-white/20 text-white' : tint}`}>{icon}</div>
+    </div>
+  </div>
+);
+
 const InvestmentStats = ({ investments }) => {
   const stats = useMemo(() => {
     // Only live holdings count: matured/closed/renewed deposits and sold holdings are history.
@@ -44,51 +57,34 @@ const InvestmentStats = ({ investments }) => {
 
   const showPortfolioTile = stats.trackedCount > 0;
 
+  const diff = stats.trackedCurrentValue - stats.trackedInvested;
+  const pct = stats.trackedInvested !== 0 ? (diff / stats.trackedInvested) * 100 : 0;
+  const positive = diff >= 0;
+
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-3 ${showPortfolioTile ? 'lg:grid-cols-4' : ''} gap-4`}>
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><PiggyBank size={22} /></div>
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Invested (Active)</p>
-          <p className="text-xl font-bold text-slate-800">₹{stats.totalInvested.toLocaleString('en-IN')}</p>
-          {stats.undecryptableCount > 0 && (
-            <p className="text-[11px] font-medium text-amber-600 mt-0.5">
-              Excludes {stats.undecryptableCount} record{stats.undecryptableCount !== 1 ? 's' : ''} that couldn't be decrypted
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${showPortfolioTile ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
+      <Tile
+        hero icon={<PiggyBank size={20} />} label="Total Invested (Active)"
+        value={`₹${stats.totalInvested.toLocaleString('en-IN')}`}
+        sub={stats.undecryptableCount > 0 && (
+          <p className="text-[11px] font-medium text-amber-200 mt-1">
+            Excludes {stats.undecryptableCount} record{stats.undecryptableCount !== 1 ? 's' : ''} that couldn't be decrypted
+          </p>
+        )}
+      />
+      <Tile icon={<CalendarClock size={20} />} tint="bg-amber-50 text-amber-600" label="Maturing in 30 Days" value={stats.maturingIn30} />
+      <Tile icon={<TrendingUp size={20} />} tint="bg-emerald-50 text-emerald-600" label="Maturing in 90 Days" value={stats.maturingIn90} />
+      {showPortfolioTile && (
+        <Tile
+          icon={<LineChart size={20} />} tint={positive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}
+          label="Portfolio Value (Active)" value={`₹${stats.trackedCurrentValue.toLocaleString('en-IN')}`}
+          sub={(
+            <p className={`text-xs font-semibold mt-1 ${positive ? 'text-emerald-600' : 'text-red-600'}`}>
+              {positive ? '▲ +' : '▼ -'}₹{Math.abs(diff).toLocaleString('en-IN')} ({positive ? '+' : '-'}{Math.abs(pct).toFixed(1)}%)
             </p>
           )}
-        </div>
-      </div>
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-        <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><CalendarClock size={22} /></div>
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Maturing in 30 Days</p>
-          <p className="text-xl font-bold text-slate-800">{stats.maturingIn30}</p>
-        </div>
-      </div>
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={22} /></div>
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Maturing in 90 Days</p>
-          <p className="text-xl font-bold text-slate-800">{stats.maturingIn90}</p>
-        </div>
-      </div>
-      {showPortfolioTile && (() => {
-        const diff = stats.trackedCurrentValue - stats.trackedInvested;
-        const pct = stats.trackedInvested !== 0 ? (diff / stats.trackedInvested) * 100 : 0;
-        const positive = diff >= 0;
-        return (
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className={`p-3 rounded-xl ${positive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}><LineChart size={22} /></div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Portfolio Value (Active)</p>
-              <p className="text-xl font-bold text-slate-800">₹{stats.trackedCurrentValue.toLocaleString('en-IN')}</p>
-              <p className={`text-[11px] font-semibold mt-0.5 ${positive ? 'text-emerald-600' : 'text-red-600'}`}>
-                {positive ? '+' : '-'}₹{Math.abs(diff).toLocaleString('en-IN')} ({positive ? '+' : '-'}{Math.abs(pct).toFixed(1)}%)
-              </p>
-            </div>
-          </div>
-        );
-      })()}
+        />
+      )}
     </div>
   );
 };

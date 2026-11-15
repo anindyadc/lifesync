@@ -51,24 +51,30 @@ const InvestmentsApp = ({ user }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">My Investments</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">My Investments</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Deposits, funds and holdings — maturities, lock-ins and tax at a glance</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setActiveTab('investment')} className={`px-4 py-2 rounded-md text-sm font-medium ${activeTab === 'investment' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}>            <PiggyBank className="inline-block mr-2" size={18} /> List View
-          </button>
+          <div className="inline-flex p-1 bg-slate-100 rounded-xl" role="tablist" aria-label="Investment views">
+            {[['investment', <PiggyBank size={16} />, 'Holdings'], ['calendar', <CalendarDays size={16} />, 'Calendar'], ['tax', <Receipt size={16} />, 'Tax Summary']].map(([key, icon, label]) => (
+              <button
+                key={key} role="tab" aria-selected={activeTab === key}
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === key ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-300 rounded-xl shadow-sm hover:border-slate-400" title="Export CSV" aria-label="Export CSV"><FileText size={18}/></button>
+          <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-300 rounded-xl shadow-sm hover:border-slate-400" title="Export PDF" aria-label="Export PDF"><Download size={18}/></button>
           <button
-            onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
+            onClick={() => { setShowForm(true); setEditInvestment(null); }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white pl-3 pr-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 shadow-sm shadow-indigo-200"
           >
-            <CalendarDays className="inline-block mr-2" size={18} /> Calendar
+            <PlusCircle size={18} /> Add Investment
           </button>
-          <button
-            onClick={() => setActiveTab('tax')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tax' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
-          >
-            <Receipt className="inline-block mr-2" size={18} /> Tax Summary
-          </button>
-          <button onClick={exportCSV} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export CSV" aria-label="Export CSV"><FileText size={18}/></button>
-          <button onClick={exportPDF} className="p-2 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm" title="Export PDF" aria-label="Export PDF"><Download size={18}/></button>
         </div>
       </div>
 
@@ -100,29 +106,18 @@ const InvestmentsApp = ({ user }) => {
       ) : (
         <>
           {activeTab === 'investment' && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={() => { setShowForm(true); setEditInvestment(null); }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md"
-                >
-                  <PlusCircle size={20} />
-                  <span>Add Investment</span>
-                </button>
-              </div>
-              <InvestmentList
-                investments={investments}
-                onEdit={handleEdit}
-                onDelete={deleteInvestment}
-                onSell={sellInvestment}
-                onClose={closeInvestment}
-                onReopen={reopenInvestment}
-              />
-            </div>
+            <InvestmentList
+              investments={investments}
+              onEdit={handleEdit}
+              onDelete={deleteInvestment}
+              onSell={sellInvestment}
+              onClose={closeInvestment}
+              onReopen={reopenInvestment}
+            />
           )}
 
           {activeTab === 'calendar' && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
               <MaturityCalendar investments={investments} onEdit={handleEdit} />
             </div>
           )}

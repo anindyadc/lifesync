@@ -11,7 +11,7 @@ export const FormGroup = ({ children }) => (
 );
 
 export const Label = ({ children, ...props }) => (
-  <label {...props} className="text-sm font-medium text-foreground">
+  <label {...props} className="text-sm font-medium text-slate-700">
     {children}
   </label>
 );
@@ -20,7 +20,7 @@ export const Input = React.forwardRef((props, ref) => (
   <input
     ref={ref}
     {...props}
-    className="w-full text-foreground sm:text-sm focus:outline-none"
+    className="w-full px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg shadow-sm hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
   />
 ));
 
@@ -28,7 +28,7 @@ export const Textarea = React.forwardRef((props, ref) => (
   <textarea
     ref={ref}
     {...props}
-    className="w-full px-3 py-2 border border-input bg-card rounded-md shadow-sm focus:ring-ring focus:border-primary sm:text-sm text-foreground"
+    className="w-full px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg shadow-sm hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
   />
 ));
 
@@ -36,7 +36,7 @@ export const Select = React.forwardRef((props, ref) => (
   <select
     ref={ref}
     {...props}
-    className="w-full px-3 py-2 border border-input bg-card rounded-md shadow-sm focus:ring-ring focus:border-primary sm:text-sm text-foreground"
+    className="w-full px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 bg-white border border-slate-300 rounded-lg shadow-sm hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
   />
 ));
 

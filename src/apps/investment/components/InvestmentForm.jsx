@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, PiggyBank } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
 import { safeGetDate } from '../../../lib/utils';
 import { estimateMaturityValue } from '../lib/financialYear';
@@ -36,6 +36,10 @@ const UndecryptableWarning = ({ fieldLabel }) => (
     a new value below will permanently overwrite it. Cancel instead if you just
     wanted to view this record.
   </p>
+);
+
+const SectionTitle = ({ children }) => (
+  <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 pt-2 pb-1 border-b border-slate-100">{children}</h4>
 );
 
 const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
@@ -174,13 +178,21 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
 
   return (
     <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-        <h3 className="text-lg font-bold">{initialData ? 'Edit Investment' : 'New Investment'}</h3>
-        <button onClick={onCancel}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
+      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-2xl shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-600 text-white rounded-xl"><PiggyBank size={18} /></div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-800 leading-tight">{initialData ? 'Edit Investment' : 'New Investment'}</h3>
+            <p className="text-xs text-slate-500">{initialData ? 'Update the details below' : 'Fields marked by the form adapt to the type you pick'}</p>
+          </div>
+        </div>
+        <button type="button" onClick={onCancel} aria-label="Close form" className="p-1.5 rounded-lg hover:bg-slate-100"><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
       </div>
 
       <div className="p-6 overflow-y-auto flex-1">
         <Form id="investment-form" onSubmit={handleSubmit} className="space-y-4">
+          <SectionTitle>Basics</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormGroup>
             <Label htmlFor="holder">Investment Holder</Label>
             <Select
@@ -217,6 +229,8 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             </Select>
           </FormGroup>
 
+          </div>
+
           {formData.type === 'Mutual Fund' && (
             <FormGroup>
               <Label htmlFor="fundCategory">Fund Category</Label>
@@ -239,6 +253,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             />
           </FormGroup>
 
+          <SectionTitle>Amount &amp; Returns</SectionTitle>
           <FormGroup>
             <Label htmlFor="amount">{isMarketLinked ? 'Amount Invested (₹)' : 'Amount (₹)'}</Label>
             {initialData && initialData.amount === null && <UndecryptableWarning fieldLabel="amount" />}
@@ -384,6 +399,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             </>
           )}
 
+          <SectionTitle>Dates</SectionTitle>
           {(isMarketLinked || isInterestBearing) && (
             <FormGroup>
               <Label htmlFor="investmentDate">{isSip ? 'SIP Start Date' : 'Investment / Purchase Date'}</Label>
@@ -418,13 +434,13 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 <input
                   type="number" min="0" step="0.5" aria-label="Tenure"
                   value={tenureValue} onChange={e => setTenureValue(e.target.value)}
-                  className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-sm"
+                  className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
                 />
-                <select aria-label="Tenure unit" value={tenureUnit} onChange={e => setTenureUnit(e.target.value)} className="px-2 py-1 border border-slate-200 rounded-lg text-sm">
+                <select aria-label="Tenure unit" value={tenureUnit} onChange={e => setTenureUnit(e.target.value)} className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500">
                   <option value="years">years</option>
                   <option value="months">months</option>
                 </select>
-                <button type="button" onClick={applyTenure} className="text-xs font-medium text-indigo-600 hover:underline">Apply</button>
+                <button type="button" onClick={applyTenure} className="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg">Apply</button>
               </div>
             </FormGroup>
           )}
@@ -454,7 +470,9 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
           )}
 
           {!isMarketLinked || formData.type === 'Mutual Fund' ? (
-            <div className="rounded-xl border border-slate-200 p-3 space-y-3">
+            <>
+            <SectionTitle>Tax &amp; Lock-in</SectionTitle>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
               <label className="flex items-start gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox" className="mt-0.5"
@@ -477,9 +495,11 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 <p className="text-xs text-slate-400 mt-1">Standard: NSC 5 yrs, ELSS 3 yrs, tax-saver FD/TD 5 yrs from the investment date. Editable.</p>
               </FormGroup>
             </div>
+            </>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3">
+          <SectionTitle>Nominee &amp; Notes</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormGroup>
               <Label htmlFor="nominee">Nominee (optional)</Label>
               <Input id="nominee" type="text" placeholder="Nominee name" value={formData.nominee} onChange={e => setFormData({...formData, nominee: e.target.value})} />
@@ -508,7 +528,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
         </Form>
       </div>
 
-      <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
+      <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-2xl shrink-0">
         <Button type="button" onClick={onCancel} disabled={submitting} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
         <Button type="submit" form="investment-form" disabled={submitting}>
           {submitting && <Loader2 size={16} className="animate-spin mr-2" />}

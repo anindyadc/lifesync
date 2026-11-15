@@ -1,131 +1,84 @@
-/* src/apps/investment/components/MaturityCalendar.css */
+/* Modern FullCalendar skin for the maturity calendar — explicit slate/indigo values
+   (the app's shadcn tokens are too pale for grid lines) scoped to .maturity-calendar. */
 
-.fc .fc-button {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-sm);
-  text-transform: capitalize; /* Make view names readable */
+.maturity-calendar .fc {
+  --fc-border-color: #e2e8f0;
+  --fc-today-bg-color: #eef2ff;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-page-bg-color: #ffffff;
+  font-family: inherit;
 }
 
-.fc .fc-button:hover {
-  background-color: hsl(var(--secondary-foreground));
-  color: hsl(var(--secondary));
+/* Toolbar */
+.maturity-calendar .fc .fc-toolbar { gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.maturity-calendar .fc .fc-toolbar-title { font-size: 1.125rem; font-weight: 700; color: #1e293b; }
+
+.maturity-calendar .fc .fc-button {
+  background: #fff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  text-transform: capitalize;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.maturity-calendar .fc .fc-button:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; }
+.maturity-calendar .fc .fc-button:focus { box-shadow: 0 0 0 3px rgb(99 102 241 / 0.3); }
+.maturity-calendar .fc .fc-button:disabled { opacity: 0.5; }
+.maturity-calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+.maturity-calendar .fc .fc-button-primary:not(:disabled):active {
+  background: #4f46e5; color: #fff; border-color: #4f46e5;
+}
+.maturity-calendar .fc .fc-button-group { gap: 0; }
+.maturity-calendar .fc .fc-button-group > .fc-button:not(:first-child) { margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.maturity-calendar .fc .fc-button-group > .fc-button:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+/* Grid */
+.maturity-calendar .fc .fc-view-harness { border: 1px solid #e2e8f0; border-radius: 1rem; overflow: hidden; background: #fff; }
+.maturity-calendar .fc .fc-scrollgrid { border: none; }
+.maturity-calendar .fc .fc-col-header-cell { background: #f8fafc; }
+.maturity-calendar .fc .fc-col-header-cell-cushion {
+  color: #64748b; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 0.6rem 0;
+}
+.maturity-calendar .fc .fc-daygrid-day-number { color: #475569; font-size: 0.8125rem; font-weight: 500; padding: 0.4rem 0.55rem; }
+.maturity-calendar .fc .fc-day-other .fc-daygrid-day-top { opacity: 0.4; }
+.maturity-calendar .fc .fc-day-today .fc-daygrid-day-number {
+  background: #4f46e5; color: #fff; border-radius: 9999px; margin: 0.25rem; padding: 0.1rem 0.45rem; font-weight: 700;
 }
 
-.fc .fc-button-primary {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-color: hsl(var(--primary));
-}
-
-.fc .fc-button-primary:hover {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-color: hsl(var(--primary));
-  opacity: 0.9;
-}
-
-.fc .fc-button-group {
-  display: inline-flex;
-  vertical-align: middle;
-}
-
-.fc .fc-button-group > .fc-button {
-  margin: 0;
-  border-radius: 0;
-}
-
-.fc .fc-button-group > .fc-button:first-child {
-  border-top-left-radius: var(--radius-sm);
-  border-bottom-left-radius: var(--radius-sm);
-}
-
-.fc .fc-button-group > .fc-button:last-child {
-  border-top-right-radius: var(--radius-sm);
-  border-bottom-right-radius: var(--radius-sm);
-}
-
-.fc .fc-toolbar-title {
-  color: hsl(var(--foreground));
-  font-size: 1.25rem; /* text-xl */
-  font-weight: 700; /* font-bold */
-}
-
-.fc .fc-col-header-cell-cushion {
-  color: hsl(var(--muted-foreground));
-  font-size: 0.875rem; /* text-sm */
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-.fc-daygrid-event {
-  background-color: hsl(var(--primary));
-  border-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem; /* text-xs */
-  padding: 2px 5px;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  cursor: pointer; /* clicking an event opens it for editing */
-}
-
-.fc-day-other .fc-daygrid-day-top {
-  opacity: 0.5;
-}
-
-.fc-day-today {
-  background-color: hsl(var(--accent));
-}
-
-.fc-view-harness {
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-}
-
-.fc-scrollgrid, .fc-scrollgrid-liquid {
+/* Events */
+.maturity-calendar .fc .fc-daygrid-event {
   border: none;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  margin: 1px 4px;
+  color: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.15);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
 }
+.maturity-calendar .fc .fc-daygrid-event:hover { transform: translateY(-1px); box-shadow: 0 3px 6px rgb(15 23 42 / 0.2); }
+.maturity-calendar .fc .fc-event-title { overflow: hidden; text-overflow: ellipsis; }
+.maturity-calendar .fc .fc-daygrid-more-link { color: #4f46e5; font-weight: 600; font-size: 0.7rem; }
 
-.fc-daygrid-day-frame {
-  border-color: hsl(var(--border));
-}
+/* List views */
+.maturity-calendar .fc .fc-list { border: none; }
+.maturity-calendar .fc .fc-list-day-cushion { background: #f1f5f9; }
+.maturity-calendar .fc .fc-list-day-text,
+.maturity-calendar .fc .fc-list-day-side-text { color: #334155; font-weight: 700; font-size: 0.8125rem; }
+.maturity-calendar .fc .fc-list-event td { border-color: #f1f5f9; padding: 0.7rem 1rem; }
+.maturity-calendar .fc .fc-list-event:hover td { background: #eef2ff; cursor: pointer; }
+.maturity-calendar .fc .fc-list-event-title a { color: #1e293b; text-decoration: none; font-weight: 500; }
+.maturity-calendar .fc .fc-list-event-time { color: #64748b; font-size: 0.75rem; }
+.maturity-calendar .fc .fc-list-empty { background: #f8fafc; color: #94a3b8; }
 
-.fc-daygrid-day-top {
-  color: hsl(var(--foreground));
-}
-
-.fc-list-event-title a {
-    color: hsl(var(--foreground));
-    text-decoration: none;
-}
-
-.fc-list-event.fc-event {
-    background-color: hsl(var(--secondary));
-    border-left: 3px solid hsl(var(--primary));
-    border-radius: var(--radius-sm);
-    margin-bottom: 0.5rem;
-}
-
-.fc-list-event:hover {
-    background-color: hsl(var(--secondary-foreground));
-}
-
-.fc-list-event-time {
-    color: hsl(var(--muted-foreground));
-    font-size: 0.75rem;
-}
-
-.fc-list-event-graphic {
-    color: hsl(var(--primary));
-}
-
-.fc-list-table {
-    border: none;
-}
-
-.fc-list-day-text, .fc-list-day-side-text {
-    color: hsl(var(--foreground));
-    font-weight: 600;
+@media (max-width: 640px) {
+  .maturity-calendar .fc .fc-toolbar { flex-direction: column; align-items: stretch; text-align: center; }
+  .maturity-calendar .fc .fc-toolbar-chunk { display: flex; justify-content: center; }
 }

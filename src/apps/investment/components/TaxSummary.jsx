@@ -106,7 +106,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
             id="fy-select"
             value={activeFY}
             onChange={e => setSelectedFY(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium shadow-sm hover:border-slate-400 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none"
           >
             {fyOptions.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
           </select>
@@ -114,13 +114,13 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
         <button
           onClick={() => exportTaxCSV(activeFY, interestRows, gainRows, c80Rows)}
           disabled={!hasAnyData}
-          className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg shadow-sm hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-xl shadow-sm hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <FileText size={16} /> Export FY {activeFY} CSV
         </button>
       </div>
 
-      <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex gap-3 text-sm">
+      <div className="p-4 bg-amber-50/70 border border-amber-200 text-amber-900 rounded-2xl flex gap-3 text-sm">
         <AlertCircle className="shrink-0 mt-0.5" size={18} />
         <div className="space-y-1">
           <p><strong>Estimates, not filing-ready figures.</strong> FD/TD/NSC interest is compounded per the schedule you set (and scaled to the maturity amount when you've entered one) — verify against Form 26AS/AIS or your interest certificate.</p>
@@ -130,36 +130,36 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Landmark size={22} /></div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl ring-4 ring-indigo-50/60"><Landmark size={22} /></div>
           <div>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">FD/TD/NSC Interest Income</p>
-            <p className="text-xl font-bold text-slate-800">{inr(totalInterest)}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{inr(totalInterest)}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
           <div className={`p-3 rounded-xl ${stcgTotal >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
             {stcgTotal >= 0 ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
           </div>
           <div>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Short-Term Capital Gain</p>
-            <p className="text-xl font-bold text-slate-800">{stcgTotal < 0 ? '-' : ''}{inr(stcgTotal)}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{stcgTotal < 0 ? '-' : ''}{inr(stcgTotal)}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4">
           <div className={`p-3 rounded-xl ${ltcgTotal >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
             {ltcgTotal >= 0 ? <TrendingUp size={22} /> : <TrendingDown size={22} />}
           </div>
           <div>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Long-Term Capital Gain</p>
-            <p className="text-xl font-bold text-slate-800">{ltcgTotal < 0 ? '-' : ''}{inr(ltcgTotal)}</p>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums">{ltcgTotal < 0 ? '-' : ''}{inr(ltcgTotal)}</p>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
         <div>
-          <h3 className="font-bold text-slate-800">Section 80C — FY {activeFY}</h3>
+          <h3 className="font-bold text-slate-800 text-base">Section 80C — FY {activeFY}</h3>
           <p className="text-xs text-slate-500 mt-1">
             Tracks investments flagged 80C-eligible against the ₹{SECTION_80C_LIMIT.toLocaleString('en-IN')} annual limit (old tax regime only —
             not available under the new regime). EPF, PPF, LIC premiums, tuition fees and home-loan principal also count toward the same limit but aren't tracked here,
@@ -177,8 +177,8 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
                 <span className="font-medium text-slate-700">{holder}</span>
                 <span className="text-slate-600">{inr(total)} of {inr(SECTION_80C_LIMIT)}</span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                <div className={`h-full rounded-full ${over ? 'bg-amber-500' : 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+              <div className="h-2.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                <div className={`h-full rounded-full ${over ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`} style={{ width: `${pct}%` }} />
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {over ? `${inr(total - SECTION_80C_LIMIT)} above the limit — the excess isn't deductible.` : `${inr(SECTION_80C_LIMIT - total)} of limit remaining`}
@@ -199,7 +199,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/60">
           <h3 className="font-bold text-slate-800">FD / TD / NSC Interest — FY {activeFY}</h3>
           {missingRateCount > 0 && (
             <p className="text-xs text-amber-600 mt-1">{missingRateCount} FD/TD/NSC entr{missingRateCount === 1 ? 'y has' : 'ies have'} no interest rate set, so they're excluded here — edit them to add one.</p>
@@ -207,32 +207,32 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Holder</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Principal</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Rate</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Interest (FY)</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Holder</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Principal</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Rate</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Interest (FY)</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {interestRows.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">No FD/TD/NSC interest accrued in FY {activeFY}.</td></tr>
               ) : interestRows.map(row => (
-                <tr key={row.id}>
+                <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-6 py-3 text-sm text-slate-900">{row.name}</td>
                   <td className="px-6 py-3 text-sm text-slate-500">{row.holder}</td>
-                  <td className="px-6 py-3 text-sm text-right text-slate-900">{inr(row.amount)}</td>
+                  <td className="px-6 py-3 text-sm text-right text-slate-900 tabular-nums">{inr(row.amount)}</td>
                   <td className="px-6 py-3 text-sm text-right text-slate-500">{row.interestRate}%</td>
-                  <td className="px-6 py-3 text-sm text-right font-semibold text-slate-900">{inr(row.interest)}</td>
+                  <td className="px-6 py-3 text-sm text-right font-semibold tabular-nums text-slate-900">{inr(row.interest)}</td>
                 </tr>
               ))}
             </tbody>
             {interestRows.length > 0 && (
               <tfoot className="bg-slate-50">
                 <tr>
-                  <td colSpan={4} className="px-6 py-3 text-sm text-right font-semibold text-slate-600">Total</td>
+                  <td colSpan={4} className="px-6 py-3 text-sm text-right font-semibold tabular-nums text-slate-600">Total</td>
                   <td className="px-6 py-3 text-sm text-right font-bold text-slate-900">{inr(totalInterest)}</td>
                 </tr>
               </tfoot>
@@ -246,7 +246,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/60">
           <h3 className="font-bold text-slate-800">Realized Capital Gains — FY {activeFY}</h3>
           {missingDateCount > 0 && (
             <p className="text-xs text-amber-600 mt-1">{missingDateCount} sold holding{missingDateCount === 1 ? '' : 's'} {missingDateCount === 1 ? 'has' : 'have'} no purchase date recorded, so STCG/LTCG couldn't be classified.</p>
@@ -254,28 +254,28 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Holder</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Held</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Invested</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Sale Value</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Gain/Loss</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Holder</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Held</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Invested</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sale Value</th>
+                <th className="px-6 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Gain/Loss</th>
+                <th className="px-6 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {gainRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-400">No holdings sold in FY {activeFY}.</td></tr>
               ) : gainRows.map(row => (
-                <tr key={row.id}>
+                <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-6 py-3 text-sm text-slate-900">{row.name}</td>
                   <td className="px-6 py-3 text-sm text-slate-500">{row.holder}</td>
                   <td className="px-6 py-3 text-sm text-slate-500">{row.holdingDays !== null ? `${row.holdingDays}d` : '-'}</td>
-                  <td className="px-6 py-3 text-sm text-right text-slate-900">{inr(row.amount)}</td>
-                  <td className="px-6 py-3 text-sm text-right text-slate-900">{inr(row.saleValue)}</td>
-                  <td className={`px-6 py-3 text-sm text-right font-semibold ${row.gain >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <td className="px-6 py-3 text-sm text-right text-slate-900 tabular-nums">{inr(row.amount)}</td>
+                  <td className="px-6 py-3 text-sm text-right text-slate-900 tabular-nums">{inr(row.saleValue)}</td>
+                  <td className={`px-6 py-3 text-sm text-right font-semibold tabular-nums ${row.gain >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {row.gain >= 0 ? '+' : '-'}{inr(row.gain)}
                   </td>
                   <td className="px-6 py-3 text-sm">

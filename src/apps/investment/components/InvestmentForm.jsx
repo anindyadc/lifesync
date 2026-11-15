@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
-import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, SIP_FREQUENCIES } from '../constants';
+import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, FIXED_RETURN_TYPES, POST_OFFICE_TYPES, POST_OFFICE_NAME, ACCOUNT_NUMBER_TYPES, SIP_FREQUENCIES } from '../constants';
 
 const emptyFormData = {
   holder: 'Self',
@@ -9,6 +9,8 @@ const emptyFormData = {
   name: '',
   amount: '',
   maturityDate: '',
+  maturityAmount: '',
+  accountNumber: '',
   details: '',
   investmentDate: '',
   interestRate: '',
@@ -39,12 +41,17 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     purchasePrice: initialData.purchasePrice || '',
     currentValue: initialData.currentValue || '',
     sipAmount: initialData.sipAmount || '',
+    maturityAmount: initialData.maturityAmount || '',
+    accountNumber: initialData.accountNumber || '',
   } : emptyFormData);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const isMarketLinked = MARKET_LINKED_TYPES.includes(formData.type);
   const isInterestBearing = INTEREST_BEARING_TYPES.includes(formData.type);
+  const isFixedReturn = FIXED_RETURN_TYPES.includes(formData.type);
+  const isPostOffice = POST_OFFICE_TYPES.includes(formData.type);
+  const hasAccountNumber = ACCOUNT_NUMBER_TYPES.includes(formData.type);
   const isSip = isMarketLinked && formData.investmentMode === 'sip';
 
   const handleSubmit = async (e) => {
@@ -56,6 +63,10 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     }
     if (!isMarketLinked && !formData.maturityDate) {
       setError('Maturity date is required.');
+      return;
+    }
+    if (formData.maturityAmount !== '' && (isNaN(Number(formData.maturityAmount)) || Number(formData.maturityAmount) <= 0)) {
+      setError('Maturity amount must be greater than 0.');
       return;
     }
     if (isMarketLinked && !formData.investmentDate) {
@@ -77,6 +88,8 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
         details: formData.details,
         maturityDate: isMarketLinked ? '' : formData.maturityDate,
         investmentDate: (isMarketLinked || isInterestBearing) ? formData.investmentDate : (formData.investmentDate || ''),
+        maturityAmount: isFixedReturn ? formData.maturityAmount : '',
+        accountNumber: hasAccountNumber ? formData.accountNumber.trim() : '',
         interestRate: isInterestBearing ? formData.interestRate : '',
         investmentMode: isMarketLinked ? formData.investmentMode : '',
         units: isMarketLinked ? formData.units : '',
@@ -118,7 +131,16 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             <Select
               id="type"
               value={formData.type}
-              onChange={e => setFormData({...formData, type: e.target.value})}
+              onChange={e => {
+                const type = e.target.value;
+                setFormData(prev => {
+                  let name = prev.name;
+                  if (POST_OFFICE_TYPES.includes(type) && !name.trim()) name = POST_OFFICE_NAME;
+                  // Leaving a post-office type for FD: drop the auto-filled value (FD is bank-only).
+                  else if (!POST_OFFICE_TYPES.includes(type) && name === POST_OFFICE_NAME) name = '';
+                  return { ...prev, type, name };
+                });
+              }}
             >
               {INVESTMENT_TYPES.map(type => (
                 <option key={type} value={type}>{type}</option>
@@ -127,11 +149,11 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
           </FormGroup>
 
           <FormGroup>
-            <Label htmlFor="name">Investment Name / Bank</Label>
+            <Label htmlFor="name">{isPostOffice ? 'Institution' : formData.type === 'FD' ? 'Bank Name' : 'Investment Name / Bank'}</Label>
             <Input
               id="name"
               type="text"
-              placeholder="e.g. SBI Fixed Deposit, HDFC Flexicap Fund, Smallcase: Rebalancer"
+              placeholder={isPostOffice ? 'Post Office' : formData.type === 'FD' ? 'e.g. SBI, HDFC Bank' : 'e.g. HDFC Flexicap Fund, Smallcase: Rebalancer'}
               required
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
@@ -152,6 +174,21 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
               onChange={e => setFormData({...formData, amount: e.target.value})}
             />
           </FormGroup>
+
+          {hasAccountNumber && (
+            <FormGroup>
+              <Label htmlFor="accountNumber">
+                {formData.type === 'NSC' ? 'NSC Certificate No. (optional)' : `${formData.type} Account Number (optional)`}
+              </Label>
+              <Input
+                id="accountNumber"
+                type="text"
+                placeholder="e.g. 1234567890"
+                value={formData.accountNumber}
+                onChange={e => setFormData({...formData, accountNumber: e.target.value})}
+              />
+            </FormGroup>
+          )}
 
           {isInterestBearing && (
             <FormGroup>
@@ -290,12 +327,29 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             </FormGroup>
           )}
 
+          {isFixedReturn && (
+            <FormGroup>
+              <Label htmlFor="maturityAmount">Maturity Amount (₹, optional)</Label>
+              {initialData && initialData.maturityAmount === null && <UndecryptableWarning fieldLabel="maturity amount" />}
+              <Input
+                id="maturityAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 71000"
+                value={formData.maturityAmount}
+                onChange={e => setFormData({...formData, maturityAmount: e.target.value})}
+              />
+              <p className="text-xs text-slate-400 mt-1">The promised payout at maturity, as stated on the receipt/certificate.</p>
+            </FormGroup>
+          )}
+
           <FormGroup>
             <Label htmlFor="details">Additional Details (Optional)</Label>
             <Textarea
               id="details"
               rows="3"
-              placeholder="e.g. FD number: 12345, NSC serial: A123456, folio number"
+              placeholder="e.g. nominee, folio number, remarks"
               value={formData.details}
               onChange={e => setFormData({...formData, details: e.target.value})}
             />

@@ -60,12 +60,14 @@ export const useInvestmentExport = (investments) => {
 
     autoTable(doc, {
       startY: 38,
-      head: [['Holder', 'Type', 'Name', 'Amount (₹)', 'Current Value (₹)', 'Gain/Loss', 'Mode / Status', 'Investment Date', 'Maturity Date', 'Details']],
+      head: [['Holder', 'Type', 'Name', 'Account No.', 'Amount (₹)', 'Maturity Amount (₹)', 'Current Value (₹)', 'Gain/Loss', 'Mode / Status', 'Investment Date', 'Maturity Date', 'Details']],
       body: investments.map(inv => [
         inv.holder || '-',
         inv.type || '-',
         inv.name || '-',
+        inv.accountNumber || '-',
         formatAmount(inv.amount),
+        formatAmount(inv.maturityAmount),
         formatAmount(MARKET_LINKED_TYPES.includes(inv.type) ? (inv.status === 'sold' ? inv.saleValue : inv.currentValue) : undefined),
         gainLossLabel(inv),
         statusLabel(inv),
@@ -80,12 +82,14 @@ export const useInvestmentExport = (investments) => {
   };
 
   const exportCSV = () => {
-    const headers = ['Holder', 'Type', 'Name', 'Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Sold Date', 'Sale Value', 'Details'];
+    const headers = ['Holder', 'Type', 'Name', 'Account No.', 'Amount', 'Maturity Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Sold Date', 'Sale Value', 'Details'];
     const rows = investments.map(inv => [
       csvEscape(inv.holder || ''),
       csvEscape(inv.type || ''),
       csvEscape(inv.name || ''),
+      csvEscape(inv.accountNumber || ''),
       csvEscape(formatAmount(inv.amount)),
+      csvEscape(formatAmount(inv.maturityAmount)),
       csvEscape(inv.investmentMode || '-'),
       csvEscape(inv.units || '-'),
       csvEscape(formatAmount(inv.purchasePrice)),

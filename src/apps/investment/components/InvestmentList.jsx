@@ -29,8 +29,15 @@ const StatusCell = ({ investment }) => {
   if (!MARKET_LINKED_TYPES.includes(investment.type)) {
     return (
       <div className="text-sm text-slate-500 flex items-center gap-1">
-        <CalendarDays size={16} className="text-slate-400"/>
-        {investment.maturityDate || '-'}
+        <div>
+          <div className="flex items-center gap-1">
+            <CalendarDays size={16} className="text-slate-400"/>
+            {investment.maturityDate || '-'}
+          </div>
+          {typeof investment.maturityAmount === 'number' && (
+            <div className="text-xs font-medium text-emerald-600 mt-0.5">Matures at ₹{investment.maturityAmount.toLocaleString('en-IN')}</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -67,6 +74,7 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
     return investments.filter(inv => {
       const matchesSearch = !search ||
         inv.name?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.accountNumber?.toLowerCase().includes(search.toLowerCase()) ||
         inv.details?.toLowerCase().includes(search.toLowerCase()) ||
         inv.holder?.toLowerCase().includes(search.toLowerCase()) ||
         inv.type?.toLowerCase().includes(search.toLowerCase());
@@ -157,6 +165,7 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-slate-900">{investment.name}</div>
+                  {investment.accountNumber && <div className="text-xs text-slate-500 mt-0.5">A/c: {investment.accountNumber}</div>}
                   {investment.details && <div className="text-xs text-slate-400 mt-1">{investment.details}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">

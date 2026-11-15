@@ -81,6 +81,7 @@ export const useInvestments = (userId) => {
             purchasePrice: decryptOptional(data.purchasePriceEncrypted),
             sipAmount: decryptOptional(data.sipAmountEncrypted),
             saleValue: decryptOptional(data.saleValueEncrypted),
+            maturityAmount: decryptOptional(data.maturityAmountEncrypted),
           };
         });
         fetchedInvestments.sort((a, b) => {
@@ -106,7 +107,7 @@ export const useInvestments = (userId) => {
 
   const addInvestment = useCallback(async (investmentData) => {
     try {
-      const { amount, currentValue, purchasePrice, sipAmount, ...rest } = investmentData;
+      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, ...rest } = investmentData;
       const payload = {
         ...rest,
         amountEncrypted: encryptAmount(amount),
@@ -119,6 +120,8 @@ export const useInvestments = (userId) => {
       if (pp !== null) payload.purchasePriceEncrypted = pp;
       const sa = encryptOptional(sipAmount);
       if (sa !== null) payload.sipAmountEncrypted = sa;
+      const ma = encryptOptional(maturityAmount);
+      if (ma !== null) payload.maturityAmountEncrypted = ma;
 
       await addDoc(collection(db, `artifacts/default-app-id/users/${userId}/investment`), payload);
     } catch (e) {
@@ -129,7 +132,7 @@ export const useInvestments = (userId) => {
 
   const updateInvestment = useCallback(async (id, investmentData) => {
     try {
-      const { amount, currentValue, purchasePrice, sipAmount, ...rest } = investmentData;
+      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, ...rest } = investmentData;
       const payload = {
         ...rest,
         amountEncrypted: encryptAmount(amount),
@@ -141,6 +144,8 @@ export const useInvestments = (userId) => {
       payload.purchasePriceEncrypted = pp !== null ? pp : deleteField();
       const sa = encryptOptional(sipAmount);
       payload.sipAmountEncrypted = sa !== null ? sa : deleteField();
+      const ma = encryptOptional(maturityAmount);
+      payload.maturityAmountEncrypted = ma !== null ? ma : deleteField();
 
       const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investment`, id);
       await updateDoc(investmentRef, payload);

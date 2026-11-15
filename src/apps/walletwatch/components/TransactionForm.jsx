@@ -97,6 +97,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     tags: '',
     paymentMode: 'upi',
     paymentAccount: '',
+    paymentApp: '',
     date: toISODate(new Date()),
     isReimbursable: false,
     isOfficial: false
@@ -156,6 +157,13 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     return Array.from(accountSet).sort();
   }, [expenses, formData.paymentMode]);
 
+  // UPI apps used before (Kiwi, PhonePe, GPay...), offered as one-tap chips.
+  const availableApps = React.useMemo(() => {
+    const set = new Set();
+    expenses.forEach(exp => { if (exp.paymentApp && exp.paymentApp.trim()) set.add(exp.paymentApp.trim()); });
+    return Array.from(set).sort();
+  }, [expenses]);
+
   const handleTagClick = (tag) => {
     const currentTags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
     if (!currentTags.includes(tag)) {
@@ -193,6 +201,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         tags: initialData.tags ? initialData.tags.join(', ') : '',
         paymentMode: initialData.paymentMode || 'upi',
         paymentAccount: initialData.paymentAccount || '',
+        paymentApp: initialData.paymentApp || '',
         date: toISODate(d),
         // A settle form's initialData is built by spreading the ORIGINAL expense being
         // settled (see walletwatch/index.jsx) — which is 'pending' by definition, that's
@@ -277,6 +286,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     try {
       await onSubmit({
         ...formData,
+        paymentApp: formData.paymentMode === 'upi' ? formData.paymentApp.trim() : '',
         amount: amountNum,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         reimbursementStatus: formData.isReimbursable ? 'pending' : 'none'
@@ -571,6 +581,36 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                   />
                 </div>
               </div>
+
+              {/* UPI app: which app made the payment, kept separate from Account (which card /
+                  bank account actually funded it) so one app can be filtered on its own. */}
+              {formData.paymentMode === 'upi' && (
+                <div>
+                  <label className={labelClass}>UPI App <span className="normal-case font-medium text-slate-300">(optional — the app you paid with)</span></label>
+                  <input
+                    type="text"
+                    value={formData.paymentApp}
+                    onChange={(e) => setFormData({ ...formData, paymentApp: e.target.value })}
+                    placeholder="e.g. Kiwi, PhonePe, GPay"
+                    className={fieldClass}
+                  />
+                  {availableApps.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {availableApps.map(app => (
+                        <button
+                          key={app}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setFormData({ ...formData, paymentApp: app })}
+                          className={`px-2 py-0.5 text-[11px] font-semibold rounded-md transition-colors ${formData.paymentApp === app ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                        >
+                          {app}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Lent & Official toggles — side by side on larger screens */}
               {!isSettling && (

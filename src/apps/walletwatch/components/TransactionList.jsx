@@ -2,10 +2,10 @@ import React, { useState, useMemo, useRef, useEffect, memo } from 'react';
 import {
   CreditCard, Trash2, Pencil, RefreshCcw, RotateCcw, Folder, ChevronDown, Tag, Filter, XCircle,
   Link2, MapPin, Search, ArrowUpDown, Calendar, Wallet, Download, FileText, Loader2,
-  LayoutGrid, List, Repeat, AlertCircle
+  LayoutGrid, List, Repeat, AlertCircle, Smartphone
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
-import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, spendValue, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, spendValue, flowValue, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const VIEW_MODE_KEY = 'walletwatch-transactionlist-view-mode';
@@ -121,6 +121,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
   const [filterTags, setFilterTags] = useState([]);
   const [filterGroups, setFilterGroups] = useState([]);
   const [filterAccounts, setFilterAccounts] = useState([]);
+  const [filterApps, setFilterApps] = useState([]);
   const [filterPaymentModes, setFilterPaymentModes] = useState([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -160,6 +161,12 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
     return Array.from(accountsSet).sort();
   }, [expenses]);
 
+  const availableApps = useMemo(() => {
+    const set = new Set();
+    expenses.forEach(exp => { if (exp.paymentApp?.trim()) set.add(exp.paymentApp.trim()); });
+    return Array.from(set).sort();
+  }, [expenses]);
+
   const expenseById = useMemo(() => {
     const map = {};
     expenses.forEach(e => { map[e.id] = e; });
@@ -195,6 +202,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
       if (filterTags.length > 0 && !(exp.tags || []).some(t => filterTags.includes(t))) return false;
       if (filterGroups.length > 0 && !filterGroups.includes(exp.group)) return false;
       if (filterAccounts.length > 0 && !filterAccounts.includes(getAccountKey(exp))) return false;
+      if (filterApps.length > 0 && !filterApps.includes(exp.paymentApp?.trim())) return false;
       if (filterPaymentModes.length > 0 && !filterPaymentModes.includes(exp.paymentMode)) return false;
 
       if (from || to) {
@@ -209,6 +217,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
           exp.description,
           exp.group,
           exp.paymentAccount,
+          exp.paymentApp,
           categories.find(c => c.id === exp.category)?.label,
           PAYMENT_MODES.find(m => m.id === exp.paymentMode)?.label,
           ...(exp.tags || []),
@@ -218,7 +227,21 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
 
       return true;
     });
-  }, [expenses, categories, filterCategory, filterScope, filterReimbursement, filterTags, filterGroups, filterAccounts, filterPaymentModes, dateFrom, dateTo, dateRangeInvalid, search]);
+  }, [expenses, categories, filterCategory, filterScope, filterReimbursement, filterTags, filterGroups, filterAccounts, filterApps, filterPaymentModes, dateFrom, dateTo, dateRangeInvalid, search]);
+
+  // When filtering by UPI app, split that app's payments by the account that funded them
+  // (e.g. Kiwi Card vs SBI 8680) — the "Kiwi Card" line is what should match the app's own
+  // monthly statement. Net outflow per account: a refund onto the same account reduces it.
+  const appBreakdown = useMemo(() => {
+    if (filterApps.length === 0) return null;
+    const byAccount = {};
+    filteredExpenses.forEach(e => {
+      const key = getAccountKey(e);
+      byAccount[key] = (byAccount[key] || 0) + flowValue(e);
+    });
+    const rows = Object.entries(byAccount).map(([account, total]) => ({ account, total })).sort((a, b) => b.total - a.total);
+    return { rows, total: rows.reduce((s, r) => s + r.total, 0) };
+  }, [filteredExpenses, filterApps]);
 
   const sortedExpenses = useMemo(() => {
     const arr = [...filteredExpenses];
@@ -233,7 +256,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
 
   const hasActiveFilters = !!(
     search.trim() || filterCategory || filterScope || filterReimbursement || filterTags.length || filterGroups.length ||
-    filterAccounts.length || filterPaymentModes.length || dateFrom || dateTo
+    filterAccounts.length || filterApps.length || filterPaymentModes.length || dateFrom || dateTo
   );
 
   const clearAllFilters = () => {
@@ -243,6 +266,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
     setFilterReimbursement('');
     setFilterTags([]);
     setFilterGroups([]);
+    setFilterApps([]);
     setFilterAccounts([]);
     setFilterPaymentModes([]);
     setDateFrom('');
@@ -653,6 +677,9 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
 
           <MultiSelectFilter label="Tags" icon={Tag} options={availableTags} selected={filterTags} onToggle={toggleInArray(setFilterTags)} onSetSelected={setFilterTags} />
           <MultiSelectFilter label="Trips" icon={MapPin} options={availableGroups} selected={filterGroups} onToggle={toggleInArray(setFilterGroups)} onSetSelected={setFilterGroups} />
+ {availableApps.length > 0 && (
+            <MultiSelectFilter label="UPI Apps" icon={Smartphone} options={availableApps} selected={filterApps} onToggle={toggleInArray(setFilterApps)} onSetSelected={setFilterApps} />
+          )}
           <MultiSelectFilter label="Accounts" icon={CreditCard} options={availableAccounts} selected={filterAccounts} onToggle={toggleInArray(setFilterAccounts)} onSetSelected={setFilterAccounts} />
 
           <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
@@ -708,6 +735,20 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
             </button>
           )}
         </div>
+
+        {appBreakdown && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs">
+            <span className="font-bold text-indigo-700 flex items-center gap-1.5">
+              <Smartphone size={13} /> {filterApps.join(', ')}: {formatCurrency(appBreakdown.total)}
+            </span>
+            {appBreakdown.rows.map(r => (
+              <span key={r.account} className="font-semibold text-slate-600">
+                {r.account} <span className="text-slate-900">{formatCurrency(r.total)}</span>
+              </span>
+            ))}
+            <span className="text-slate-400">Narrow by month with the date range to compare with the app's statement.</span>
+          </div>
+        )}
 
         {/* Row 3: grouping, sort, export */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -840,6 +881,11 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, onR
       )}
 
       <div className="flex flex-wrap gap-1.5">
+        {exp.paymentApp?.trim() && (
+          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-600">
+            <Smartphone size={9} /> {exp.paymentApp.trim()}
+          </span>
+        )}
         {accountLabel && (
           <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500">
             {PaymentIcon && <PaymentIcon size={9} />} {accountLabel}
@@ -933,6 +979,11 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, onRe
           <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 shrink-0">
             <Calendar size={11} className="text-slate-400" /> {formatDate(exp.date)}
           </span>
+          {exp.paymentApp?.trim() && (
+            <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-600 shrink-0">
+              <Smartphone size={9} /> {exp.paymentApp.trim()}
+            </span>
+          )}
           {accountLabel && (
             <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 truncate">
               {PaymentIcon && <PaymentIcon size={9} />} {accountLabel}

@@ -21,6 +21,8 @@ const toRow = (e, categories) => [
   e.description || '',
   categoryLabelFor(e, categories),
   PAYMENT_MODES.find(p => p.id === e.paymentMode)?.label || e.paymentMode || '-',
+  e.paymentAccount?.trim() || '-',
+  e.paymentApp?.trim() || '-',
   e.amount
 ];
 
@@ -56,7 +58,7 @@ export const downloadCsvContent = (csvContent, filename) => {
 
 /** Pure CSV/PDF builders — callable outside a hook (e.g. from a modal scoped to one trip/group). */
 export const downloadExpensesCSV = (expenses, categories, filename = 'expenses.csv') => {
-  const headers = ['Date', 'Description', 'Category', 'Mode', 'Amount'];
+  const headers = ['Date', 'Description', 'Category', 'Mode', 'Account', 'UPI App', 'Amount'];
   const rows = expenses.map(e => toRow(e, categories).map(csvEscape).join(','));
   downloadCsvContent([headers.join(','), ...rows].join('\n'), filename);
 };
@@ -98,10 +100,10 @@ export const downloadExpensesPDF = async (expenses, categories, { title = 'Walle
 
   autoTable(doc, {
     startY: yPos,
-    head: [['Date', 'Description', 'Category', 'Mode', 'Amount (INR)']],
+    head: [['Date', 'Description', 'Category', 'Mode', 'Account', 'UPI App', 'Amount (INR)']],
     body: expenses.map(e => {
       const row = toRow(e, categories);
-      row[4] = `INR ${Number(e.amount).toLocaleString('en-IN')}`;
+      row[row.length - 1] = `INR ${Number(e.amount).toLocaleString('en-IN')}`;
       return row;
     }),
     styles: { fontSize: 9 },

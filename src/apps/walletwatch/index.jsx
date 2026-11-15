@@ -616,6 +616,7 @@ const WalletWatchApp = ({ user }) => {
             addTemplate={fixedExpenses.addTemplate}
             updateTemplate={fixedExpenses.updateTemplate}
             toggleTemplateActive={fixedExpenses.toggleTemplateActive}
+            stopTemplate={fixedExpenses.stopTemplate}
             deleteTemplate={fixedExpenses.deleteTemplate}
             markPaid={fixedExpenses.markPaid}
             skipInstance={fixedExpenses.skipInstance}

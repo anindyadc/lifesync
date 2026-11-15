@@ -39,18 +39,41 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // part of [startDate, endDate] overlaps the given financial year. This is an estimate
 // (simple interest, not the bank's actual compounding schedule) — good enough to see
 // which FY interest income lands in, not a substitute for the bank's interest certificate.
-export const fdInterestForFY = (principal, ratePct, startDate, endDate, fyLabel) => {
+//
+// `periodsPerYear` is the compounding frequency (4 = quarterly, 1 = yearly...);
+// 0/undefined means simple interest. With compounding, interest in an FY is the
+// growth of the deposit's value across that FY's overlap with its life.
+export const valueAfterYears = (principal, ratePct, years, periodsPerYear) => {
+  if (!periodsPerYear) return principal * (1 + (ratePct / 100) * years);
+  return principal * Math.pow(1 + ratePct / 100 / periodsPerYear, periodsPerYear * years);
+};
+
+export const fdInterestForFY = (principal, ratePct, startDate, endDate, fyLabel, periodsPerYear = 0) => {
   if (!principal || !ratePct || !startDate || !endDate) return 0;
   const { start: fyStart, end: fyEnd } = getFYBounds(fyLabel);
   const overlapStart = startDate > fyStart ? startDate : fyStart;
   const overlapEnd = endDate < fyEnd ? endDate : fyEnd;
   if (overlapStart > overlapEnd) return 0;
-  const days = Math.round((overlapEnd - overlapStart) / DAY_MS) + 1;
-  return principal * (ratePct / 100) * (days / 365);
+  // Years elapsed since the deposit began, at the start and end of the overlap.
+  const yearsAt = (d) => Math.max(0, (d - startDate) / DAY_MS) / 365;
+  const from = yearsAt(overlapStart);
+  const to = (Math.round((overlapEnd - startDate) / DAY_MS) + 1) / 365;
+  return valueAfterYears(principal, ratePct, to, periodsPerYear) - valueAfterYears(principal, ratePct, from, periodsPerYear);
+};
+
+// Estimated total value at maturity — shown in the form as a sanity check against
+// the maturity amount printed on the receipt/certificate.
+export const estimateMaturityValue = (principal, ratePct, startDate, endDate, periodsPerYear = 0) => {
+  if (!principal || !ratePct || !startDate || !endDate || endDate <= startDate) return null;
+  const years = (endDate - startDate) / DAY_MS / 365;
+  return valueAfterYears(principal, ratePct, years, periodsPerYear);
 };
 
 // India's equity/equity-fund LTCG threshold: holding period of 12 months or more.
-export const classifyGain = (purchaseDate, saleDate) => {
+// Debt-category funds (units bought on/after 1 Apr 2023) are taxed at slab rate with
+// no STCG/LTCG split, so they're classified 'SLAB'.
+export const classifyGain = (purchaseDate, saleDate, fundCategory = 'equity') => {
+  if (fundCategory === 'debt') return 'SLAB';
   const days = Math.round((saleDate - purchaseDate) / DAY_MS);
   return days >= 365 ? 'LTCG' : 'STCG';
 };

@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import { PiggyBank, CalendarClock, TrendingUp, LineChart } from 'lucide-react';
 import { safeGetDate } from '../../../lib/utils';
+import { isActiveHolding } from '../constants';
 
 const InvestmentStats = ({ investments }) => {
   const stats = useMemo(() => {
-    const validAmounts = investments.filter(inv => typeof inv.amount === 'number' && !isNaN(inv.amount));
+    // Only live holdings count: matured/closed/renewed deposits and sold holdings are history.
+    const live = investments.filter(isActiveHolding);
+    const validAmounts = live.filter(inv => typeof inv.amount === 'number' && !isNaN(inv.amount));
     const totalInvested = validAmounts.reduce((sum, inv) => sum + inv.amount, 0);
-    const undecryptableCount = investments.filter(inv => inv.amount === null).length;
+    const undecryptableCount = live.filter(inv => inv.amount === null).length;
 
     const now = new Date();
     const in30 = new Date(now);
@@ -14,7 +17,7 @@ const InvestmentStats = ({ investments }) => {
     const in90 = new Date(now);
     in90.setDate(in90.getDate() + 90);
 
-    const maturingWithin = (limit) => investments.filter(inv => {
+    const maturingWithin = (limit) => live.filter(inv => {
       const d = safeGetDate(inv.maturityDate);
       return d && d >= now && d <= limit;
     }).length;
@@ -22,8 +25,8 @@ const InvestmentStats = ({ investments }) => {
     // Unrealized gain/loss across active market-linked holdings that have a
     // Current Value entered — sold holdings are excluded since their gain is
     // already realized (see the Tax Summary tab), not part of "current" portfolio value.
-    const tracked = investments.filter(inv =>
-      inv.status !== 'sold' && typeof inv.amount === 'number' && typeof inv.currentValue === 'number'
+    const tracked = live.filter(inv =>
+       typeof inv.amount === 'number' && typeof inv.currentValue === 'number'
     );
     const trackedInvested = tracked.reduce((sum, inv) => sum + inv.amount, 0);
     const trackedCurrentValue = tracked.reduce((sum, inv) => sum + inv.currentValue, 0);
@@ -46,7 +49,7 @@ const InvestmentStats = ({ investments }) => {
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
         <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><PiggyBank size={22} /></div>
         <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Invested</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Invested (Active)</p>
           <p className="text-xl font-bold text-slate-800">₹{stats.totalInvested.toLocaleString('en-IN')}</p>
           {stats.undecryptableCount > 0 && (
             <p className="text-[11px] font-medium text-amber-600 mt-0.5">

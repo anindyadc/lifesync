@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Edit, Trash2, PiggyBank, CalendarDays, AlertTriangle, Search, Banknote, RotateCcw } from 'lucide-react';
+import { Edit, Trash2, PiggyBank, CalendarDays, AlertTriangle, Search, Banknote, RotateCcw, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import CustomAlertDialog from '../../../components/AlertDialog';
 import SellInvestmentModal from './SellInvestmentModal';
-import { MARKET_LINKED_TYPES } from '../constants';
+import CloseDepositModal from './CloseDepositModal';
+import { safeGetDate } from '../../../lib/utils';
+import { MARKET_LINKED_TYPES, FIXED_RETURN_TYPES, STATUS_LABELS, isActiveHolding, maskAccountNumber } from '../constants';
 
 const gainLoss = (invested, compareValue) => {
   if (typeof invested !== 'number' || typeof compareValue !== 'number') return null;
@@ -27,6 +29,16 @@ const GainLossLine = ({ investment }) => {
 
 const StatusCell = ({ investment }) => {
   if (!MARKET_LINKED_TYPES.includes(investment.type)) {
+    if (!isActiveHolding(investment)) {
+      return (
+        <div className="text-sm">
+          <span className="inline-flex items-center text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{STATUS_LABELS[investment.status] || 'Closed'}</span>
+          {investment.closedDate && <div className="text-slate-500 mt-1">{investment.closedDate}</div>}
+        </div>
+      );
+    }
+    const mat = safeGetDate(investment.maturityDate);
+    const overdue = mat && mat < new Date();
     return (
       <div className="text-sm text-slate-500 flex items-center gap-1">
         <div>
@@ -36,6 +48,9 @@ const StatusCell = ({ investment }) => {
           </div>
           {typeof investment.maturityAmount === 'number' && (
             <div className="text-xs font-medium text-emerald-600 mt-0.5">Matures at ₹{investment.maturityAmount.toLocaleString('en-IN')}</div>
+          )}
+          {overdue && FIXED_RETURN_TYPES.includes(investment.type) && (
+            <div className="text-[11px] font-semibold text-amber-600 mt-0.5">Past maturity — mark as closed</div>
           )}
         </div>
       </div>
@@ -59,16 +74,29 @@ const StatusCell = ({ investment }) => {
   );
 };
 
-const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => {
+const AccountNumber = ({ value }) => {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+      A/c: <span className="font-mono">{shown ? value : maskAccountNumber(value)}</span>
+      <button type="button" onClick={() => setShown(s => !s)} aria-label={shown ? 'Hide account number' : 'Show account number'} className="text-slate-400 hover:text-slate-600">
+        {shown ? <EyeOff size={12} /> : <Eye size={12} />}
+      </button>
+    </div>
+  );
+};
+
+const InvestmentList = ({ investments, onEdit, onDelete, onSell, onClose, onReopen }) => {
   const [search, setSearch] = useState('');
   const [holderFilter, setHolderFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sellTarget, setSellTarget] = useState(null);
+  const [closeTarget, setCloseTarget] = useState(null);
 
   const uniqueHolders = useMemo(() => [...new Set(investments.map(inv => inv.holder).filter(Boolean))], [investments]);
   const uniqueTypes = useMemo(() => [...new Set(investments.map(inv => inv.type).filter(Boolean))], [investments]);
-  const hasMarketLinked = useMemo(() => investments.some(inv => MARKET_LINKED_TYPES.includes(inv.type)), [investments]);
+  const hasClosable = useMemo(() => investments.some(inv => MARKET_LINKED_TYPES.includes(inv.type) || FIXED_RETURN_TYPES.includes(inv.type)), [investments]);
 
   const filteredInvestments = useMemo(() => {
     return investments.filter(inv => {
@@ -81,7 +109,7 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
       const matchesHolder = holderFilter === 'all' || inv.holder === holderFilter;
       const matchesType = typeFilter === 'all' || inv.type === typeFilter;
       const matchesStatus = statusFilter === 'all' ||
-        (statusFilter === 'sold' ? inv.status === 'sold' : inv.status !== 'sold');
+        (statusFilter === 'closed' ? !isActiveHolding(inv) : isActiveHolding(inv));
       return matchesSearch && matchesHolder && matchesType && matchesStatus;
     });
   }, [investments, search, holderFilter, typeFilter, statusFilter]);
@@ -125,15 +153,15 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
           <option value="all">All Types</option>
           {uniqueTypes.map(type => <option key={type} value={type}>{type}</option>)}
         </select>
-        {hasMarketLinked && (
+        {hasClosable && (
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
           >
-            <option value="all">Active + Sold</option>
+            <option value="all">Active + Closed</option>
             <option value="active">Active Only</option>
-            <option value="sold">Sold Only</option>
+            <option value="closed">Sold / Closed Only</option>
           </select>
         )}
       </div>
@@ -165,7 +193,8 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-slate-900">{investment.name}</div>
-                  {investment.accountNumber && <div className="text-xs text-slate-500 mt-0.5">A/c: {investment.accountNumber}</div>}
+                  {investment.accountNumber && <AccountNumber value={investment.accountNumber} />}
+                  {investment.nominee && <div className="text-xs text-slate-400 mt-0.5">Nominee: {investment.nominee}{investment.nomineeRelation ? ` (${investment.nomineeRelation})` : ''}</div>}
                   {investment.details && <div className="text-xs text-slate-400 mt-1">{investment.details}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -193,7 +222,12 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
                         <Banknote size={18} />
                       </button>
                     )}
-                    {investment.status === 'sold' && (
+                    {FIXED_RETURN_TYPES.includes(investment.type) && isActiveHolding(investment) && (
+                      <button onClick={() => setCloseTarget(investment)} aria-label="Mark deposit matured or closed" title="Mark matured / closed" className="text-emerald-600 hover:text-emerald-900 p-2 rounded-full hover:bg-emerald-50">
+                        <CheckCircle2 size={18} />
+                      </button>
+                    )}
+                    {!isActiveHolding(investment) && (
                       <button onClick={() => onReopen(investment.id)} aria-label="Reopen investment" title="Reopen (undo sale)" className="text-slate-500 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100">
                         <RotateCcw size={18} />
                       </button>
@@ -211,6 +245,17 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onReopen }) => 
           </tbody>
         </table>
       </div>
+
+      {closeTarget && (
+        <CloseDepositModal
+          investment={closeTarget}
+          onCancel={() => setCloseTarget(null)}
+          onConfirm={async (data) => {
+            await onClose(closeTarget.id, data);
+            setCloseTarget(null);
+          }}
+        />
+      )}
 
       {sellTarget && (
         <SellInvestmentModal

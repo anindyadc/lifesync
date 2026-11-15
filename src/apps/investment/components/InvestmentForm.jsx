@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
-import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, FIXED_RETURN_TYPES, POST_OFFICE_TYPES, POST_OFFICE_NAME, ACCOUNT_NUMBER_TYPES, SIP_FREQUENCIES } from '../constants';
+import { safeGetDate } from '../../../lib/utils';
+import { estimateMaturityValue } from '../lib/financialYear';
+import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, FIXED_RETURN_TYPES, POST_OFFICE_TYPES, POST_OFFICE_NAME, ACCOUNT_NUMBER_TYPES, SIP_FREQUENCIES, FUND_CATEGORIES, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING, NOMINEE_RELATIONS } from '../constants';
 
 const emptyFormData = {
   holder: 'Self',
@@ -11,6 +13,10 @@ const emptyFormData = {
   maturityDate: '',
   maturityAmount: '',
   accountNumber: '',
+  compounding: '',
+  fundCategory: 'equity',
+  nominee: '',
+  nomineeRelation: '',
   details: '',
   investmentDate: '',
   interestRate: '',
@@ -43,15 +49,41 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     sipAmount: initialData.sipAmount || '',
     maturityAmount: initialData.maturityAmount || '',
     accountNumber: initialData.accountNumber || '',
+    compounding: initialData.compounding || '',
+    fundCategory: initialData.fundCategory || 'equity',
+    nominee: initialData.nominee || '',
+    nomineeRelation: initialData.nomineeRelation || '',
   } : emptyFormData);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [tenureValue, setTenureValue] = useState('');
+  const [tenureUnit, setTenureUnit] = useState('years');
 
   const isMarketLinked = MARKET_LINKED_TYPES.includes(formData.type);
   const isInterestBearing = INTEREST_BEARING_TYPES.includes(formData.type);
   const isFixedReturn = FIXED_RETURN_TYPES.includes(formData.type);
   const isPostOffice = POST_OFFICE_TYPES.includes(formData.type);
   const hasAccountNumber = ACCOUNT_NUMBER_TYPES.includes(formData.type);
+  const effectiveCompounding = formData.compounding || DEFAULT_COMPOUNDING[formData.type] || 'simple';
+  const compoundingN = COMPOUNDING_OPTIONS.find(o => o.value === effectiveCompounding)?.n ?? 0;
+  const estimatedMaturity = isFixedReturn
+    ? estimateMaturityValue(Number(formData.amount), Number(formData.interestRate), safeGetDate(formData.investmentDate), safeGetDate(formData.maturityDate), compoundingN)
+    : null;
+
+  const applyTenure = () => {
+    const start = safeGetDate(formData.investmentDate);
+    const n = Number(tenureValue);
+    if (!start || !n || n <= 0) {
+      setError('Enter the investment date and a tenure first.');
+      return;
+    }
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + (tenureUnit === 'years' ? Math.round(n * 12) : Math.round(n)));
+    const iso = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+    setError('');
+    setFormData(prev => ({ ...prev, maturityDate: iso }));
+  };
+
   const isSip = isMarketLinked && formData.investmentMode === 'sip';
 
   const handleSubmit = async (e) => {
@@ -64,6 +96,14 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     if (!isMarketLinked && !formData.maturityDate) {
       setError('Maturity date is required.');
       return;
+    }
+    if (!isMarketLinked && formData.investmentDate && formData.maturityDate) {
+      const s = safeGetDate(formData.investmentDate);
+      const m = safeGetDate(formData.maturityDate);
+      if (s && m && m <= s) {
+        setError('Maturity date must be after the investment date.');
+        return;
+      }
     }
     if (formData.maturityAmount !== '' && (isNaN(Number(formData.maturityAmount)) || Number(formData.maturityAmount) <= 0)) {
       setError('Maturity amount must be greater than 0.');
@@ -89,6 +129,10 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
         maturityDate: isMarketLinked ? '' : formData.maturityDate,
         investmentDate: (isMarketLinked || isInterestBearing) ? formData.investmentDate : (formData.investmentDate || ''),
         maturityAmount: isFixedReturn ? formData.maturityAmount : '',
+        compounding: isInterestBearing ? formData.compounding : '',
+        fundCategory: formData.type === 'Mutual Fund' ? formData.fundCategory : '',
+        nominee: formData.nominee.trim(),
+        nomineeRelation: formData.nominee.trim() ? formData.nomineeRelation : '',
         accountNumber: hasAccountNumber ? formData.accountNumber.trim() : '',
         interestRate: isInterestBearing ? formData.interestRate : '',
         investmentMode: isMarketLinked ? formData.investmentMode : '',
@@ -148,6 +192,16 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             </Select>
           </FormGroup>
 
+          {formData.type === 'Mutual Fund' && (
+            <FormGroup>
+              <Label htmlFor="fundCategory">Fund Category</Label>
+              <Select id="fundCategory" value={formData.fundCategory} onChange={e => setFormData({...formData, fundCategory: e.target.value})}>
+                {FUND_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </Select>
+              <p className="text-xs text-slate-400 mt-1">Debt funds are taxed at your slab rate (no long-term benefit) for units bought on/after 1 Apr 2023.</p>
+            </FormGroup>
+          )}
+
           <FormGroup>
             <Label htmlFor="name">{isPostOffice ? 'Institution' : formData.type === 'FD' ? 'Bank Name' : 'Investment Name / Bank'}</Label>
             <Input
@@ -202,7 +256,17 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 value={formData.interestRate}
                 onChange={e => setFormData({...formData, interestRate: e.target.value})}
               />
-              <p className="text-xs text-slate-400 mt-1">Used by Tax Summary to estimate interest income per financial year (simple interest).</p>
+              <p className="text-xs text-slate-400 mt-1">Used by Tax Summary to estimate interest income per financial year.</p>
+            </FormGroup>
+          )}
+
+          {isInterestBearing && (
+            <FormGroup>
+              <Label htmlFor="compounding">Interest Compounding</Label>
+              <Select id="compounding" value={effectiveCompounding} onChange={e => setFormData({...formData, compounding: e.target.value})}>
+                {COMPOUNDING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+              <p className="text-xs text-slate-400 mt-1">Defaults: FD and Post Office TD quarterly, NSC yearly. Check your receipt.</p>
             </FormGroup>
           )}
 
@@ -324,6 +388,19 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 value={formData.maturityDate}
                 onChange={e => setFormData({...formData, maturityDate: e.target.value})}
               />
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-slate-500">or set from tenure:</span>
+                <input
+                  type="number" min="0" step="0.5" aria-label="Tenure"
+                  value={tenureValue} onChange={e => setTenureValue(e.target.value)}
+                  className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-sm"
+                />
+                <select aria-label="Tenure unit" value={tenureUnit} onChange={e => setTenureUnit(e.target.value)} className="px-2 py-1 border border-slate-200 rounded-lg text-sm">
+                  <option value="years">years</option>
+                  <option value="months">months</option>
+                </select>
+                <button type="button" onClick={applyTenure} className="text-xs font-medium text-indigo-600 hover:underline">Apply</button>
+              </div>
             </FormGroup>
           )}
 
@@ -341,8 +418,29 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 onChange={e => setFormData({...formData, maturityAmount: e.target.value})}
               />
               <p className="text-xs text-slate-400 mt-1">The promised payout at maturity, as stated on the receipt/certificate.</p>
+              {estimatedMaturity && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Estimated from rate &amp; compounding: ≈ ₹{Math.round(estimatedMaturity).toLocaleString('en-IN')}
+                  {formData.maturityAmount && Math.abs(Number(formData.maturityAmount) - estimatedMaturity) / estimatedMaturity > 0.02 &&
+                    <span className="text-amber-600"> — differs from your entry by over 2%; double-check the rate, dates or amount.</span>}
+                </p>
+              )}
             </FormGroup>
           )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormGroup>
+              <Label htmlFor="nominee">Nominee (optional)</Label>
+              <Input id="nominee" type="text" placeholder="Nominee name" value={formData.nominee} onChange={e => setFormData({...formData, nominee: e.target.value})} />
+            </FormGroup>
+            <FormGroup>
+              <Label htmlFor="nomineeRelation">Relationship</Label>
+              <Select id="nomineeRelation" value={formData.nomineeRelation} disabled={!formData.nominee.trim()} onChange={e => setFormData({...formData, nomineeRelation: e.target.value})}>
+                <option value="">Select…</option>
+                {NOMINEE_RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </Select>
+            </FormGroup>
+          </div>
 
           <FormGroup>
             <Label htmlFor="details">Additional Details (Optional)</Label>

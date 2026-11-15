@@ -12,7 +12,7 @@ const InvestmentsApp = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
   const [activeTab, setActiveTab] = useState('investment'); // 'investment', 'calendar', 'tax'
-  const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment, sellInvestment, reopenInvestment } = useInvestments(user.uid);
+  const { investments, loading, error, addInvestment, updateInvestment, deleteInvestment, sellInvestment, closeInvestment, reopenInvestment } = useInvestments(user.uid);
   const { exportPDF, exportCSV, exportTaxCSV } = useInvestmentExport(investments);
 
   const handleSave = async (investmentData) => {
@@ -115,6 +115,7 @@ const InvestmentsApp = ({ user }) => {
                 onEdit={handleEdit}
                 onDelete={deleteInvestment}
                 onSell={sellInvestment}
+                onClose={closeInvestment}
                 onReopen={reopenInvestment}
               />
             </div>

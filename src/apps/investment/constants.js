@@ -17,3 +17,37 @@ export const POST_OFFICE_NAME = 'Post Office';
 // Types that carry an account / certificate number.
 export const ACCOUNT_NUMBER_TYPES = ['FD', 'TD', 'NSC'];
 export const SIP_FREQUENCIES = ['monthly', 'weekly', 'quarterly'];
+
+// Lifecycle for fixed-return holdings (FD/TD/NSC). Market-linked ones use 'sold'.
+export const CLOSED_STATUSES = ['sold', 'matured', 'closed', 'renewed'];
+export const DEPOSIT_CLOSE_OUTCOMES = [
+  { value: 'matured', label: 'Matured (paid out)' },
+  { value: 'renewed', label: 'Renewed / rolled over' },
+  { value: 'closed', label: 'Closed early (premature)' },
+];
+export const STATUS_LABELS = { sold: 'Sold', matured: 'Matured', closed: 'Closed early', renewed: 'Renewed' };
+export const isActiveHolding = (inv) => !CLOSED_STATUSES.includes(inv.status);
+
+// Mutual-fund category drives capital-gains classification. Since 1 Apr 2023,
+// debt-fund gains are taxed at the holder's slab rate regardless of holding period.
+export const FUND_CATEGORIES = [
+  { value: 'equity', label: 'Equity / Equity-oriented (incl. ELSS)' },
+  { value: 'debt', label: 'Debt / Liquid / Other specified' },
+];
+
+// Compounding schedule for fixed-return interest estimates.
+export const COMPOUNDING_OPTIONS = [
+  { value: 'quarterly', label: 'Quarterly', n: 4 },
+  { value: 'half-yearly', label: 'Half-yearly', n: 2 },
+  { value: 'yearly', label: 'Yearly', n: 1 },
+  { value: 'monthly', label: 'Monthly', n: 12 },
+  { value: 'simple', label: 'Simple (no compounding)', n: 0 },
+];
+export const DEFAULT_COMPOUNDING = { FD: 'quarterly', TD: 'quarterly', NSC: 'yearly' };
+export const NOMINEE_RELATIONS = ['Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Sibling', 'Other'];
+
+export const maskAccountNumber = (value) => {
+  if (!value) return '';
+  const s = String(value);
+  return s.length <= 4 ? s : `${'X'.repeat(Math.min(s.length - 4, 8))}${s.slice(-4)}`;
+};

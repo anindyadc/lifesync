@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, FileText, Landmark, TrendingUp, TrendingDown } from 'lucide-react';
 import { safeGetDate } from '../../../lib/utils';
-import { MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES } from '../constants';
+import { MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING } from '../constants';
 import { getFYLabel, getCurrentFYLabel, fyRangeBetween, fdInterestForFY, classifyGain } from '../lib/financialYear';
 
 const inr = (n) => `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -34,9 +34,20 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       .filter(inv => inv.interestRate)
       .map(inv => {
         const start = safeGetDate(inv.investmentDate);
-        const end = safeGetDate(inv.maturityDate);
-        const interest = fdInterestForFY(inv.amount, Number(inv.interestRate), start, end, activeFY);
-        return { ...inv, interest };
+        let end = safeGetDate(inv.maturityDate);
+        // Interest stops when a deposit is closed/renewed before its scheduled maturity.
+        const closedAt = inv.status && inv.status !== 'sold' && inv.closedDate ? safeGetDate(inv.closedDate) : null;
+        if (closedAt && closedAt < end) end = closedAt;
+        const comp = inv.compounding || DEFAULT_COMPOUNDING[inv.type] || 'simple';
+        const n = COMPOUNDING_OPTIONS.find(o => o.value === comp)?.n ?? 0;
+        let interest = fdInterestForFY(inv.amount, Number(inv.interestRate), start, end, activeFY, n);
+        // The maturity amount on the receipt is authoritative: scale the estimate so the
+        // deposit's lifetime interest matches it exactly (skipped for early closures).
+        if (typeof inv.maturityAmount === 'number' && inv.maturityAmount > inv.amount && !(closedAt && closedAt < safeGetDate(inv.maturityDate))) {
+          const lifetime = fyRangeBetween(start, end).reduce((sum, fy) => sum + fdInterestForFY(inv.amount, Number(inv.interestRate), start, end, fy, n), 0);
+          if (lifetime > 0) interest *= (inv.maturityAmount - inv.amount) / lifetime;
+        }
+        return { ...inv, interest, scaledToMaturity: typeof inv.maturityAmount === 'number' };
       })
       .filter(row => row.interest > 0);
     return {
@@ -46,7 +57,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
     };
   }, [investments, activeFY]);
 
-  const { gainRows, stcgTotal, ltcgTotal, missingDateCount } = useMemo(() => {
+  const { gainRows, stcgTotal, ltcgTotal, slabTotal, missingDateCount } = useMemo(() => {
     const eligible = investments
       .filter(inv => MARKET_LINKED_TYPES.includes(inv.type) && inv.status === 'sold' && inv.soldDate && typeof inv.amount === 'number' && typeof inv.saleValue === 'number')
       .filter(inv => {
@@ -57,7 +68,8 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       const purchaseDate = safeGetDate(inv.investmentDate);
       const saleDate = safeGetDate(inv.soldDate);
       const gain = inv.saleValue - inv.amount;
-      const classification = purchaseDate ? classifyGain(purchaseDate, saleDate) : null;
+      const category = inv.type === 'Mutual Fund' ? (inv.fundCategory || 'equity') : 'equity';
+      const classification = category === 'debt' ? 'SLAB' : (purchaseDate ? classifyGain(purchaseDate, saleDate, category) : null);
       const holdingDays = purchaseDate ? Math.round((saleDate - purchaseDate) / 86400000) : null;
       return { ...inv, gain, classification, holdingDays };
     });
@@ -65,6 +77,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       gainRows: rows,
       stcgTotal: rows.filter(r => r.classification === 'STCG').reduce((s, r) => s + r.gain, 0),
       ltcgTotal: rows.filter(r => r.classification === 'LTCG').reduce((s, r) => s + r.gain, 0),
+      slabTotal: rows.filter(r => r.classification === 'SLAB').reduce((s, r) => s + r.gain, 0),
       missingDateCount: rows.filter(r => !r.classification).length,
     };
   }, [investments, activeFY]);
@@ -97,9 +110,9 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
       <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex gap-3 text-sm">
         <AlertCircle className="shrink-0 mt-0.5" size={18} />
         <div className="space-y-1">
-          <p><strong>Estimates, not filing-ready figures.</strong> FD/NSC interest uses simple-interest accrual (not your bank's actual compounding) — verify against Form 26AS/AIS or your interest certificate.</p>
+          <p><strong>Estimates, not filing-ready figures.</strong> FD/TD/NSC interest is compounded per the schedule you set (and scaled to the maturity amount when you've entered one) — verify against Form 26AS/AIS or your interest certificate.</p>
           <p>Capital gains treat each holding as a single lot from its Investment/Purchase Date — a SIP's individual installments each have their own real purchase date and would each be classified separately for an exact filing.</p>
-          <p>STCG/LTCG here means "held under/over 12 months," the equity threshold — actual tax rates and exemption limits change by year and aren't applied here. Confirm current rates with a CA before filing.</p>
+          <p>STCG/LTCG here means "held under/over 12 months," the equity threshold. Debt-fund gains are shown as "Slab" (taxed at your income-tax slab rate) and excluded from the STCG/LTCG totals. Tax rates and exemption limits change by year and aren't applied here. Confirm current rates with a CA before filing.</p>
         </div>
       </div>
 
@@ -107,7 +120,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Landmark size={22} /></div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">FD/NSC Interest Income</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">FD/TD/NSC Interest Income</p>
             <p className="text-xl font-bold text-slate-800">{inr(totalInterest)}</p>
           </div>
         </div>
@@ -133,9 +146,9 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-slate-800">FD / NSC Interest — FY {activeFY}</h3>
+          <h3 className="font-bold text-slate-800">FD / TD / NSC Interest — FY {activeFY}</h3>
           {missingRateCount > 0 && (
-            <p className="text-xs text-amber-600 mt-1">{missingRateCount} FD/NSC entr{missingRateCount === 1 ? 'y has' : 'ies have'} no interest rate set, so they're excluded here — edit them to add one.</p>
+            <p className="text-xs text-amber-600 mt-1">{missingRateCount} FD/TD/NSC entr{missingRateCount === 1 ? 'y has' : 'ies have'} no interest rate set, so they're excluded here — edit them to add one.</p>
           )}
         </div>
         <div className="overflow-x-auto">
@@ -151,7 +164,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {interestRows.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">No FD/NSC interest accrued in FY {activeFY}.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-400">No FD/TD/NSC interest accrued in FY {activeFY}.</td></tr>
               ) : interestRows.map(row => (
                 <tr key={row.id}>
                   <td className="px-6 py-3 text-sm text-slate-900">{row.name}</td>
@@ -173,6 +186,10 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
           </table>
         </div>
       </div>
+
+      {slabTotal !== 0 && (
+        <p className="text-sm text-slate-600">Debt-fund gains taxed at slab rate this FY: <strong>{slabTotal < 0 ? '-' : ''}{inr(slabTotal)}</strong></p>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
@@ -209,8 +226,8 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
                   </td>
                   <td className="px-6 py-3 text-sm">
                     {row.classification ? (
-                      <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${row.classification === 'LTCG' ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
-                        {row.classification}
+                      <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${row.classification === 'LTCG' ? 'text-emerald-700 bg-emerald-50' : row.classification === 'SLAB' ? 'text-slate-700 bg-slate-100' : 'text-amber-700 bg-amber-50'}`}>
+                        {row.classification === 'SLAB' ? 'Slab' : row.classification}
                       </span>
                     ) : <span className="text-xs text-slate-400">Unknown</span>}
                   </td>

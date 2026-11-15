@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { safeGetDate } from '../../../lib/utils';
-import { MARKET_LINKED_TYPES } from '../constants';
+import { MARKET_LINKED_TYPES, STATUS_LABELS, isActiveHolding, maskAccountNumber } from '../constants';
 
 const formatDateField = (dateValue) => {
   const d = safeGetDate(dateValue);
@@ -15,7 +15,8 @@ const formatAmount = (amount) => {
 };
 
 const statusLabel = (inv) => {
-  if (!MARKET_LINKED_TYPES.includes(inv.type)) return '-';
+  if (!isActiveHolding(inv)) return STATUS_LABELS[inv.status] || 'Closed';
+  if (!MARKET_LINKED_TYPES.includes(inv.type)) return 'Active';
   return inv.status === 'sold' ? 'Sold' : (inv.investmentMode === 'sip' ? `SIP (${inv.sipFrequency || 'monthly'})` : 'Lump Sum · Active');
 };
 
@@ -65,7 +66,7 @@ export const useInvestmentExport = (investments) => {
         inv.holder || '-',
         inv.type || '-',
         inv.name || '-',
-        inv.accountNumber || '-',
+        maskAccountNumber(inv.accountNumber) || '-',
         formatAmount(inv.amount),
         formatAmount(inv.maturityAmount),
         formatAmount(MARKET_LINKED_TYPES.includes(inv.type) ? (inv.status === 'sold' ? inv.saleValue : inv.currentValue) : undefined),
@@ -82,12 +83,12 @@ export const useInvestmentExport = (investments) => {
   };
 
   const exportCSV = () => {
-    const headers = ['Holder', 'Type', 'Name', 'Account No.', 'Amount', 'Maturity Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Sold Date', 'Sale Value', 'Details'];
+    const headers = ['Holder', 'Type', 'Name', 'Account No.', 'Amount', 'Maturity Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Compounding', 'Nominee', 'Sold / Closed Date', 'Sale Value', 'Details'];
     const rows = investments.map(inv => [
       csvEscape(inv.holder || ''),
       csvEscape(inv.type || ''),
       csvEscape(inv.name || ''),
-      csvEscape(inv.accountNumber || ''),
+      csvEscape(maskAccountNumber(inv.accountNumber)),
       csvEscape(formatAmount(inv.amount)),
       csvEscape(formatAmount(inv.maturityAmount)),
       csvEscape(inv.investmentMode || '-'),
@@ -95,11 +96,13 @@ export const useInvestmentExport = (investments) => {
       csvEscape(formatAmount(inv.purchasePrice)),
       csvEscape(formatAmount(inv.currentValue)),
       csvEscape(gainLossLabel(inv)),
-      csvEscape(inv.status === 'sold' ? 'Sold' : 'Active'),
+      csvEscape(isActiveHolding(inv) ? 'Active' : (STATUS_LABELS[inv.status] || 'Closed')),
       csvEscape(inv.investmentDate ? formatDateField(inv.investmentDate) : '-'),
       csvEscape(inv.maturityDate ? formatDateField(inv.maturityDate) : '-'),
       csvEscape(inv.interestRate ? `${inv.interestRate}%` : '-'),
-      csvEscape(inv.soldDate ? formatDateField(inv.soldDate) : '-'),
+      csvEscape(inv.compounding || '-'),
+      csvEscape(inv.nominee ? `${inv.nominee}${inv.nomineeRelation ? ` (${inv.nomineeRelation})` : ''}` : '-'),
+      csvEscape((inv.soldDate || inv.closedDate) ? formatDateField(inv.soldDate || inv.closedDate) : '-'),
       csvEscape(formatAmount(inv.saleValue)),
       csvEscape(inv.details || '')
     ].join(','));
@@ -113,7 +116,7 @@ export const useInvestmentExport = (investments) => {
     const headers = ['Section', 'Holder', 'Name', 'Principal / Invested', 'Rate / Sale Value', 'Interest / Gain', 'Classification'];
     const rows = [
       ...interestRows.map(row => [
-        csvEscape('FD/NSC Interest'),
+        csvEscape('FD/TD/NSC Interest'),
         csvEscape(row.holder || ''),
         csvEscape(row.name || ''),
         csvEscape(formatAmount(row.amount)),

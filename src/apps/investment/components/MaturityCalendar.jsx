@@ -5,12 +5,13 @@ import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 import { CalendarDays } from 'lucide-react';
 import { safeGetDate } from '../../../lib/utils';
+import { isActiveHolding } from '../constants';
 
 // FullCalendar CSS imports moved to index.css
 import './MaturityCalendar.css'; // Import custom styles
 
 const MaturityCalendar = ({ investments, onEdit }) => {
-  const events = useMemo(() => investments.map(inv => {
+  const events = useMemo(() => investments.filter(isActiveHolding).map(inv => {
     // A missing/malformed maturityDate used to fall back to `new Date()`, making the
     // investment render as maturing *today* instead of being left off the calendar.
     const startDate = safeGetDate(inv.maturityDate);

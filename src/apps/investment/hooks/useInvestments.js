@@ -57,6 +57,21 @@ const decryptOptional = (encryptedValue) => {
   return decryptAmount(encryptedValue);
 };
 
+// Free-text identifiers (account / certificate numbers) — kept separate from the numeric
+// helpers above because parseFloat would corrupt leading zeros and long digit strings.
+const encryptText = (value) => {
+  const s = (value ?? '').toString().trim();
+  return s ? CryptoJS.AES.encrypt(s, SECRET_KEY).toString() : null;
+};
+const decryptText = (encrypted) => {
+  if (!encrypted) return '';
+  try {
+    return CryptoJS.AES.decrypt(encrypted, SECRET_KEY).toString(CryptoJS.enc.Utf8);
+  } catch {
+    return '';
+  }
+};
+
 export const useInvestments = (userId) => {
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +97,8 @@ export const useInvestments = (userId) => {
             sipAmount: decryptOptional(data.sipAmountEncrypted),
             saleValue: decryptOptional(data.saleValueEncrypted),
             maturityAmount: decryptOptional(data.maturityAmountEncrypted),
+            // Falls back to the legacy plain-text field written before encryption.
+            accountNumber: data.accountNumberEncrypted ? decryptText(data.accountNumberEncrypted) : (data.accountNumber || ''),
           };
         });
         fetchedInvestments.sort((a, b) => {
@@ -107,7 +124,7 @@ export const useInvestments = (userId) => {
 
   const addInvestment = useCallback(async (investmentData) => {
     try {
-      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, ...rest } = investmentData;
+      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, accountNumber, ...rest } = investmentData;
       const payload = {
         ...rest,
         amountEncrypted: encryptAmount(amount),
@@ -122,6 +139,8 @@ export const useInvestments = (userId) => {
       if (sa !== null) payload.sipAmountEncrypted = sa;
       const ma = encryptOptional(maturityAmount);
       if (ma !== null) payload.maturityAmountEncrypted = ma;
+      const an = encryptText(accountNumber);
+      if (an) payload.accountNumberEncrypted = an;
 
       await addDoc(collection(db, `artifacts/default-app-id/users/${userId}/investment`), payload);
     } catch (e) {
@@ -132,7 +151,7 @@ export const useInvestments = (userId) => {
 
   const updateInvestment = useCallback(async (id, investmentData) => {
     try {
-      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, ...rest } = investmentData;
+      const { amount, currentValue, purchasePrice, sipAmount, maturityAmount, accountNumber, ...rest } = investmentData;
       const payload = {
         ...rest,
         amountEncrypted: encryptAmount(amount),
@@ -146,6 +165,9 @@ export const useInvestments = (userId) => {
       payload.sipAmountEncrypted = sa !== null ? sa : deleteField();
       const ma = encryptOptional(maturityAmount);
       payload.maturityAmountEncrypted = ma !== null ? ma : deleteField();
+      const an = encryptText(accountNumber);
+      payload.accountNumberEncrypted = an || deleteField();
+      payload.accountNumber = deleteField(); // drop any legacy plain-text copy
 
       const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investment`, id);
       await updateDoc(investmentRef, payload);
@@ -182,12 +204,24 @@ export const useInvestments = (userId) => {
     }
   }, [userId]);
 
+  // Closes a fixed-return holding (FD/TD/NSC): matured, renewed, or closed early.
+  const closeInvestment = useCallback(async (id, { status, closedDate }) => {
+    try {
+      const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investment`, id);
+      await updateDoc(investmentRef, { status, closedDate, updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.error("Error closing investment: ", e);
+      setError("Failed to close investment.");
+    }
+  }, [userId]);
+
   const reopenInvestment = useCallback(async (id) => {
     try {
       const investmentRef = doc(db, `artifacts/default-app-id/users/${userId}/investment`, id);
       await updateDoc(investmentRef, {
         status: 'active',
         soldDate: deleteField(),
+        closedDate: deleteField(),
         saleValueEncrypted: deleteField(),
         updatedAt: serverTimestamp(),
       });
@@ -197,5 +231,5 @@ export const useInvestments = (userId) => {
     }
   }, [userId]);
 
-  return { investments, loading, error, addInvestment, updateInvestment, deleteInvestment, sellInvestment, reopenInvestment };
+  return { investments, loading, error, addInvestment, updateInvestment, deleteInvestment, sellInvestment, closeInvestment, reopenInvestment };
 };

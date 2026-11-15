@@ -4,6 +4,11 @@ import { db } from '../../../lib/firebase';
 
 const APP_ID = 'default-app-id';
 
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 // Clamps a target day-of-month (1-31) to the actual last day of that month, e.g.
@@ -82,12 +87,47 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
     if (!user || !templatesLoaded || !instancesLoaded) return;
 
     const today = new Date();
-    const monthKey = monthKeyOf(today);
+    const currentKey = monthKeyOf(today);
     const todayDay = today.getDate();
 
-    templates.forEach(async (tpl) => {
+    // Catch-up: the app can go unopened for weeks, and instances are only ever created when it
+    // runs, so every month since the bill began (an auto-pay template: since auto-pay was
+    // switched on) is generated here, not just the current one — missed months then show up as
+    // unpaid "Also unpaid" rows to Pay/Skip with the right date. Capped at a year back.
+    const MAX_BACKFILL_MONTHS = 12;
+    const lowerBoundOf = (tpl) => {
+      if (tpl.autoPay && tpl.autoPayStart) return new Date(`${tpl.autoPayStart}T00:00:00`);
+      return tpl.createdAt?.toDate ? tpl.createdAt.toDate() : null;
+    };
+    const monthsFor = (tpl) => {
+      const months = [];
+      const since = lowerBoundOf(tpl);
+      const floor = new Date(today.getFullYear(), today.getMonth() - MAX_BACKFILL_MONTHS, 1);
+      let cursor = since && !isNaN(since)
+        ? new Date(Math.max(new Date(since.getFullYear(), since.getMonth(), 1), floor))
+        : new Date(today.getFullYear(), today.getMonth(), 1);
+      while (cursor.getFullYear() < today.getFullYear() || (cursor.getFullYear() === today.getFullYear() && cursor.getMonth() <= today.getMonth())) {
+        months.push({ year: cursor.getFullYear(), month: cursor.getMonth() });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      }
+      return months;
+    };
+
+    templates.forEach((tpl) => {
       if (!tpl.active) return;
-      if (todayDay < tpl.periodStartDay) return;
+      monthsFor(tpl).forEach(async ({ year, month }) => {
+      const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const isCurrent = monthKey === currentKey;
+      if (isCurrent && todayDay < tpl.periodStartDay) return;
+
+      const startDay = clampDayToMonth(year, month, tpl.periodStartDay);
+      const endDay = clampDayToMonth(year, month, tpl.periodEndDay);
+      // Don't invent bills for periods that ended before this template (or auto-pay) existed.
+      const lowerBound = lowerBoundOf(tpl);
+      if (lowerBound && !isNaN(lowerBound)) {
+        const relevantDay = tpl.autoPay ? startDay : endDay;
+        if (new Date(year, month, relevantDay, 23, 59, 59) < lowerBound) return;
+      }
 
       const dedupeKey = `${tpl.id}|${monthKey}`;
       if (generatingRef.current.has(dedupeKey)) return;
@@ -95,11 +135,6 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
       if (alreadyExists) return;
 
       generatingRef.current.add(dedupeKey);
-
-      const year = today.getFullYear();
-      const month = today.getMonth();
-      const startDay = clampDayToMonth(year, month, tpl.periodStartDay);
-      const endDay = clampDayToMonth(year, month, tpl.periodEndDay);
 
       try {
         // Deterministic doc ID (rather than addDoc's random one) makes this write
@@ -116,6 +151,7 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
           paymentMode: tpl.paymentMode || null,
           paymentAccount: tpl.paymentAccount || null,
           isOfficial: !!tpl.isOfficial,
+          autoPay: !!tpl.autoPay,
           dueStart: Timestamp.fromDate(new Date(year, month, startDay)),
           dueEnd: Timestamp.fromDate(new Date(year, month, endDay)),
           status: 'pending',
@@ -126,6 +162,108 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
       } catch (error) {
         console.error('Fixed Expense Instance Generation Error:', error);
         generatingRef.current.delete(dedupeKey);
+      }
+      });
+    });
+  }, [user, appId, templates, instances, templatesLoaded, instancesLoaded]);
+
+  // Sync: an instance copies its template's due window, amount, label etc. at the moment it's
+  // generated, so editing a template (e.g. moving the due day later) never reached an
+  // already-generated pending instance — it kept its old dueEnd and stayed "Overdue". Keep
+  // every still-pending instance in line with its template; paid/skipped ones are history
+  // and are left alone. The ref stops a repeat write while the snapshot is catching up.
+  const syncedRef = useRef(new Map());
+  useEffect(() => {
+    if (!user || !templatesLoaded || !instancesLoaded) return;
+
+    instances.forEach(async (inst) => {
+      if (inst.status !== 'pending' || !inst.monthKey) return;
+      const tpl = templates.find(t => t.id === inst.templateId);
+      if (!tpl) return;
+
+      const [year, monthNum] = inst.monthKey.split('-').map(Number);
+      const month = monthNum - 1;
+      const dueStart = new Date(year, month, clampDayToMonth(year, month, tpl.periodStartDay));
+      const dueEnd = new Date(year, month, clampDayToMonth(year, month, tpl.periodEndDay));
+
+      const desired = {
+        label: tpl.label,
+        amount: tpl.amount,
+        category: tpl.category,
+        paymentMode: tpl.paymentMode || null,
+        paymentAccount: tpl.paymentAccount || null,
+        isOfficial: !!tpl.isOfficial,
+        autoPay: !!tpl.autoPay,
+      };
+      const sameDay = (ts, d) => ts?.toMillis && ts.toMillis() === d.getTime();
+      const inSync = sameDay(inst.dueStart, dueStart) && sameDay(inst.dueEnd, dueEnd) &&
+        Object.entries(desired).every(([k, v]) => (k === 'autoPay' ? !!inst[k] === v : (inst[k] ?? null) === (v ?? null)));
+      if (inSync) return;
+
+      const key = `${inst.id}|${dueStart.getTime()}|${dueEnd.getTime()}|${JSON.stringify(desired)}`;
+      if (syncedRef.current.get(inst.id) === key) return;
+      syncedRef.current.set(inst.id, key);
+
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseInstances', inst.id), {
+          ...desired,
+          dueStart: Timestamp.fromDate(dueStart),
+          dueEnd: Timestamp.fromDate(dueEnd),
+        });
+      } catch (error) {
+        console.error('Fixed Expense Instance Sync Error:', error);
+        syncedRef.current.delete(inst.id);
+      }
+    });
+  }, [user, appId, templates, instances, templatesLoaded, instancesLoaded]);
+
+  // Auto-pay: once an auto-pay instance's debit day has arrived, record the expense and mark
+  // the bill paid without any click. Runs on mount like the generation above (no cron on the
+  // Spark plan), but dates the expense to the debit day itself, not "today". The expense gets a
+  // deterministic id so two tabs/devices racing here write the same document, not two.
+  const autoPaidRef = useRef(new Set());
+  useEffect(() => {
+    if (!user || !templatesLoaded || !instancesLoaded) return;
+    const now = new Date();
+
+    instances.forEach(async (inst) => {
+      if (inst.status !== 'pending' || !inst.autoPay) return;
+      const tpl = templates.find(t => t.id === inst.templateId);
+      if (!tpl || !tpl.active || !tpl.autoPay) return;
+      const debit = inst.dueStart?.toDate ? inst.dueStart.toDate() : null;
+      if (!debit || debit > now) return;
+      if (tpl.autoPayStart && debit < new Date(`${tpl.autoPayStart}T00:00:00`)) return;
+      if (autoPaidRef.current.has(inst.id)) return;
+      autoPaidRef.current.add(inst.id);
+
+      try {
+        const base = ['artifacts', appId, 'users', user.uid];
+        const expenseRef = doc(db, ...base, 'expenses', `autopay_${inst.id}`);
+        const batch = writeBatch(db);
+        batch.set(expenseRef, {
+          description: inst.label,
+          amount: -Math.abs(Number(inst.amount)),
+          category: inst.category,
+          paymentMode: inst.paymentMode || 'upi',
+          paymentAccount: inst.paymentAccount || '',
+          isOfficial: !!inst.isOfficial,
+          isFixedExpense: true,
+          isAutoPaid: true,
+          fixedExpenseTemplateId: inst.templateId,
+          fixedExpenseInstanceId: inst.id,
+          date: Timestamp.fromDate(new Date(debit.getFullYear(), debit.getMonth(), debit.getDate())),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        batch.update(doc(db, ...base, 'fixedExpenseInstances', inst.id), {
+          status: 'paid',
+          paidExpenseId: expenseRef.id,
+          paidDate: Timestamp.fromDate(new Date(debit.getFullYear(), debit.getMonth(), debit.getDate())),
+        });
+        await batch.commit();
+      } catch (error) {
+        console.error('Fixed Expense Auto-pay Error:', error);
+        autoPaidRef.current.delete(inst.id);
       }
     });
   }, [user, appId, templates, instances, templatesLoaded, instancesLoaded]);
@@ -141,7 +279,9 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
       paymentAccount: data.paymentAccount || null,
       isOfficial: !!data.isOfficial,
       periodStartDay: Number(data.periodStartDay),
-      periodEndDay: Number(data.periodEndDay),
+      periodEndDay: Number(data.autoPay ? data.periodStartDay : data.periodEndDay),
+      autoPay: !!data.autoPay,
+      ...(data.autoPay ? { autoPayStart: todayISO() } : {}),
       active: data.active !== false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -151,6 +291,7 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
   const updateTemplate = async (id, data) => {
     if (!user) return;
     const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'fixedExpenseTemplates', id);
+    const existing = templates.find(t => t.id === id);
     await updateDoc(ref, {
       label: data.label,
       amount: Number(data.amount),
@@ -159,7 +300,10 @@ export const useFixedExpenses = (user, appId = APP_ID) => {
       paymentAccount: data.paymentAccount || null,
       isOfficial: !!data.isOfficial,
       periodStartDay: Number(data.periodStartDay),
-      periodEndDay: Number(data.periodEndDay),
+      periodEndDay: Number(data.autoPay ? data.periodStartDay : data.periodEndDay),
+      autoPay: !!data.autoPay,
+      // Keep the original switch-on date while auto-pay stays on; reset it when turned (back) on.
+      autoPayStart: !data.autoPay ? deleteField() : (existing?.autoPay && existing.autoPayStart ? existing.autoPayStart : todayISO()),
       active: data.active !== false,
       // Re-activating through the edit form also lifts a previous Stop.
       ...(data.active !== false ? { stopped: false, stoppedAt: deleteField() } : {}),

@@ -29,7 +29,9 @@ const computeStatus = (tpl, currentInstance) => {
   if (currentInstance) {
     if (currentInstance.status === 'paid') return 'paid';
     if (currentInstance.status === 'skipped') return 'skipped';
-    return isPastDue(safeGetDate(currentInstance.dueEnd)) ? 'overdue' : 'due';
+    if (isPastDue(safeGetDate(currentInstance.dueEnd))) return 'overdue';
+    const opens = safeGetDate(currentInstance.dueStart);
+    return opens && opens > new Date() ? 'upcoming' : 'due';
   }
   return new Date().getDate() >= tpl.periodStartDay ? 'due' : 'upcoming';
 };
@@ -528,10 +530,11 @@ const FixedExpenseForm = ({ initialData, categories, onSubmit, onCancel }) => {
     periodStartDay: initialData.periodStartDay ?? 1,
     periodEndDay: initialData.periodEndDay ?? 5,
     isOfficial: !!initialData.isOfficial,
+    autoPay: !!initialData.autoPay,
     active: initialData.active !== false,
   } : {
     label: '', amount: '', category: categories[0]?.id || '', paymentMode: 'upi', paymentAccount: '',
-    periodStartDay: 1, periodEndDay: 5, isOfficial: false, active: true,
+    periodStartDay: 1, periodEndDay: 5, isOfficial: false, autoPay: false, active: true,
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -545,12 +548,13 @@ const FixedExpenseForm = ({ initialData, categories, onSubmit, onCancel }) => {
     if (!formData.amount || isNaN(amountNum) || amountNum <= 0) return setError('Enter an amount greater than 0.');
     if (!formData.category) return setError('Pick a category.');
     if (!Number.isInteger(start) || start < 1 || start > 31) return setError('Period start day must be 1–31.');
-    if (!Number.isInteger(end) || end < 1 || end > 31) return setError('Period end day must be 1–31.');
-    if (end < start) return setError('Period end day must be on or after the start day.');
+    if (!formData.autoPay && (!Number.isInteger(end) || end < 1 || end > 31)) return setError('Period end day must be 1–31.');
+    if (!formData.autoPay && end < start) return setError('Period end day must be on or after the start day.');
     setError('');
     setSaving(true);
     try {
-      await onSubmit({ ...formData, periodStartDay: start, periodEndDay: end });
+      // Auto-pay bills debit on one day, so the window collapses to that single day.
+      await onSubmit({ ...formData, periodStartDay: start, periodEndDay: formData.autoPay ? start : end });
     } finally {
       setSaving(false);
     }
@@ -598,13 +602,25 @@ const FixedExpenseForm = ({ initialData, categories, onSubmit, onCancel }) => {
             />
           </div>
 
+          <label className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${formData.autoPay ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+            <input type="checkbox" checked={formData.autoPay} onChange={(e) => setFormData({ ...formData, autoPay: e.target.checked })} className="w-4 h-4 mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 shrink-0" />
+            <span>
+              <span className={`text-xs font-semibold ${formData.autoPay ? 'text-emerald-900' : 'text-slate-700'}`}>Auto-pay (bank / card auto-debits this bill)</span>
+              <span className="block text-[11px] text-slate-400 font-medium mt-0.5">On the debit day, an expense is recorded and the bill is marked paid automatically — the next time you open WalletWatch, dated to the debit day.</span>
+            </span>
+          </label>
+
           <div>
-            <label className={labelClass}>Due window (day of month)</label>
+            <label className={labelClass}>{formData.autoPay ? 'Debit day (day of month)' : 'Due window (day of month)'}</label>
             <div className="flex items-center gap-2">
               <input type="number" min="1" max="31" value={formData.periodStartDay} onChange={(e) => setFormData({ ...formData, periodStartDay: e.target.value })} className={`${fieldClass} w-20`} />
-              <span className="text-slate-300 text-xs">to</span>
-              <input type="number" min="1" max="31" value={formData.periodEndDay} onChange={(e) => setFormData({ ...formData, periodEndDay: e.target.value })} className={`${fieldClass} w-20`} />
-              <span className="text-[11px] text-slate-400 font-medium">Use the same day twice for a single due date</span>
+              {!formData.autoPay && (
+                <>
+                  <span className="text-slate-300 text-xs">to</span>
+                  <input type="number" min="1" max="31" value={formData.periodEndDay} onChange={(e) => setFormData({ ...formData, periodEndDay: e.target.value })} className={`${fieldClass} w-20`} />
+                  <span className="text-[11px] text-slate-400 font-medium">Use the same day twice for a single due date</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -653,7 +669,12 @@ const FixedExpenseForm = ({ initialData, categories, onSubmit, onCancel }) => {
 const MarkPaidForm = ({ context, onSubmit, onCancel }) => {
   const { template, instance } = context;
   const [amount, setAmount] = useState(instance.amount ?? template.amount);
-  const [date, setDate] = useState(toISODate(new Date()));
+  // A bill from an earlier month defaults to the day it fell due (the usual case when catching
+  // up after not opening the app); a current bill defaults to today. Always editable.
+  const [date, setDate] = useState(() => {
+    const due = safeGetDate(instance.dueEnd);
+    return toISODate(due && due < new Date() ? due : new Date());
+  });
   const [paymentMode, setPaymentMode] = useState(instance.paymentMode || 'upi');
   const [paymentAccount, setPaymentAccount] = useState(instance.paymentAccount || '');
   const [saving, setSaving] = useState(false);

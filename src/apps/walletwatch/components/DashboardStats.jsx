@@ -388,9 +388,9 @@ export const GroupSubtotals = ({ expenses, categories, onEdit }) => {
  * until it's actually reimbursed (see the `reimbursementStatus !== 'settled'` filter
  * below), not a bug tied to the month navigator.
  *
- * Capturing the reimbursement: check BOTH "Official" and "Lent to someone?" on an
- * official-trip expense when logging it — this sets `reimbursementStatus: 'pending'` the
- * same way a personal lend does. Once the employer pays it back, hit "Settle" on that
+ * Capturing the reimbursement: ticking "Official" now also ticks "Lent to someone?" (so the
+ * expense is saved with `reimbursementStatus: 'pending'`, the same as a personal lend), and
+ * `getReimbursementStatus` treats any older unsettled official expense as pending too. Once the employer pays it back, hit "Settle" on that
  * transaction from History (same flow as settling a personal lend); the expense flips to
  * `reimbursementStatus: 'settled'` and drops out of this "pending claim" total.
  */
@@ -402,7 +402,7 @@ export const OfficialTripsSummary = ({ allExpenses, categories, onEdit }) => {
     const map = {};
     allExpenses.forEach(e => {
       // An official refund (positive, isRefund) reduces the claim like a negative expense.
-      if (e.isOfficial && (e.amount < 0 || (e.isRefund && e.amount > 0)) && e.reimbursementStatus !== 'settled') {
+      if (e.isOfficial && !e.isNotClaimable && (e.amount < 0 || (e.isRefund && e.amount > 0)) && e.reimbursementStatus !== 'settled') {
         const key = e.group && e.group.trim() ? e.group.trim() : 'Unspecified Trip';
         if (!map[key]) map[key] = { total: 0, items: [] };
         map[key].total += flowValue(e);

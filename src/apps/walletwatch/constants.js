@@ -138,3 +138,38 @@ export const getAvailableTags = (expenses) => {
   });
   return Array.from(tagsSet).sort();
 };
+
+// Groups settled transactions by how each was originally paid (mode + account + UPI app),
+// so a reimbursement for a mixed trip (Card, Kiwi UPI, savings UPI...) records exactly what it
+// covered. Stored on the refund entry as `settledBreakdown` for documentation.
+export const summarizeByFunding = (items) => {
+  const map = new Map();
+  items.forEach(e => {
+    const mode = e.paymentMode || 'other';
+    const account = e.paymentAccount?.trim() || '';
+    const app = e.paymentApp?.trim() || '';
+    const key = `${mode}|${account}|${app}`;
+    const row = map.get(key) || { mode, account, app, amount: 0, count: 0 };
+    row.amount += Math.abs(Number(e.amount) || 0);
+    row.count += 1;
+    map.set(key, row);
+  });
+  return [...map.values()].sort((a, b) => b.amount - a.amount);
+};
+
+export const fundingLabel = (row) => {
+  const modeLabel = PAYMENT_MODES.find(m => m.id === row.mode)?.label || row.mode;
+  return [modeLabel, row.app, row.account].filter(Boolean).join(' · ');
+};
+
+// An official (employer-reimbursed) expense is by definition awaiting reimbursement, so it
+// counts as 'pending' for Settle / Settle All even when it was saved before that rule (or
+// without ticking "Lent to someone?"). Only a real expense qualifies — not a refund or a
+// settlement credit, and not one flagged `isNotClaimable` (official but the employer won't
+// reimburse it). Use this instead of reading `reimbursementStatus` directly wherever
+// "is this awaiting repayment?" matters.
+export const getReimbursementStatus = (e) => {
+  const s = e.reimbursementStatus;
+  if (e.isOfficial && !e.isNotClaimable && (!s || s === 'none') && Number(e.amount) < 0 && !e.isRefund) return 'pending';
+  return s || 'none';
+};

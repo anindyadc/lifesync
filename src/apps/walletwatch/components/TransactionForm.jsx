@@ -3,7 +3,7 @@ import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle
 import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
 // Modular import for local deployment - ensuring single source of truth
-import { PAYMENT_MODES, getAvailableTags } from '../constants';
+import { PAYMENT_MODES, getAvailableTags, getReimbursementStatus, summarizeByFunding, fundingLabel } from '../constants';
 import CategoryPicker from './CategoryPicker';
 
 // Safe arithmetic evaluator for the inline Amount calculator — hand-rolled recursive
@@ -88,7 +88,7 @@ function formatIndianNumber(value) {
  * - Heading: text-[15px] font-semibold text-slate-800
  * - Accent: indigo-600, used consistently for the primary action, selected states, icon
  */
-const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettling, expenses = [] }) => {
+const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettling, settleItems = null, expenses = [] }) => {
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
@@ -100,7 +100,8 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     paymentApp: '',
     date: toISODate(new Date()),
     isReimbursable: false,
-    isOfficial: false
+    isOfficial: false,
+    notClaimable: false
   });
 
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
@@ -164,6 +165,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     return Array.from(set).sort();
   }, [expenses]);
 
+  // What a Settle / Settle All is paying back, grouped by how each item was originally paid.
+  const settleSummary = React.useMemo(() => (settleItems && settleItems.length ? summarizeByFunding(settleItems) : null), [settleItems]);
+
   const handleTagClick = (tag) => {
     const currentTags = formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
     if (!currentTags.includes(tag)) {
@@ -209,8 +213,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         // REFUND entry itself as 'pending' (the "Lent to someone?" checkbox is hidden
         // while isSettling, so the user has no way to see or correct it), making the
         // refund look unsettled and settleable again — a refund of a refund.
-        isReimbursable: !isSettling && initialData.reimbursementStatus === 'pending',
-        isOfficial: !!initialData.isOfficial
+        isReimbursable: !isSettling && getReimbursementStatus(initialData) === 'pending',
+        isOfficial: !!initialData.isOfficial,
+        notClaimable: !!initialData.isNotClaimable
       });
     } else if (categories && categories.length > 0 && !formData.category) {
       setFormData(prev => ({ ...prev, category: categories[0].id }));
@@ -265,7 +270,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     if (trimmedGroup) {
       const groupIsOfficial = expenses.some(e => e.isOfficial && (e.group || '').trim().toLowerCase() === trimmedGroup);
       if (groupIsOfficial && !formData.isOfficial) {
-        setFormData(prev => ({ ...prev, isOfficial: true }));
+        setFormData(prev => ({ ...prev, isOfficial: true, isReimbursable: !prev.notClaimable }));
       }
     }
   }
@@ -289,7 +294,8 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         paymentApp: formData.paymentMode === 'upi' ? formData.paymentApp.trim() : '',
         amount: amountNum,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-        reimbursementStatus: formData.isReimbursable ? 'pending' : 'none'
+        isNotClaimable: formData.isOfficial && formData.notClaimable,
+        reimbursementStatus: formData.isReimbursable && !(formData.isOfficial && formData.notClaimable) ? 'pending' : 'none'
       }, keepOpen);
 
       if (keepOpen) {
@@ -299,7 +305,8 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
           ...prev,
           amount: '',
           description: '',
-          isReimbursable: false,
+          // Back-to-back entries on an official trip should keep defaulting to "claim back".
+          isReimbursable: prev.isOfficial && !prev.notClaimable,
           date: toISODate(new Date()),
         }));
         setSavedCount(c => c + 1);
@@ -528,10 +535,25 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                 </div>
               </div>
 
+              {settleSummary && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-1.5">
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                    Settling {settleItems.length} transaction{settleItems.length !== 1 ? 's' : ''}
+                  </p>
+                  {settleSummary.map(row => (
+                    <div key={`${row.mode}|${row.account}|${row.app}`} className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-600 truncate">{fundingLabel(row)} <span className="text-slate-400 font-medium">· {row.count} item{row.count !== 1 ? 's' : ''}</span></span>
+                      <span className="font-bold text-slate-800 shrink-0 ml-2">₹{row.amount.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-slate-400">These are what the refund covers, saved with it. Below, record where the money was <strong>received</strong>.</p>
+                </div>
+              )}
+
               {/* Mode, Account & Date Row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className={labelClass}>Payment</label>
+                  <label className={labelClass}>{settleItems ? 'Received via' : 'Payment'}</label>
                   <select
                     value={formData.paymentMode}
                     onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
@@ -543,14 +565,14 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                   </select>
                 </div>
                 <div className="relative">
-                  <label className={labelClass}>Account</label>
+                  <label className={labelClass}>{settleItems ? 'Refund account' : 'Account'}</label>
                   <input
                     type="text"
                     value={formData.paymentAccount}
                     onChange={(e) => setFormData({ ...formData, paymentAccount: e.target.value })}
                     onFocus={() => setShowAccountSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowAccountSuggestions(false), 200)}
-                    placeholder="e.g. GPay-300, HDFC"
+                    placeholder={settleItems ? 'Where it was credited, e.g. SBI 8680' : 'e.g. GPay-300, HDFC'}
                     className={fieldClass}
                   />
                   {showAccountSuggestions && availableAccounts.length > 0 && (
@@ -623,7 +645,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                     <input
                       type="checkbox"
                       checked={formData.isReimbursable}
-                      onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked })}
+                      onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked, ...(e.target.checked ? { notClaimable: false } : {}) })}
                       className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 transition-all shrink-0"
                     />
                     <div className="min-w-0">
@@ -648,7 +670,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                     <input
                       type="checkbox"
                       checked={formData.isOfficial}
-                      onChange={(e) => setFormData({ ...formData, isOfficial: e.target.checked })}
+                      onChange={(e) => setFormData({ ...formData, isOfficial: e.target.checked, ...(e.target.checked ? { isReimbursable: !formData.notClaimable } : { notClaimable: false }) })}
                       className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 transition-all shrink-0"
                     />
                     <div className="min-w-0">
@@ -660,10 +682,29 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       <p className={`text-[10px] font-medium leading-tight ${
                         formData.isOfficial ? 'text-blue-600' : 'text-slate-400'
                       }`}>
-                        Employer-reimbursed — kept out of personal reports
+                        Employer-reimbursed — also marked pending return, kept out of personal reports
                       </p>
                     </div>
                   </label>
+
+                  {formData.isOfficial && (
+                    <label className={`sm:col-span-2 flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                      formData.notClaimable ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={formData.notClaimable}
+                        onChange={(e) => setFormData({ ...formData, notClaimable: e.target.checked, ...(e.target.checked ? { isReimbursable: false } : { isReimbursable: true }) })}
+                        className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500/20 transition-all shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className={`block text-xs font-semibold ${formData.notClaimable ? 'text-amber-900' : 'text-slate-700'}`}>Not claimable</span>
+                        <p className={`text-[10px] font-medium leading-tight ${formData.notClaimable ? 'text-amber-700' : 'text-slate-400'}`}>
+                          Official, but the employer won't reimburse it — left out of the pending claim and Settle
+                        </p>
+                      </div>
+                    </label>
+                  )}
                 </div>
               )}
             </div>

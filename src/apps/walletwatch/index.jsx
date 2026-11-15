@@ -17,7 +17,7 @@ import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { useCreditCards } from './hooks/useCreditCards';
 import { useCashBalance } from './hooks/useCashBalance';
-import { getTopLevelCategories, getChildCategories } from './constants';
+import { getTopLevelCategories, getChildCategories, summarizeByFunding } from './constants';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -86,18 +86,22 @@ const WalletWatchApp = ({ user }) => {
   const settleGroupInitialData = useMemo(() => {
     if (!settleGroup) return null;
     const total = settleGroup.items.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
-    const first = settleGroup.items[0] || {};
     return {
       date: new Date(),
       description: `Refund: ${settleGroup.label}`,
       category: 'reimbursement',
       group: settleGroup.label,
       amount: total,
-      paymentMode: first.paymentMode || 'upi',
-      paymentAccount: first.paymentAccount || '',
+      // The refund entry's Payment/Account mean WHERE the reimbursement was received, not how
+      // the trip was paid (items can be mixed Card/UPI), so don't inherit the first item's.
+      paymentMode: 'bank',
+      paymentAccount: '',
       isOfficial: settleGroup.items.every(e => e.isOfficial),
     };
   }, [settleGroup]);
+
+  // The transactions a settle form is paying back (one for a single Settle, many for Settle All).
+  const settleItems = settleGroup ? settleGroup.items : (relatedTxn ? [relatedTxn] : null);
 
   if (loading) {
     return (
@@ -138,6 +142,8 @@ const WalletWatchApp = ({ user }) => {
       // Bulk group-settle links back to every item it covers via `relatedIds` instead
       // of the single-item `relatedId` above — see settleGroup/onSettleGroup.
       ...(settleGroup ? { relatedIds: settleGroup.items.map(i => i.id) } : {}),
+      // Documents which funding sources (card / UPI app / account) this refund covers.
+      ...(!editingId && settleItems ? { settledBreakdown: summarizeByFunding(settleItems) } : {}),
     };
 
     if (editingId) {
@@ -694,6 +700,7 @@ const WalletWatchApp = ({ user }) => {
               categories={categories}
               expenses={allExpenses}
               isSettling={!!relatedTxn || !!settleGroup || !!refundOf}
+              settleItems={editingId ? null : settleItems}
               onSubmit={handleSave}
               onCancel={closeAddModal}
             />

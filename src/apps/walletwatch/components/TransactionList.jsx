@@ -5,7 +5,7 @@ import {
   LayoutGrid, List, Repeat, AlertCircle, Smartphone
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTagColor, safeGetDate } from '../../../lib/utils';
-import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, spendValue, flowValue, getAccountKey, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
+import { PAYMENT_MODES, CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, isSettledSpend, spendValue, flowValue, getAccountKey, getReimbursementStatus, fundingLabel, getAvailableTags, getTopLevelCategories, getChildCategories, categoryMatchesId } from '../constants';
 import { downloadExpensesCSV, downloadExpensesPDF } from '../hooks/useExport';
 
 const VIEW_MODE_KEY = 'walletwatch-transactionlist-view-mode';
@@ -198,7 +198,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
       if (filterCategory && !categoryMatchesId(exp, filterCategory, categories)) return false;
       if (filterScope === 'personal' && exp.isOfficial) return false;
       if (filterScope === 'official' && !exp.isOfficial) return false;
-      if (filterReimbursement && exp.reimbursementStatus !== filterReimbursement) return false;
+      if (filterReimbursement && getReimbursementStatus(exp) !== filterReimbursement) return false;
       if (filterTags.length > 0 && !(exp.tags || []).some(t => filterTags.includes(t))) return false;
       if (filterGroups.length > 0 && !filterGroups.includes(exp.group)) return false;
       if (filterAccounts.length > 0 && !filterAccounts.includes(getAccountKey(exp))) return false;
@@ -465,7 +465,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
           // alike — unlike the `lent`/`official` totals split, this deliberately doesn't
           // care which) can be swept into one bulk Settle All instead of settling each
           // transaction individually.
-          const pendingItems = items.filter(e => e.reimbursementStatus === 'pending');
+          const pendingItems = items.filter(e => getReimbursementStatus(e) === 'pending');
 
           return (
             <div key={name} className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm transition-all duration-300">
@@ -843,7 +843,9 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
  */
 // An expense can be refunded (a return, cancelled order, chargeback) unless it's a lend —
 // lends have their own Settle flow — or already a credit itself.
-const canRefund = (exp) => Number(exp.amount) < 0 && (!exp.reimbursementStatus || exp.reimbursementStatus === 'none');
+// An official expense stays refundable while it awaits reimbursement (a returned ticket nets
+// against the claim via flowValue); a personal lend keeps only its own Settle flow.
+const canRefund = (exp) => Number(exp.amount) < 0 && (!exp.reimbursementStatus || exp.reimbursementStatus === 'none' || (!!exp.isOfficial && exp.reimbursementStatus === 'pending'));
 
 const RefundedChip = ({ amount, size = 'text-[9px]' }) => amount > 0 ? (
   <span className={`${size} bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter`}>Refunded {formatCurrency(amount)}</span>
@@ -879,6 +881,11 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, onR
           <Link2 size={9} /> {relatedLabel}
         </p>
       )}
+      {exp.settledBreakdown?.length > 0 && (
+        <p className="text-[10px] text-slate-400 font-medium leading-snug">
+          Covered: {exp.settledBreakdown.map(r => `${fundingLabel(r)} ₹${Math.round(r.amount).toLocaleString('en-IN')}`).join(' · ')}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-1.5">
         {exp.paymentApp?.trim() && (
@@ -899,15 +906,18 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, onR
             </span>
           );
         })}
-        {exp.reimbursementStatus === 'pending' && (
+        {getReimbursementStatus(exp) === 'pending' && (
           <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Lent</span>
         )}
-        {exp.reimbursementStatus === 'settled' && (
+        {getReimbursementStatus(exp) === 'settled' && (
           <span className="text-[9px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Settled</span>
         )}
         <RefundedChip amount={refundedAmount} />
         {exp.isOfficial && (
           <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Official</span>
+        )}
+        {exp.isOfficial && exp.isNotClaimable && (
+          <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Not claimable</span>
         )}
         {exp.isFixedExpense && (
           <span className="flex items-center gap-0.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">
@@ -918,7 +928,7 @@ const TransactionCard = memo(({ exp, categories, onEdit, onDelete, onSettle, onR
 
       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
         <span className={`font-black text-base ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span>
-        {exp.reimbursementStatus === 'pending' && (
+        {getReimbursementStatus(exp) === 'pending' && (
           <button
             onClick={() => onSettle(exp)}
             className="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 shadow-sm transition-all active:scale-95 text-xs font-bold"
@@ -972,6 +982,11 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, onRe
                 <Link2 size={9} /> {relatedLabel}
               </p>
             )}
+            {exp.settledBreakdown?.length > 0 && (
+              <p className="text-[10px] text-slate-400 font-medium leading-snug mt-0.5 truncate" title={exp.settledBreakdown.map(r => `${fundingLabel(r)} ₹${Math.round(r.amount).toLocaleString('en-IN')}`).join(' · ')}>
+                Covered: {exp.settledBreakdown.map(r => `${fundingLabel(r)} ₹${Math.round(r.amount).toLocaleString('en-IN')}`).join(' · ')}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1004,15 +1019,18 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, onRe
 
         <div className="flex flex-col items-start sm:items-end pl-12 sm:pl-0">
           <span className={`font-black text-sm ${exp.amount < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{formatCurrency(exp.amount)}</span>
-          {exp.reimbursementStatus === 'pending' && (
+          {getReimbursementStatus(exp) === 'pending' && (
             <span className="text-[8px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1 animate-pulse">Lent</span>
           )}
-          {exp.reimbursementStatus === 'settled' && (
+          {getReimbursementStatus(exp) === 'settled' && (
             <span className="text-[8px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Settled</span>
           )}
           <RefundedChip amount={refundedAmount} size="text-[8px] mt-1" />
           {exp.isOfficial && (
             <span className="text-[8px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Official</span>
+          )}
+          {exp.isOfficial && exp.isNotClaimable && (
+            <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">Not claimable</span>
           )}
           {exp.isFixedExpense && (
             <span className="flex items-center gap-0.5 text-[8px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1">
@@ -1022,7 +1040,7 @@ const TransactionRow = memo(({ exp, categories, onEdit, onDelete, onSettle, onRe
         </div>
 
         <div className="flex items-center gap-1 justify-end pl-12 sm:pl-0 shrink-0">
-          {exp.reimbursementStatus === 'pending' && (
+          {getReimbursementStatus(exp) === 'pending' && (
             <button
               onClick={() => onSettle(exp)}
               className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 shadow-sm transition-all active:scale-90"

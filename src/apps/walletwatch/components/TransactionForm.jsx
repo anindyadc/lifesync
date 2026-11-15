@@ -3,7 +3,7 @@ import { Layers, ArrowLeftRight, CreditCard, Type, Tag, ChevronDown, CheckCircle
 import { getTagColor, toISODate, safeGetDate } from '../../../lib/utils';
 
 // Modular import for local deployment - ensuring single source of truth
-import { PAYMENT_MODES, getAvailableTags, getReimbursementStatus, summarizeByFunding, fundingLabel } from '../constants';
+import { PAYMENT_MODES, getAvailableTags, getReimbursementStatus, roundMoney, summarizeByFunding, fundingLabel } from '../constants';
 import CategoryPicker from './CategoryPicker';
 
 // Safe arithmetic evaluator for the inline Amount calculator — hand-rolled recursive
@@ -198,7 +198,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
     if (initialData) {
       const d = safeGetDate(initialData.date);
       setFormData({
-        amount: Math.abs(initialData.amount),
+        amount: roundMoney(Math.abs(initialData.amount)),
         description: initialData.description || '',
         category: initialData.category || '',
         group: initialData.group || '',

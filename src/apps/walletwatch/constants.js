@@ -142,6 +142,10 @@ export const getAvailableTags = (expenses) => {
 // Groups settled transactions by how each was originally paid (mode + account + UPI app),
 // so a reimbursement for a mixed trip (Card, Kiwi UPI, savings UPI...) records exactly what it
 // covered. Stored on the refund entry as `settledBreakdown` for documentation.
+// Rounds to 2 decimals (paise): summing floats like 44489.95 + 0.1 otherwise yields
+// 44489.950000000004, which then leaks into prefilled form fields.
+export const roundMoney = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
 export const summarizeByFunding = (items) => {
   const map = new Map();
   items.forEach(e => {
@@ -154,7 +158,7 @@ export const summarizeByFunding = (items) => {
     row.count += 1;
     map.set(key, row);
   });
-  return [...map.values()].sort((a, b) => b.amount - a.amount);
+  return [...map.values()].map(r => ({ ...r, amount: roundMoney(r.amount) })).sort((a, b) => b.amount - a.amount);
 };
 
 export const fundingLabel = (row) => {

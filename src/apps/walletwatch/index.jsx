@@ -17,7 +17,7 @@ import { useMiscExpenseDraft } from './hooks/useMiscExpenseDraft';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { useCreditCards } from './hooks/useCreditCards';
 import { useCashBalance } from './hooks/useCashBalance';
-import { getTopLevelCategories, getChildCategories, summarizeByFunding } from './constants';
+import { getTopLevelCategories, getChildCategories, summarizeByFunding, roundMoney } from './constants';
 
 const WalletWatchApp = ({ user }) => {
   // Single source of truth for "which month am I looking at" — shared by the Dashboard's
@@ -85,7 +85,7 @@ const WalletWatchApp = ({ user }) => {
   // an official trip would be paid back) rather than requiring the user to re-enter them.
   const settleGroupInitialData = useMemo(() => {
     if (!settleGroup) return null;
-    const total = settleGroup.items.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+    const total = roundMoney(settleGroup.items.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0));
     return {
       date: new Date(),
       description: `Refund: ${settleGroup.label}`,

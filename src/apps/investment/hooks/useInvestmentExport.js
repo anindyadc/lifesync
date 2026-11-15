@@ -83,7 +83,7 @@ export const useInvestmentExport = (investments) => {
   };
 
   const exportCSV = () => {
-    const headers = ['Holder', 'Type', 'Name', 'Account No.', 'Amount', 'Maturity Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Compounding', 'Nominee', 'Sold / Closed Date', 'Sale Value', 'Details'];
+    const headers = ['Holder', 'Type', 'Name', 'Account No.', 'Amount', 'Maturity Amount', 'Investment Mode', 'Units', 'Purchase Price', 'Current Value', 'Gain/Loss', 'Status', 'Investment Date', 'Maturity Date', 'Interest Rate', 'Compounding', '80C', 'Lock-in Ends', 'Nominee', 'Sold / Closed Date', 'Sale Value', 'Details'];
     const rows = investments.map(inv => [
       csvEscape(inv.holder || ''),
       csvEscape(inv.type || ''),
@@ -101,6 +101,8 @@ export const useInvestmentExport = (investments) => {
       csvEscape(inv.maturityDate ? formatDateField(inv.maturityDate) : '-'),
       csvEscape(inv.interestRate ? `${inv.interestRate}%` : '-'),
       csvEscape(inv.compounding || '-'),
+      csvEscape(inv.taxSaving ? 'Yes' : 'No'),
+      csvEscape(inv.lockInEnd ? formatDateField(inv.lockInEnd) : '-'),
       csvEscape(inv.nominee ? `${inv.nominee}${inv.nomineeRelation ? ` (${inv.nomineeRelation})` : ''}` : '-'),
       csvEscape((inv.soldDate || inv.closedDate) ? formatDateField(inv.soldDate || inv.closedDate) : '-'),
       csvEscape(formatAmount(inv.saleValue)),
@@ -112,7 +114,7 @@ export const useInvestmentExport = (investments) => {
 
   // FY-scoped export for the Tax Summary tab: FD/NSC accrued interest rows plus
   // realized-sale capital-gains rows for the selected financial year.
-  const exportTaxCSV = (fyLabel, interestRows, gainRows) => {
+  const exportTaxCSV = (fyLabel, interestRows, gainRows, c80Rows = []) => {
     const headers = ['Section', 'Holder', 'Name', 'Principal / Invested', 'Rate / Sale Value', 'Interest / Gain', 'Classification'];
     const rows = [
       ...interestRows.map(row => [
@@ -123,6 +125,15 @@ export const useInvestmentExport = (investments) => {
         csvEscape(`${row.interestRate}%`),
         csvEscape(formatAmount(row.interest)),
         csvEscape('Interest Income'),
+      ].join(',')),
+      ...c80Rows.map(row => [
+        csvEscape('Section 80C'),
+        csvEscape(row.holder || ''),
+        csvEscape(row.name || ''),
+        csvEscape(formatAmount(row.amount)),
+        csvEscape(''),
+        csvEscape(formatAmount(row.amount)),
+        csvEscape('80C Eligible Investment'),
       ].join(',')),
       ...gainRows.map(row => [
         csvEscape('Capital Gains'),

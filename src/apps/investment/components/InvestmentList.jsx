@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Edit, Trash2, PiggyBank, CalendarDays, AlertTriangle, Search, Banknote, RotateCcw, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Lock, Edit, Trash2, PiggyBank, CalendarDays, AlertTriangle, Search, Banknote, RotateCcw, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import CustomAlertDialog from '../../../components/AlertDialog';
 import SellInvestmentModal from './SellInvestmentModal';
 import CloseDepositModal from './CloseDepositModal';
@@ -73,6 +73,24 @@ const StatusCell = ({ investment }) => {
     </div>
   );
 };
+
+const isLocked = (inv) => {
+  const d = safeGetDate(inv.lockInEnd);
+  return isActiveHolding(inv) && d && d > new Date();
+};
+
+const LockBadges = ({ investment }) => (
+  <div className="flex flex-wrap gap-1 mt-1">
+    {isLocked(investment) && (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+        <Lock size={10} /> Locked until {investment.lockInEnd}
+      </span>
+    )}
+    {investment.taxSaving && (
+      <span className="inline-flex items-center text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">80C</span>
+    )}
+  </div>
+);
 
 const AccountNumber = ({ value }) => {
   const [shown, setShown] = useState(false);
@@ -193,6 +211,7 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onClose, onReop
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-slate-900">{investment.name}</div>
+                  <LockBadges investment={investment} />
                   {investment.accountNumber && <AccountNumber value={investment.accountNumber} />}
                   {investment.nominee && <div className="text-xs text-slate-400 mt-0.5">Nominee: {investment.nominee}{investment.nomineeRelation ? ` (${investment.nomineeRelation})` : ''}</div>}
                   {investment.details && <div className="text-xs text-slate-400 mt-1">{investment.details}</div>}
@@ -218,7 +237,7 @@ const InvestmentList = ({ investments, onEdit, onDelete, onSell, onClose, onReop
                       <Edit size={18} />
                     </button>
                     {MARKET_LINKED_TYPES.includes(investment.type) && investment.status !== 'sold' && (
-                      <button onClick={() => setSellTarget(investment)} aria-label="Sell or redeem investment" title="Sell / Redeem" className="text-emerald-600 hover:text-emerald-900 p-2 rounded-full hover:bg-emerald-50">
+                      <button onClick={() => setSellTarget(investment)} aria-label="Sell or redeem investment" title={isLocked(investment) ? `Sell / Redeem (locked until ${investment.lockInEnd})` : 'Sell / Redeem'} className="text-emerald-600 hover:text-emerald-900 p-2 rounded-full hover:bg-emerald-50">
                         <Banknote size={18} />
                       </button>
                     )}

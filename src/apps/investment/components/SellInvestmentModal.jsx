@@ -42,6 +42,11 @@ const SellInvestmentModal = ({ investment, onConfirm, onCancel }) => {
         </div>
 
         <div className="p-6">
+          {investment.lockInEnd && new Date(investment.lockInEnd) > new Date() && (
+            <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+              This holding is locked in until {investment.lockInEnd}. Units usually can't be redeemed before then.
+            </p>
+          )}
           <Form id="sell-investment-form" onSubmit={handleSubmit} className="space-y-4">
             <FormGroup>
               <Label htmlFor="soldDate">Sale Date</Label>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, FileText, Landmark, TrendingUp, TrendingDown } from 'lucide-react';
 import { safeGetDate } from '../../../lib/utils';
-import { MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING } from '../constants';
+import { SECTION_80C_LIMIT, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING } from '../constants';
 import { getFYLabel, getCurrentFYLabel, fyRangeBetween, fdInterestForFY, classifyGain } from '../lib/financialYear';
 
 const inr = (n) => `₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -82,7 +82,20 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
     };
   }, [investments, activeFY]);
 
-  const hasAnyData = interestRows.length > 0 || gainRows.length > 0;
+  // Section 80C: counted in the financial year of the investment date, per holder.
+  const { c80Rows, c80ByHolder } = useMemo(() => {
+    const rows = investments
+      .filter(inv => inv.taxSaving && typeof inv.amount === 'number' && inv.investmentDate)
+      .filter(inv => {
+        const d = safeGetDate(inv.investmentDate);
+        return d && getFYLabel(d) === activeFY;
+      });
+    const byHolder = {};
+    rows.forEach(r => { byHolder[r.holder || 'Self'] = (byHolder[r.holder || 'Self'] || 0) + r.amount; });
+    return { c80Rows: rows, c80ByHolder: Object.entries(byHolder) };
+  }, [investments, activeFY]);
+
+  const hasAnyData = interestRows.length > 0 || gainRows.length > 0 || c80Rows.length > 0;
 
   return (
     <div className="space-y-6">
@@ -99,7 +112,7 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
           </select>
         </div>
         <button
-          onClick={() => exportTaxCSV(activeFY, interestRows, gainRows)}
+          onClick={() => exportTaxCSV(activeFY, interestRows, gainRows, c80Rows)}
           disabled={!hasAnyData}
           className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg shadow-sm hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -142,6 +155,47 @@ const TaxSummary = ({ investments, exportTaxCSV }) => {
             <p className="text-xl font-bold text-slate-800">{ltcgTotal < 0 ? '-' : ''}{inr(ltcgTotal)}</p>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <div>
+          <h3 className="font-bold text-slate-800">Section 80C — FY {activeFY}</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Tracks investments flagged 80C-eligible against the ₹{SECTION_80C_LIMIT.toLocaleString('en-IN')} annual limit (old tax regime only —
+            not available under the new regime). EPF, PPF, LIC premiums, tuition fees and home-loan principal also count toward the same limit but aren't tracked here,
+            so treat "remaining" as an upper bound. Interest on NSC for years 1–4 is also deemed reinvested and eligible; that isn't computed here.
+          </p>
+        </div>
+        {c80ByHolder.length === 0 ? (
+          <p className="text-sm text-slate-400">No 80C-eligible investments dated in FY {activeFY}.</p>
+        ) : c80ByHolder.map(([holder, total]) => {
+          const pct = Math.min(100, (total / SECTION_80C_LIMIT) * 100);
+          const over = total > SECTION_80C_LIMIT;
+          return (
+            <div key={holder}>
+              <div className="flex justify-between text-sm">
+                <span className="font-medium text-slate-700">{holder}</span>
+                <span className="text-slate-600">{inr(total)} of {inr(SECTION_80C_LIMIT)}</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                <div className={`h-full rounded-full ${over ? 'bg-amber-500' : 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {over ? `${inr(total - SECTION_80C_LIMIT)} above the limit — the excess isn't deductible.` : `${inr(SECTION_80C_LIMIT - total)} of limit remaining`}
+              </p>
+            </div>
+          );
+        })}
+        {c80Rows.length > 0 && (
+          <ul className="text-sm text-slate-600 divide-y divide-slate-100">
+            {c80Rows.map(r => (
+              <li key={r.id} className="py-1.5 flex justify-between gap-3">
+                <span>{r.type} — {r.name} <span className="text-slate-400">({r.holder})</span></span>
+                <span className="font-medium text-slate-800">{inr(r.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">

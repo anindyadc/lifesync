@@ -37,6 +37,12 @@ const CloseDepositModal = ({ investment, onConfirm, onCancel }) => {
           <button onClick={onCancel} aria-label="Close dialog"><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
         </div>
         <div className="p-6">
+          {investment.lockInEnd && new Date(investment.lockInEnd) > new Date() && (
+            <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+              Locked in until {investment.lockInEnd}. Closing a tax-saver deposit early is generally not permitted, and if it
+              {investment.taxSaving ? ' is' : ' were'} allowed the 80C deduction claimed earlier can be reversed.
+            </p>
+          )}
           <Form id="close-deposit-form" onSubmit={handleSubmit} className="space-y-4">
             <FormGroup>
               <Label htmlFor="closeOutcome">Outcome</Label>

@@ -31,7 +31,8 @@ export const isActiveHolding = (inv) => !CLOSED_STATUSES.includes(inv.status);
 // Mutual-fund category drives capital-gains classification. Since 1 Apr 2023,
 // debt-fund gains are taxed at the holder's slab rate regardless of holding period.
 export const FUND_CATEGORIES = [
-  { value: 'equity', label: 'Equity / Equity-oriented (incl. ELSS)' },
+  { value: 'equity', label: 'Equity / Equity-oriented' },
+  { value: 'elss', label: 'ELSS (tax-saving equity fund)' },
   { value: 'debt', label: 'Debt / Liquid / Other specified' },
 ];
 
@@ -50,4 +51,33 @@ export const maskAccountNumber = (value) => {
   if (!value) return '';
   const s = String(value);
   return s.length <= 4 ? s : `${'X'.repeat(Math.min(s.length - 4, 8))}${s.slice(-4)}`;
+};
+
+// Section 80C (old tax regime only): deduction cap per taxpayer per financial year.
+// Kept here so the yearly Budget check is a one-line change.
+export const SECTION_80C_LIMIT = 150000;
+
+// Standard lock-in / eligibility defaults. All are editable in the form:
+// - NSC: 5-year lock-in, 80C eligible.
+// - ELSS: 3-year lock-in, 80C eligible.
+// - FD / Post Office TD: 80C only when the tenure is 5 years (tax-saver FD / 5-year TD),
+//   with a 5-year lock-in.
+const addYears = (date, years) => {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + years);
+  return d;
+};
+const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// investmentDate / maturityDate are already-resolved Date objects (or null).
+export const getTaxDefaults = ({ type, fundCategory, investmentDate, maturityDate }) => {
+  if (!investmentDate) return { taxSaving: false, lockInEnd: '' };
+  if (type === 'NSC') return { taxSaving: true, lockInEnd: toISO(addYears(investmentDate, 5)) };
+  if (type === 'Mutual Fund' && fundCategory === 'elss') return { taxSaving: true, lockInEnd: toISO(addYears(investmentDate, 3)) };
+  if ((type === 'FD' || type === 'TD') && maturityDate) {
+    const fiveYears = addYears(investmentDate, 5);
+    // A day of slack so a "5-year" deposit ending the day before the anniversary qualifies.
+    if (maturityDate >= new Date(fiveYears.getTime() - 86400000)) return { taxSaving: true, lockInEnd: toISO(fiveYears) };
+  }
+  return { taxSaving: false, lockInEnd: '' };
 };

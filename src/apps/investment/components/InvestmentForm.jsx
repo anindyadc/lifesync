@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Form, FormGroup, Label, Input, Select, Button, Textarea } from '../../../components/Form';
 import { safeGetDate } from '../../../lib/utils';
 import { estimateMaturityValue } from '../lib/financialYear';
-import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, FIXED_RETURN_TYPES, POST_OFFICE_TYPES, POST_OFFICE_NAME, ACCOUNT_NUMBER_TYPES, SIP_FREQUENCIES, FUND_CATEGORIES, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING, NOMINEE_RELATIONS } from '../constants';
+import { INVESTMENT_TYPES, INVESTMENT_HOLDERS, MARKET_LINKED_TYPES, INTEREST_BEARING_TYPES, FIXED_RETURN_TYPES, POST_OFFICE_TYPES, POST_OFFICE_NAME, ACCOUNT_NUMBER_TYPES, SIP_FREQUENCIES, FUND_CATEGORIES, getTaxDefaults, COMPOUNDING_OPTIONS, DEFAULT_COMPOUNDING, NOMINEE_RELATIONS } from '../constants';
 
 const emptyFormData = {
   holder: 'Self',
@@ -17,6 +17,8 @@ const emptyFormData = {
   fundCategory: 'equity',
   nominee: '',
   nomineeRelation: '',
+  taxSaving: false,
+  lockInEnd: '',
   details: '',
   investmentDate: '',
   interestRate: '',
@@ -53,14 +55,34 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     fundCategory: initialData.fundCategory || 'equity',
     nominee: initialData.nominee || '',
     nomineeRelation: initialData.nomineeRelation || '',
+    taxSaving: !!initialData.taxSaving,
+    lockInEnd: initialData.lockInEnd || '',
   } : emptyFormData);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Once the user touches a tax field themselves, stop overwriting it with the standard default.
+  // Records saved before these fields existed are treated as untouched, so editing one
+  // fills in the defaults.
+  const lockManual = useRef(!!initialData?.lockInEnd);
+  const taxManual = useRef(initialData?.taxSaving !== undefined);
   const [tenureValue, setTenureValue] = useState('');
   const [tenureUnit, setTenureUnit] = useState('years');
 
   const isMarketLinked = MARKET_LINKED_TYPES.includes(formData.type);
   const isInterestBearing = INTEREST_BEARING_TYPES.includes(formData.type);
+  const patch = (updates) => setFormData(prev => {
+    const next = { ...prev, ...updates };
+    if (!lockManual.current || !taxManual.current) {
+      const defaults = getTaxDefaults({
+        type: next.type, fundCategory: next.fundCategory,
+        investmentDate: safeGetDate(next.investmentDate), maturityDate: safeGetDate(next.maturityDate),
+      });
+      if (!taxManual.current) next.taxSaving = defaults.taxSaving;
+      if (!lockManual.current) next.lockInEnd = defaults.lockInEnd;
+    }
+    return next;
+  });
+
   const isFixedReturn = FIXED_RETURN_TYPES.includes(formData.type);
   const isPostOffice = POST_OFFICE_TYPES.includes(formData.type);
   const hasAccountNumber = ACCOUNT_NUMBER_TYPES.includes(formData.type);
@@ -81,7 +103,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
     end.setMonth(end.getMonth() + (tenureUnit === 'years' ? Math.round(n * 12) : Math.round(n)));
     const iso = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
     setError('');
-    setFormData(prev => ({ ...prev, maturityDate: iso }));
+    patch({ maturityDate: iso });
   };
 
   const isSip = isMarketLinked && formData.investmentMode === 'sip';
@@ -131,6 +153,8 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
         maturityAmount: isFixedReturn ? formData.maturityAmount : '',
         compounding: isInterestBearing ? formData.compounding : '',
         fundCategory: formData.type === 'Mutual Fund' ? formData.fundCategory : '',
+        taxSaving: !!formData.taxSaving,
+        lockInEnd: formData.lockInEnd || '',
         nominee: formData.nominee.trim(),
         nomineeRelation: formData.nominee.trim() ? formData.nomineeRelation : '',
         accountNumber: hasAccountNumber ? formData.accountNumber.trim() : '',
@@ -184,6 +208,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                   else if (!POST_OFFICE_TYPES.includes(type) && name === POST_OFFICE_NAME) name = '';
                   return { ...prev, type, name };
                 });
+                patch({ type });
               }}
             >
               {INVESTMENT_TYPES.map(type => (
@@ -195,7 +220,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
           {formData.type === 'Mutual Fund' && (
             <FormGroup>
               <Label htmlFor="fundCategory">Fund Category</Label>
-              <Select id="fundCategory" value={formData.fundCategory} onChange={e => setFormData({...formData, fundCategory: e.target.value})}>
+              <Select id="fundCategory" value={formData.fundCategory} onChange={e => patch({ fundCategory: e.target.value })}>
                 {FUND_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </Select>
               <p className="text-xs text-slate-400 mt-1">Debt funds are taxed at your slab rate (no long-term benefit) for units bought on/after 1 Apr 2023.</p>
@@ -367,7 +392,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 type="date"
                 required
                 value={formData.investmentDate}
-                onChange={e => setFormData({...formData, investmentDate: e.target.value})}
+                onChange={e => patch({ investmentDate: e.target.value })}
               />
               {isMarketLinked && (
                 <p className="text-xs text-slate-400 mt-1">
@@ -386,7 +411,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 type="date"
                 required
                 value={formData.maturityDate}
-                onChange={e => setFormData({...formData, maturityDate: e.target.value})}
+                onChange={e => patch({ maturityDate: e.target.value })}
               />
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-xs text-slate-500">or set from tenure:</span>
@@ -427,6 +452,32 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
               )}
             </FormGroup>
           )}
+
+          {!isMarketLinked || formData.type === 'Mutual Fund' ? (
+            <div className="rounded-xl border border-slate-200 p-3 space-y-3">
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox" className="mt-0.5"
+                  checked={formData.taxSaving}
+                  onChange={e => { taxManual.current = true; setFormData(prev => ({ ...prev, taxSaving: e.target.checked })); }}
+                />
+                <span>
+                  Eligible for Section 80C deduction (old tax regime)
+                  <span className="block text-xs text-slate-400">
+                    Auto-set for NSC, ELSS and FD/TD of 5 years or more; you can override it.
+                  </span>
+                </span>
+              </label>
+              <FormGroup>
+                <Label htmlFor="lockInEnd">Lock-in Ends (optional)</Label>
+                <Input
+                  id="lockInEnd" type="date" value={formData.lockInEnd}
+                  onChange={e => { lockManual.current = true; setFormData(prev => ({ ...prev, lockInEnd: e.target.value })); }}
+                />
+                <p className="text-xs text-slate-400 mt-1">Standard: NSC 5 yrs, ELSS 3 yrs, tax-saver FD/TD 5 yrs from the investment date. Editable.</p>
+              </FormGroup>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <FormGroup>

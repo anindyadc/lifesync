@@ -1,0 +1,10 @@
+{
+  "name": "investment-reminders",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone script (run by .github/workflows/investment-alerts.yml) — sends Telegram alerts for upcoming investment maturities and lock-in expiries. Deliberately isolated from the root package.json so firebase-admin never ends up in the Vite app bundle.",
+  "main": "send-alerts.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

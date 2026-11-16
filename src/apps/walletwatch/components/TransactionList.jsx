@@ -625,7 +625,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer max-w-[130px] truncate"
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none cursor-pointer max-w-[48%] sm:max-w-[130px] truncate"
           >
             <option value="">All Categories</option>
             {getTopLevelCategories(categories).map(c => {
@@ -682,7 +682,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
           )}
           <MultiSelectFilter label="Accounts" icon={CreditCard} options={availableAccounts} selected={filterAccounts} onToggle={toggleInArray(setFilterAccounts)} onSetSelected={setFilterAccounts} />
 
-          <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+          <div className="flex items-center gap-1 sm:border-l border-slate-200 sm:pl-2">
             {PAYMENT_MODES.map(mode => {
               const isSelected = filterPaymentModes.includes(mode.id);
               const ModeIcon = mode.icon;
@@ -692,7 +692,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
                   type="button"
                   onClick={() => toggleInArray(setFilterPaymentModes)(mode.id)}
                   title={mode.label}
-                  className={`p-1.5 rounded-lg border transition-colors ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+                  className={`p-2 sm:p-1.5 rounded-lg border transition-colors ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
                 >
                   <ModeIcon size={14} />
                 </button>
@@ -700,14 +700,14 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
             })}
           </div>
 
-          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto sm:border-l border-slate-200 sm:pl-2">
             <Calendar size={13} className="text-slate-400" />
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               aria-label="From date"
-              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none"
+              className="flex-1 sm:flex-none min-w-0 px-2 py-1.5 sm:py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none"
             />
             <span className="text-slate-300 text-xs">–</span>
             <input
@@ -715,7 +715,7 @@ const TransactionList = ({ expenses, categories, onEdit, onDelete, onSettle, onR
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               aria-label="To date"
-              className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none"
+              className="flex-1 sm:flex-none min-w-0 px-2 py-1.5 sm:py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none"
             />
             {dateRangeInvalid && (
               <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500" title="From date is after To date — the range is being ignored">

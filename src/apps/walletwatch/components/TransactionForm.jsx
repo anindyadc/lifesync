@@ -320,11 +320,11 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
   };
 
   const labelClass = "block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1";
-  const fieldClass = "w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none font-medium text-sm transition-all";
+  const fieldClass = "w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none font-medium text-base sm:text-sm transition-all min-w-0";
 
   return (
     <div className="flex flex-col min-h-0 font-sans">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0 bg-white">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0 bg-white">
         <h2 className="text-[15px] font-semibold text-slate-800 flex items-center gap-1.5">
           {isSettling ? (
             <ArrowLeftRight className="text-emerald-500" size={16} />
@@ -334,14 +334,14 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
           {isSettling ? 'Record Refund' : (initialData ? 'Edit Entry' : 'New Transaction')}
         </h2>
         {onCancel && (
-          <button type="button" onClick={onCancel} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
-            <X size={16} />
+          <button type="button" onClick={onCancel} aria-label="Close" className="p-2 -mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+            <X size={18} />
           </button>
         )}
       </div>
 
       <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 sm:px-5 py-4 space-y-4 overscroll-contain">
           {/* Amount — focal field: bigger type, same compact height as other inputs */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -351,9 +351,9 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                 onClick={() => setShowCalculator(v => !v)}
                 aria-label="Toggle calculator"
                 title="Calculator"
-                className={`p-1 rounded-md transition-colors ${showCalculator ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                className={`p-2 sm:p-1 -m-1 rounded-md transition-colors ${showCalculator ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
               >
-                <Calculator size={13} />
+                <Calculator size={16} />
               </button>
             </div>
             <div className="relative">
@@ -369,7 +369,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                   setAmountError('');
                 }}
                 placeholder="0.00"
-                className="w-full pl-7 pr-3 py-2 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all"
+                className="w-full pl-7 pr-3 py-2.5 sm:py-2 text-2xl sm:text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 outline-none transition-all"
                 required
                 autoFocus={!initialData}
               />
@@ -393,7 +393,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       key={key}
                       type="button"
                       onClick={() => handleCalcButton(key)}
-                      className={`py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                      className={`py-2.5 sm:py-1.5 rounded-md text-base sm:text-sm font-semibold transition-colors ${
                         ['/', '*', '-', '+'].includes(key)
                           ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
                           : key === 'C'
@@ -410,14 +410,14 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                     type="button"
                     onClick={() => handleCalcButton('back')}
                     aria-label="Backspace"
-                    className="px-3 py-1.5 rounded-md text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors flex items-center justify-center"
+                    className="px-4 sm:px-3 py-2.5 sm:py-1.5 rounded-md text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors flex items-center justify-center"
                   >
                     <Delete size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={handleUseCalcResult}
-                    className="py-1.5 rounded-md text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                    className="py-2.5 sm:py-1.5 rounded-md text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                   >
                     Use Result
                   </button>
@@ -491,7 +491,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleGroupClick(group)}
-                          className="shrink-0 px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
+                          className="shrink-0 px-2.5 py-2.5 sm:py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
                         >
                           {group}
                         </button>
@@ -524,7 +524,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                             type="button"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => handleTagClick(tag)}
-                            className={`px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${colors.bg} ${colors.text} hover:opacity-80 rounded-md transition-colors`}
+                            className={`px-2.5 py-1.5 sm:px-2 sm:py-0.5 text-[11px] font-semibold uppercase tracking-wide ${colors.bg} ${colors.text} hover:opacity-80 rounded-md transition-colors`}
                           >
                             + {tag}
                           </button>
@@ -585,7 +585,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleAccountClick(account)}
-                          className="shrink-0 px-2.5 py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
+                          className="shrink-0 px-2.5 py-2.5 sm:py-1.5 text-sm font-semibold text-left bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md transition-colors truncate"
                         >
                           {account}
                         </button>
@@ -624,7 +624,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => setFormData({ ...formData, paymentApp: app })}
-                          className={`px-2 py-0.5 text-[11px] font-semibold rounded-md transition-colors ${formData.paymentApp === app ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                          className={`px-2.5 py-1.5 sm:px-2 sm:py-0.5 text-[11px] font-semibold rounded-md transition-colors ${formData.paymentApp === app ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'}`}
                         >
                           {app}
                         </button>
@@ -646,7 +646,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       type="checkbox"
                       checked={formData.isReimbursable}
                       onChange={(e) => setFormData({ ...formData, isReimbursable: e.target.checked, ...(e.target.checked ? { notClaimable: false } : {}) })}
-                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 transition-all shrink-0"
+                      className="w-5 h-5 sm:w-4 sm:h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 transition-all shrink-0"
                     />
                     <div className="min-w-0">
                       <span className={`block text-xs font-semibold ${
@@ -654,7 +654,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       }`}>
                         Lent to someone?
                       </span>
-                      <p className={`text-[10px] font-medium leading-tight ${
+                      <p className={`text-[11px] sm:text-[10px] font-medium leading-tight ${
                         formData.isReimbursable ? 'text-indigo-600' : 'text-slate-400'
                       }`}>
                         Mark as pending return
@@ -671,7 +671,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       type="checkbox"
                       checked={formData.isOfficial}
                       onChange={(e) => setFormData({ ...formData, isOfficial: e.target.checked, ...(e.target.checked ? { isReimbursable: !formData.notClaimable } : { notClaimable: false }) })}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 transition-all shrink-0"
+                      className="w-5 h-5 sm:w-4 sm:h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 transition-all shrink-0"
                     />
                     <div className="min-w-0">
                       <span className={`block text-xs font-semibold ${
@@ -679,7 +679,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                       }`}>
                         Official trip?
                       </span>
-                      <p className={`text-[10px] font-medium leading-tight ${
+                      <p className={`text-[11px] sm:text-[10px] font-medium leading-tight ${
                         formData.isOfficial ? 'text-blue-600' : 'text-slate-400'
                       }`}>
                         Employer-reimbursed — also marked pending return, kept out of personal reports
@@ -695,11 +695,11 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                         type="checkbox"
                         checked={formData.notClaimable}
                         onChange={(e) => setFormData({ ...formData, notClaimable: e.target.checked, ...(e.target.checked ? { isReimbursable: false } : { isReimbursable: true }) })}
-                        className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500/20 transition-all shrink-0"
+                        className="w-5 h-5 sm:w-4 sm:h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500/20 transition-all shrink-0"
                       />
                       <div className="min-w-0">
                         <span className={`block text-xs font-semibold ${formData.notClaimable ? 'text-amber-900' : 'text-slate-700'}`}>Not claimable</span>
-                        <p className={`text-[10px] font-medium leading-tight ${formData.notClaimable ? 'text-amber-700' : 'text-slate-400'}`}>
+                        <p className={`text-[11px] sm:text-[10px] font-medium leading-tight ${formData.notClaimable ? 'text-amber-700' : 'text-slate-400'}`}>
                           Official, but the employer won't reimburse it — left out of the pending claim and Settle
                         </p>
                       </div>
@@ -712,7 +712,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
         </div>
 
         {/* Action Buttons — slim pinned footer, always reachable without scrolling */}
-        <div className="shrink-0 border-t border-slate-100 px-5 py-2.5 space-y-2 bg-white">
+        <div className="shrink-0 border-t border-slate-100 px-4 sm:px-5 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] space-y-2 bg-white">
           {submitError && <p className="text-[11px] font-semibold text-red-500">{submitError}</p>}
           {!initialData && !isSettling ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -720,14 +720,14 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
                 type="button"
                 disabled={saving}
                 onClick={(e) => handleSubmit(e, true)}
-                className="w-full py-2 bg-white border border-indigo-600 text-indigo-600 hover:bg-indigo-50 font-semibold text-sm rounded-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 sm:py-2 bg-white border border-indigo-600 text-indigo-600 hover:bg-indigo-50 font-semibold text-sm rounded-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : 'Save & Add Another'}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : 'Save & Close'}
               </button>
@@ -736,7 +736,7 @@ const TransactionForm = ({ initialData, onSubmit, onCancel, categories, isSettli
             <button
               type="submit"
               disabled={saving}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg shadow-sm active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : (isSettling ? 'Record Refund' : 'Update Record')}
             </button>

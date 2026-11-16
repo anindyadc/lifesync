@@ -31,8 +31,8 @@ const SellInvestmentModal = ({ investment, onConfirm, onCancel }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col rounded-b-none sm:rounded-b-2xl max-h-[92dvh] overflow-y-auto">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <div>
             <h3 className="text-lg font-bold">Sell / Redeem</h3>

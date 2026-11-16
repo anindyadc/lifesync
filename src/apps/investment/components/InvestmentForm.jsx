@@ -177,8 +177,8 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-2xl shrink-0">
+    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[90vh] rounded-b-none sm:rounded-b-2xl">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-600 text-white rounded-xl"><PiggyBank size={18} /></div>
           <div>
@@ -186,10 +186,10 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
             <p className="text-xs text-slate-500">{initialData ? 'Update the details below' : 'Fields marked by the form adapt to the type you pick'}</p>
           </div>
         </div>
-        <button type="button" onClick={onCancel} aria-label="Close form" className="p-1.5 rounded-lg hover:bg-slate-100"><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
+        <button type="button" onClick={onCancel} aria-label="Close form" className="p-2 -mr-1 rounded-lg hover:bg-slate-100"><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
       </div>
 
-      <div className="p-6 overflow-y-auto flex-1">
+      <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
         <Form id="investment-form" onSubmit={handleSubmit} className="space-y-4">
           <SectionTitle>Basics</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -434,9 +434,9 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
                 <input
                   type="number" min="0" step="0.5" aria-label="Tenure"
                   value={tenureValue} onChange={e => setTenureValue(e.target.value)}
-                  className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+                  className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
                 />
-                <select aria-label="Tenure unit" value={tenureUnit} onChange={e => setTenureUnit(e.target.value)} className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500">
+                <select aria-label="Tenure unit" value={tenureUnit} onChange={e => setTenureUnit(e.target.value)} className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500">
                   <option value="years">years</option>
                   <option value="months">months</option>
                 </select>
@@ -528,7 +528,7 @@ const InvestmentForm = ({ initialData, onSubmit, onCancel }) => {
         </Form>
       </div>
 
-      <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-2xl shrink-0">
+      <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-100 flex justify-end gap-3 bg-slate-50 sm:rounded-b-2xl shrink-0">
         <Button type="button" onClick={onCancel} disabled={submitting} className="bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</Button>
         <Button type="submit" form="investment-form" disabled={submitting}>
           {submitting && <Loader2 size={16} className="animate-spin mr-2" />}

@@ -82,3 +82,10 @@
   .maturity-calendar .fc .fc-toolbar { flex-direction: column; align-items: stretch; text-align: center; }
   .maturity-calendar .fc .fc-toolbar-chunk { display: flex; justify-content: center; }
 }
+
+@media (max-width: 639px) {
+  .maturity-calendar .fc .fc-toolbar { gap: 0.5rem; margin-bottom: 0.75rem; }
+  .maturity-calendar .fc .fc-footer-toolbar { margin-top: 0.75rem; margin-bottom: 0; justify-content: center; }
+  .maturity-calendar .fc .fc-toolbar-title { font-size: 1rem; }
+  .maturity-calendar .fc .fc-button { padding: 0.45rem 0.65rem; }
+}

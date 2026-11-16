@@ -512,35 +512,35 @@ const WalletWatchApp = ({ user }) => {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-50 gap-3">
-        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm sm:sticky top-0 z-50 gap-3">
+        <div className="flex gap-1 sm:gap-2 bg-slate-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
           <button
             onClick={() => setView('dashboard')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'dashboard' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 sm:flex-none shrink-0 px-2.5 sm:px-4 py-2 rounded-lg text-[13px] sm:text-sm font-bold transition-all ${view === 'dashboard' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             Dashboard
           </button>
           <button
             onClick={() => setView('history')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 sm:flex-none shrink-0 px-2.5 sm:px-4 py-2 rounded-lg text-[13px] sm:text-sm font-bold transition-all ${view === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             History
           </button>
           <button
             onClick={() => setView('fixed')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'fixed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 sm:flex-none shrink-0 px-2.5 sm:px-4 py-2 rounded-lg text-[13px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'fixed' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <Repeat size={14} /> Fixed
           </button>
           <button
             onClick={() => setView('cards')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 sm:flex-none shrink-0 px-2.5 sm:px-4 py-2 rounded-lg text-[13px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cards' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <CreditCard size={14} /> Cards
           </button>
           <button
             onClick={() => setView('cash')}
-            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cash' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 sm:flex-none shrink-0 px-2.5 sm:px-4 py-2 rounded-lg text-[13px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${view === 'cash' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <Banknote size={14} /> Cash
           </button>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
@@ -18,6 +18,13 @@ const TYPE_COLORS = {
 const DEFAULT_COLOR = '#4f46e5';
 
 const MaturityCalendar = ({ investments, onEdit }) => {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const events = useMemo(() => investments.filter(isActiveHolding).map(inv => {
     // A missing/malformed maturityDate used to fall back to `new Date()`, making the
     // investment render as maturing *today* instead of being left off the calendar.
@@ -50,11 +57,12 @@ const MaturityCalendar = ({ investments, onEdit }) => {
   // FullCalendar options and callbacks
   const calendarOptions = {
     plugins: [dayGridPlugin, listPlugin, interactionPlugin],
-    headerToolbar: {
-      left: 'prev,next today',
-      center: 'title',
-      right: 'dayGridMonth,listYear,listWeek,listDay' // Month view, and list views for Year, Week, Day
-    },
+    // Phones can't fit prev/next + title + four view buttons on one line, so the view
+    // switcher moves to a footer row there.
+    headerToolbar: isMobile
+      ? { left: 'prev,next', center: 'title', right: 'today' }
+      : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listYear,listWeek,listDay' },
+    footerToolbar: isMobile ? { center: 'dayGridMonth,listYear,listWeek,listDay' } : false,
     initialView: 'dayGridMonth',
     editable: false,
     selectable: false,
@@ -94,7 +102,7 @@ const MaturityCalendar = ({ investments, onEdit }) => {
           ))}
         </div>
       )}
-      <div className="h-[640px]">
+      <div className="h-[560px] sm:h-[640px]">
       {events.length > 0 ? (
         <FullCalendar
           {...calendarOptions}

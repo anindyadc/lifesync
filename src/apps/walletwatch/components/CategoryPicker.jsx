@@ -1,7 +1,7 @@
 import { getTopLevelCategories, getChildCategories } from '../constants';
 
 const pillClass = (isSelected, cat) =>
-  `px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors ${
+  `px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg border text-sm sm:text-xs font-semibold transition-colors ${
     isSelected
       ? `${cat.bg || 'bg-indigo-50 text-indigo-700'}`
       : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-300'

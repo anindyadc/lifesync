@@ -91,6 +91,23 @@ const AuthScreen = () => {
   const iconCls = 'text-muted-foreground group-focus-within:text-primary transition-colors mr-3 shrink-0';
   const labelCls = 'block text-sm font-semibold text-foreground mb-1.5';
 
+  const getStrength = (pw) => {
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+    const levels = [
+      { label: 'Too short', bar: 'bg-red-500' },
+      { label: 'Weak', bar: 'bg-red-500' },
+      { label: 'Fair', bar: 'bg-amber-500' },
+      { label: 'Good', bar: 'bg-emerald-500' },
+      { label: 'Strong', bar: 'bg-emerald-600' },
+    ];
+    return { score, ...levels[score] };
+  };
+  const strength = getStrength(password);
+
   const features = [
     { icon: ListChecks, text: 'Plan tasks and track your time' },
     { icon: Wallet, text: 'Understand where your money goes' },
@@ -130,14 +147,39 @@ const AuthScreen = () => {
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center p-6 sm:p-10 -mt-6 lg:mt-0">
-        <div className="w-full max-w-md bg-card lg:bg-transparent rounded-3xl lg:rounded-none shadow-xl lg:shadow-none border lg:border-0 border-border p-6 sm:p-8 lg:p-0">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            {isLogin ? 'Welcome back' : 'Create your account'}
-          </h2>
-          <p className="text-muted-foreground mt-1.5 mb-7">
-            {isLogin ? 'Sign in to continue to your dashboard.' : 'It only takes a minute to get started.'}
-          </p>
+      <div className="relative overflow-hidden flex flex-col items-center justify-center px-4 pb-8 pt-0 sm:p-10 -mt-6 lg:mt-0 bg-muted/40 min-h-[calc(100dvh-14rem)] lg:min-h-screen">
+        {/* Decorative backdrop: dot grid + soft colour glows */}
+        <div aria-hidden="true" className="absolute inset-0 opacity-60 [background-image:radial-gradient(hsl(var(--muted-foreground)/0.25)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
+        <div aria-hidden="true" className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div aria-hidden="true" className="absolute -bottom-24 -left-16 w-72 h-72 rounded-full bg-fuchsia-500/15 blur-3xl" />
+
+        <div className="relative w-full max-w-md bg-card rounded-3xl shadow-2xl shadow-indigo-500/10 border border-border overflow-hidden">
+          <div aria-hidden="true" className="h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500" />
+          <div className="p-6 sm:p-9">
+          {/* Sign in / Sign up switch */}
+          <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 p-1 mb-7 rounded-xl bg-muted">
+            {[{ label: 'Sign In', value: true }, { label: 'Sign Up', value: false }].map((tab) => (
+              <button key={tab.label} type="button" role="tab" aria-selected={isLogin === tab.value}
+                onClick={() => { setIsLogin(tab.value); setError(''); setInfo(''); }}
+                className={`h-10 rounded-lg text-sm font-semibold transition-all ${isLogin === tab.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-4 mb-7">
+            <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              {isLogin ? <Lock size={22} /> : <User size={22} />}
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">
+                {isLogin ? 'Welcome back' : 'Create your account'}
+              </h2>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                {isLogin ? 'Sign in to continue to your dashboard.' : 'It only takes a minute to get started.'}
+              </p>
+            </div>
+          </div>
 
           <form onSubmit={handleAuth} className="space-y-5">
             {error && (
@@ -184,6 +226,16 @@ const AuthScreen = () => {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {!isLogin && password && (
+                <div className="mt-2" aria-live="polite">
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4].map((i) => (
+                      <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= strength.score ? strength.bar : 'bg-muted'}`} />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Password strength: <span className="font-semibold text-foreground">{strength.label}</span></p>
+                </div>
+              )}
             </div>
 
             {isLogin && (
@@ -207,14 +259,13 @@ const AuthScreen = () => {
             </button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <button type="button" onClick={() => { setIsLogin(!isLogin); setError(''); setInfo(''); }}
-              className="text-primary font-bold hover:underline">
-              {isLogin ? 'Sign Up' : 'Sign In'}
-            </button>
-          </p>
+          <div className="mt-7 pt-5 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+            Secured with encrypted authentication
+          </div>
+          </div>
         </div>
+        <p className="relative mt-6 text-xs text-muted-foreground lg:hidden">© {new Date().getFullYear()} LifeSync</p>
       </div>
     </div>
   );

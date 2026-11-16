@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Layers, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Layers, CheckCircle, Eye, EyeOff, Wallet, ListChecks, ShieldCheck, Pill } from 'lucide-react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -11,7 +11,6 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { Form, FormGroup, Label, Input, Button } from './Form';
 
 const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,6 +21,7 @@ const AuthScreen = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const APP_ID = 'default-app-id';
 
@@ -86,128 +86,134 @@ const AuthScreen = () => {
     }
   };
 
+  const fieldWrap = 'group flex items-center w-full px-4 h-12 rounded-xl border border-input bg-background/60 transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15 hover:border-primary/40';
+  const inputCls = 'flex-1 min-w-0 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-base sm:text-sm text-foreground placeholder:text-muted-foreground/60';
+  const iconCls = 'text-muted-foreground group-focus-within:text-primary transition-colors mr-3 shrink-0';
+  const labelCls = 'block text-sm font-semibold text-foreground mb-1.5';
+
+  const features = [
+    { icon: ListChecks, text: 'Plan tasks and track your time' },
+    { icon: Wallet, text: 'Understand where your money goes' },
+    { icon: Pill, text: 'Keep health records in one place' },
+    { icon: ShieldCheck, text: 'Private, secure and synced everywhere' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans text-foreground">
-      <div className="bg-card max-w-md w-full rounded-2xl shadow-lg border border-border overflow-hidden">
-        <div className="bg-primary/90 p-8 text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-full bg-primary opacity-20 transform -skew-y-6 origin-top-left"></div>
-          <div className="relative z-10 text-primary-foreground">
-            <div className="bg-primary-foreground/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-lg">
-              <Layers size={32} />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">LifeSync</h1>
-            <p className="text-primary-foreground/80 mt-2 font-medium">Your All-in-One Hub</p>
+    <div className="min-h-screen bg-background text-foreground font-sans lg:grid lg:grid-cols-2">
+      {/* Brand panel */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white px-6 py-10 lg:p-14 flex flex-col justify-between">
+        <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-32 -right-16 w-96 h-96 rounded-full bg-fuchsia-300/20 blur-3xl" />
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg ring-1 ring-white/30">
+            <Layers size={24} />
           </div>
+          <span className="text-2xl font-bold tracking-tight">LifeSync</span>
         </div>
-        
-        <div className="p-8">
-          <Form onSubmit={handleAuth} className="space-y-5">
+        <div className="relative z-10 mt-8 lg:mt-0">
+          <h1 className="text-3xl lg:text-5xl font-extrabold tracking-tight leading-tight">
+            Your whole life,<br className="hidden lg:block" /> in sync.
+          </h1>
+          <p className="mt-3 text-white/80 text-base lg:text-lg max-w-md">
+            Tasks, money, health and more, together in one simple hub.
+          </p>
+          <ul className="hidden lg:block mt-10 space-y-4">
+            {features.map((f) => { const FeatureIcon = f.icon; const text = f.text; return (
+              <li key={text} className="flex items-center gap-3 text-white/90">
+                <span className="w-9 h-9 rounded-lg bg-white/15 ring-1 ring-white/20 flex items-center justify-center shrink-0"><FeatureIcon size={18} /></span>
+                {text}
+              </li>
+            ); })}
+          </ul>
+        </div>
+        <p className="relative z-10 hidden lg:block text-sm text-white/60">© {new Date().getFullYear()} LifeSync</p>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex items-center justify-center p-6 sm:p-10 -mt-6 lg:mt-0">
+        <div className="w-full max-w-md bg-card lg:bg-transparent rounded-3xl lg:rounded-none shadow-xl lg:shadow-none border lg:border-0 border-border p-6 sm:p-8 lg:p-0">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            {isLogin ? 'Welcome back' : 'Create your account'}
+          </h2>
+          <p className="text-muted-foreground mt-1.5 mb-7">
+            {isLogin ? 'Sign in to continue to your dashboard.' : 'It only takes a minute to get started.'}
+          </p>
+
+          <form onSubmit={handleAuth} className="space-y-5">
             {error && (
-              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg flex items-center gap-2">
-                <AlertCircle size={16} /> {error}
+              <div role="alert" className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" /> {error}
               </div>
             )}
-
             {info && (
-              <div className="p-3 bg-emerald-500/10 text-emerald-600 text-sm rounded-lg flex items-center gap-2">
-                <CheckCircle size={16} /> {info}
+              <div className="p-3 bg-emerald-500/10 text-emerald-600 text-sm rounded-xl flex items-center gap-2">
+                <CheckCircle size={16} className="shrink-0" /> {info}
               </div>
             )}
 
             {!isLogin && (
-              <FormGroup>
-                <Label htmlFor="name">Full Name</Label>
-                <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
-                  <User className="text-muted-foreground mr-3 shrink-0" size={20} />
-                  <Input 
-                    required 
-                    type="text"
-                    id="name" 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)} 
-                    placeholder="Full Name" 
-                    className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
-                  />
+              <div>
+                <label htmlFor="name" className={labelCls}>Full Name</label>
+                <div className={fieldWrap}>
+                  <User className={iconCls} size={18} />
+                  <input required type="text" id="name" autoComplete="name" value={name}
+                    onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" className={inputCls} />
                 </div>
-              </FormGroup>
+              </div>
             )}
-            
-            <FormGroup>
-              <Label htmlFor="email">Email Address</Label>
-              <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
-                <Mail className="text-muted-foreground mr-3 shrink-0" size={20} />
-                <Input 
-                  required 
-                  type="email"
-                  id="email" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  placeholder="Email Address" 
-                  className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
-                />
+
+            <div>
+              <label htmlFor="email" className={labelCls}>Email</label>
+              <div className={fieldWrap}>
+                <Mail className={iconCls} size={18} />
+                <input required type="email" id="email" autoComplete="email" value={email}
+                  onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className={inputCls} />
               </div>
-            </FormGroup>
-            
-            <FormGroup>
-              <Label htmlFor="password">Password</Label>
-              <div className="flex items-center w-full px-3 py-2 border border-input rounded-xl bg-card focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-all">
-                <Lock className="text-muted-foreground mr-3 shrink-0" size={20} />
-                <Input 
-                  required 
-                  type="password"
-                  id="password" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  placeholder="Password" 
-                  className="flex-1 border-none focus:ring-0 px-0 py-0 text-foreground"
-                />
+            </div>
+
+            <div>
+              <label htmlFor="password" className={labelCls}>Password</label>
+              <div className={fieldWrap}>
+                <Lock className={iconCls} size={18} />
+                <input required type={showPassword ? 'text' : 'password'} id="password"
+                  autoComplete={isLogin ? 'current-password' : 'new-password'} value={password}
+                  onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputCls} />
+                <button type="button" onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="ml-2 p-1 text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-            </FormGroup>
+            </div>
 
             {isLogin && (
               <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2 cursor-pointer group">
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-primary border-primary' : 'border-border group-hover:border-primary/50'}`}>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-primary border-primary' : 'border-border group-hover:border-primary/50'}`}>
                     {rememberMe && <CheckCircle size={14} className="text-primary-foreground" />}
-                  </div>
+                  </span>
                   <input type="checkbox" className="sr-only" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                   <span className="text-sm text-muted-foreground font-medium">Remember me</span>
-                </Label>
-                <button type="button" onClick={handleForgotPassword} className="text-sm text-primary font-bold hover:underline">
-                  Forgot Password?
+                </label>
+                <button type="button" onClick={handleForgotPassword} className="text-sm text-primary font-semibold hover:underline">
+                  Forgot password?
                 </button>
               </div>
             )}
 
-            <Button
-              disabled={loading} 
-              className="w-full py-3.5 font-bold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-            >
-              {loading ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <>
-                  {isLogin ? 'Sign In' : 'Create Account'} 
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </Button>
-          </Form>
+            <button type="submit" disabled={loading}
+              className="w-full h-12 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.99] shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-70 flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (<>{isLogin ? 'Sign In' : 'Create Account'} <ArrowRight size={18} /></>)}
+            </button>
+          </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button 
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
-                }} 
-                className="text-primary font-bold hover:underline"
-              >
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </button>
-            </p>
-          </div>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            <button type="button" onClick={() => { setIsLogin(!isLogin); setError(''); setInfo(''); }}
+              className="text-primary font-bold hover:underline">
+              {isLogin ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
         </div>
       </div>
     </div>
